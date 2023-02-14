@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import { ChannelType, GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
@@ -6,15 +7,31 @@ import WebdavFileSystem from "./src/webdav/WebdavFileSystem";
 import ClientFile from "./src/file/ClientFile";
 import ServerFile from "./src/file/ServerFile";
 import VirtualDiscordFileSystem from "./src/webdav/WebdavFileSystem";
-import FileTransformer from "./src/file/FileTransformer";
+
 // https://discord.com/oauth2/authorize?client_id=1074020035716202506&permissions=8&scope=bot%20applications.commands
 
-
 async function main() {
+    dotenv.config();
+
     const token = process.env.BTOKEN;
+    const guildId = process.env.GUILD_ID;
+    const metaChannelName = process.env.META_CHANNEL;
+    const filesChannelName = process.env.FILES_CHANNEL;
 
     if (!token) {
-        printAndExit("No token provided. Please SET the BTOKEN environment variable to your bot token.");
+        printAndExit("No token provided. Please set the TOKEN .env variable to your bot token.");
+    }
+
+    if (!guildId) {
+        printAndExit("No guild id provided. Please set the GUILD_ID .env variable to your guild id.");
+    }
+
+    if (!metaChannelName) {
+        printAndExit("No meta channel name provided. Please set the META_CHANNEL .env variable to your metadata channel name.");
+    }
+
+    if (!filesChannelName) {
+        printAndExit("No files channel name provided. Please set the FILES_CHANNEL .env variable to your files channel name.");
     }
 
     const app = new DiscordFileStorageApp({
@@ -22,7 +39,7 @@ async function main() {
             GatewayIntentBits.Guilds,
             GatewayIntentBits.MessageContent,
         ]
-    }, "989877084136554526");
+    }, guildId!);
 
 
     app.once("ready", () => {

@@ -1,7 +1,8 @@
 import { Readable } from 'stream';
 // took from https://stackoverflow.com/questions/63440916/how-can-i-asynchronously-handle-stream-events-in-node-js-while-preserving-order
 /**
- * A simple event queue that allows you to queue up events on a stream. 
+ * A simple event queue that allows you to queue up events on a stream with async handlers.  
+ * At the moment only Readable streams are supported.
  */
 export default class EventQueue {
     stream: Readable;

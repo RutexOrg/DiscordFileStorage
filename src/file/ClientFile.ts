@@ -1,7 +1,10 @@
-import FileBase from "./RemoteFileBase";
+import FileBase from "./FileBase";
 import fs from "fs";
 import path from "path";
 
+/**
+ * Represents a file on the client side. This file is not stored on the server. 
+ */
 export default class ClientFile extends FileBase {
  
     private path: string;
@@ -19,12 +22,20 @@ export default class ClientFile extends FileBase {
         this.path = path;
     }
 
-    getReadableStream(maxChunkSize: number = 16000): fs.ReadStream {
+    public getReadableStream(maxChunkSize: number = 16000): fs.ReadStream {
         return fs.createReadStream(this.path, { highWaterMark: maxChunkSize })
     }
 
-    getWritableStream(): fs.WriteStream {
+    public getWritableStream(): fs.WriteStream {
         return fs.createWriteStream(this.path);
+    }
+
+    private fsStat(): fs.Stats {
+        return fs.statSync(this.path);
+    }
+
+    public isValid(): boolean {
+        return this.fsStat().isFile();
     }
 
     public static fromLocalPath(localPath: string): ClientFile {

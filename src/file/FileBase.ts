@@ -1,3 +1,6 @@
+/**
+ * Basic shared FileBase class that represents a file.  
+ */
 export default class FileBase {
     private filename: string;
     private totalSize: number;

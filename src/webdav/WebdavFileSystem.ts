@@ -4,8 +4,12 @@ import { Errors } from "webdav-server/lib/index.v2";
 import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
 import color from "colors/safe";
-import RamReadableBuffer from "../RamReadableBuffer";
+import RamReadableBuffer from "../stream-helpers/RamReadableBuffer";
 
+/**
+ * Virtual file system wrapper on top of DiscordFileStorageApp.
+ * WARNING! Many methods are not implemented yet or not implemented at all but some very basic functionality is working.
+ */
 export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializer {
     uid(): string {
         return "virtual-discord-file-system@1.0.0";

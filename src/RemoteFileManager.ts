@@ -1,8 +1,8 @@
 import { AttachmentBuilder } from "discord.js";
 import DiscordFileStorageApp from "./DiscordFileStorageApp";
-import EventQueue from "./EventQeue";
+import EventQueue from "./stream-helpers/EventQeue";
 import axios from "axios";
-import HttpStreamPool from './webdav/HttpStreamPool';
+import HttpStreamPool from './stream-helpers/HttpStreamPool';
 import ServerFile from './file/ServerFile';
 import ClientFile from './file/ClientFile';
 import FileManager from './file/FileTransformer';
@@ -22,9 +22,13 @@ interface IDownloadResult {
     message: string;
 }
 
+export const MAX_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
+
+/**
+ * Class that handles all the remote file management on discord.
+ */
 export default class RemoteFileManager {
 
-    private static maxChunkSize: number = 8 * 1000 * 1000;
     private app: DiscordFileStorageApp;
     private axiosInstance = axios.create({
         responseType: "stream",
@@ -81,7 +85,7 @@ export default class RemoteFileManager {
             urls.push(attachment.url);
         }
         
-        return (await (new HttpStreamPool(this.axiosInstance, urls)).getDownloadStream(urls));
+        return (await (new HttpStreamPool(urls)).getDownloadStream());
     }
 
     public async postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
@@ -109,7 +113,7 @@ export default class RemoteFileManager {
         return new Promise(async (resolve, reject) => {
             let file = FileTransformer.clientToServerFile(f);
             const filesChannel = await this.app.getFileChannel();
-            const asyncStream = new EventQueue(readStream ?? f.getReadableStream(RemoteFileManager.maxChunkSize), reject);
+            const asyncStream = new EventQueue(readStream ?? f.getReadableStream(MAX_CHUNK_SIZE), reject);
             let chunkNumber = 1;
             
             file.setFilesPostedInChannelId(filesChannel.id);
@@ -154,7 +158,7 @@ export default class RemoteFileManager {
         return new Writable({
             write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written
                 file.setTotalSize(file.getTotalSize() + chunk.length);
-                if(buffer.length + chunk.length > RemoteFileManager.maxChunkSize) {
+                if(buffer.length + chunk.length > MAX_CHUNK_SIZE) {
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ? chunks.`);
 
                     const attachmentBuilder = new AttachmentBuilder(buffer);

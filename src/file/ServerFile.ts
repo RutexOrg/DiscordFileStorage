@@ -1,5 +1,8 @@
-import FileBase from "./RemoteFileBase";
+import FileBase from "./FileBase";
 
+/**
+ * Represents a file on the server side. This file is stored on the server.
+ */
 export default class ServerFile extends FileBase {
     private discordMessageIds: string[] = [];
     private filesPostedInChannelId: string = "";

@@ -9,14 +9,17 @@ import FileManager from './file/FileTransformer';
 import ClientFile from './file/ClientFile';
 
 
+/**
+ * Main class of the DiscordFileStorageApp. It is a Discord.js client with some additional functionality.
+ */
 export default class DiscordFileStorageApp extends Client {
    
     private files: Array<ServerFile> = [];
     private guildId: string;
     
     private channelsToCreate = [
-        "filebot-metadata",
-        "filebot-files",
+        process.env.META_CHANNEL!,
+        process.env.FILES_CHANNEL!,
     ]
 
     private remoteFileManager: RemoteFileManager;
@@ -43,11 +46,11 @@ export default class DiscordFileStorageApp extends Client {
     };
     
     public async getMetadataChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == "filebot-metadata") as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == process.env.META_CHANNEL!.toLowerCase()) as TextBasedChannel;
     }
 
     public async getFileChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == "filebot-files") as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == process.env.FILES_CHANNEL!.toLowerCase()) as TextBasedChannel;
     }
 
     public async prepare(){
@@ -75,7 +78,6 @@ export default class DiscordFileStorageApp extends Client {
                 console.log(color.green("channel already exists: " + chan));
             }
         }
-
     }
 
     async getAllMessages(id: string): Promise<Message[]> {
@@ -165,15 +167,9 @@ export default class DiscordFileStorageApp extends Client {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-
     public getFileManager(): RemoteFileManager {
         return this.remoteFileManager;
     }
-
-
-
-
-
 
 }
 
