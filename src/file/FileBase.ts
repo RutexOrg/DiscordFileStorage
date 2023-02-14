@@ -29,6 +29,4 @@ export default class FileBase {
         this.totalSize = totalSize;
     }
     
-
-    
 }

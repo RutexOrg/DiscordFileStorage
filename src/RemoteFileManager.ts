@@ -150,16 +150,17 @@ export default class RemoteFileManager {
         });
     }
     
-    public async getUploadWritableStream(file: ServerFile): Promise<Writable> {
+    public async getUploadWritableStream(file: ServerFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
         let chunkNumber = 1;
+        let totalChunks = Math.ceil(size / MAX_CHUNK_SIZE);
         file.setFilesPostedInChannelId(filesChannel.id);
         let buffer = Buffer.alloc(0);
         return new Writable({
             write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written
                 file.setTotalSize(file.getTotalSize() + chunk.length);
                 if(buffer.length + chunk.length > MAX_CHUNK_SIZE) {
-                    console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ? chunks.`);
+                    console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
 
                     const attachmentBuilder = new AttachmentBuilder(buffer);
                     attachmentBuilder.setName(chunkNumber + "-" + file.getFileName());

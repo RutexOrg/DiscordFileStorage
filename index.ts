@@ -1,14 +1,10 @@
+import config from "./src/config";
 import dotenv from "dotenv";
-import { ChannelType, GatewayIntentBits } from "discord.js";
+import {  GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
-import { v2 as webdav } from "webdav-server";
-import WebdavFileSystem from "./src/webdav/WebdavFileSystem";
-import ClientFile from "./src/file/ClientFile";
-import ServerFile from "./src/file/ServerFile";
 import VirtualDiscordFileSystem from "./src/webdav/WebdavFileSystem";
-
-// https://discord.com/oauth2/authorize?client_id=1074020035716202506&permissions=8&scope=bot%20applications.commands
+import { v2 as webdav } from "webdav-server";
 
 async function main() {
     dotenv.config();
@@ -36,29 +32,23 @@ async function main() {
 
     const app = new DiscordFileStorageApp({
         intents: [
-            GatewayIntentBits.Guilds,
             GatewayIntentBits.MessageContent,
         ]
     }, guildId!);
 
-
-    app.once("ready", () => {
-        console.log(color.green("Ready"));
-    });
-
     console.log(color.yellow("Logging in..."));
     await app.login(token);
+    await app.waitForReady();
     await app.prepare();
 
     console.log(color.yellow("Fetching files..."));
     await app.loadFilesToCache();
 
 
-    const startWebdavServer = true;
 
-    if (startWebdavServer) {
+    if (config.startWebDavServer) {
         const webdavServer = new webdav.WebDAVServer({
-            port: 1900,
+            port: config.webdavPort,
             rootFileSystem: new VirtualDiscordFileSystem(app),
         });
 
@@ -73,29 +63,6 @@ async function main() {
             next();
         });
     }
-
-    // for(let file of app.getFiles()){
-    //     await app.deleteFile(file);
-    // }
-
-    // const sampleUploadFile = ClientFile.fromLocalPath("c:\\users\\david\\Desktop\\Relationen.pdf");
-    // let uploadTest = (await app.uploadFile(sampleUploadFile));
-    // if(uploadTest.success){
-    //     console.log(color.green("File uploaded successfully"));
-    // }else{
-    //     console.log(color.red("Failed to upload file"));
-    // }
-
-    // // (TODO: auto cache)
-    // console.log(color.yellow("Updating files cache and sleeping 5 sec..."));
-    // await client.loadFilesToCache();
-    // await client.sleep(5000);
-
-
-    // let file = client.getFiles()[0];
-    // file.setLocalFilePath("c:\\users\\david\\Desktop\\test\\download-" + file.getFileName());
-    // await client.downloadFile(file, fs.createWriteStream("c:\\users\\david\\Desktop\\test\\download111.mp4"));
-    // console.log(color.green("Done"));    
 
 }
 

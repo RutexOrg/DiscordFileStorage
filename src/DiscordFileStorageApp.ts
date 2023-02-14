@@ -31,14 +31,14 @@ export default class DiscordFileStorageApp extends Client {
         if(DiscordFileStorageApp.instance){
             throw new Error("DiscordFileStorageApp already exists");
         }
-
         DiscordFileStorageApp.instance = this;
+
         this.guildId = guildId;
         this.remoteFileManager = new RemoteFileManager(this);
-        this.once("fileUploaded", (file: ServerFile) => {
+        
+        this.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
             this.files.push(file);
         });
-
     }
 
     public async getGuild(): Promise<Guild>{
@@ -46,16 +46,23 @@ export default class DiscordFileStorageApp extends Client {
     };
     
     public async getMetadataChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == process.env.META_CHANNEL!.toLowerCase()) as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.META_CHANNEL!) as TextBasedChannel;
     }
 
     public async getFileChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name.toLowerCase() == process.env.FILES_CHANNEL!.toLowerCase()) as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.FILES_CHANNEL!) as TextBasedChannel;
+    }
+
+    public async waitForReady(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.once("ready", () => {
+                resolve();
+            });
+        });
     }
 
     public async prepare(){
         const guilds = this.guilds.cache;
-
         if(!guilds.has(this.guildId)){
             printAndExit("Guild not found");
         }
@@ -66,9 +73,10 @@ export default class DiscordFileStorageApp extends Client {
         }
     
         console.log(color.yellow("Fetching channels..."));
+        await guild.channels.fetch();
         let guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
         for(let chan of this.channelsToCreate){
-            if(!guildChannels.some(channel => channel.name.toLowerCase() == chan.toLowerCase())){
+            if(!guildChannels.some(channel => channel.name == chan)){
                 console.log("creating channel: " + chan );
                 await guild.channels.create({
                     name: chan,

@@ -150,6 +150,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
 
+
         if(this.app.getFiles().map(file => file.getFileName()).includes(requestedFile)) {
             return callback(Errors.ResourceAlreadyExists);
         }
@@ -157,11 +158,6 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         if(!this.containsInVirtualCreatedFiles(requestedFile)) {
             return callback(Errors.ResourceNotFound);
         }
-
-        console.log(color.cyan(String("-----------------")));
-        console.log(color.cyan(String(ctx.targetSource)));
-        console.log(color.cyan(String(ctx.mode)));
-        console.log(color.cyan(String("-----------------")));
 
         let creatingFileFirst = ctx.mode == "mustCreate";
         if(creatingFileFirst) {
@@ -174,7 +170,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
         let file = new ServerFile(requestedFile, 0, []);
         
-        this.app.getFileManager().getUploadWritableStream(file).then(stream => {
+        this.app.getFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
             callback(undefined, stream);
             stream.once("close", () => {
@@ -187,6 +183,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(err);
         });
     }
+
 
     protected _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): void {
         let fileName = this.getFilenameFromPath(path);
@@ -202,6 +199,5 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(Errors.IllegalArguments);
         });
     }
-    
 
 }
