@@ -9,7 +9,8 @@ import FileManager from './file/FileTransformer';
 import FileTransformer from './file/FileTransformer';
 import { WriteStream, ReadStream } from "fs";
 import {Writable, Readable} from "stream";
-import color from "colors/safe";
+import { EventEmitter } from "events";
+import TypedEmitter from 'typed-emitter';
 
 interface IUploadResult {
     success: boolean;
@@ -24,10 +25,15 @@ interface IDownloadResult {
 
 export const MAX_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
 
+export type RemoteFileManagerEvents = {
+    fileUploaded: (file: ServerFile) => void;
+    fileDeleted: (file: ServerFile) => void;
+}
+
 /**
  * Class that handles all the remote file management on discord.
  */
-export default class RemoteFileManager {
+export default class RemoteFileManager extends (EventEmitter as new () => TypedEmitter<RemoteFileManagerEvents>) {
 
     private app: DiscordFileStorageApp;
     private axiosInstance = axios.create({
@@ -35,6 +41,7 @@ export default class RemoteFileManager {
     });
 
     constructor(client: DiscordFileStorageApp) {
+        super();
         this.app = client;
     }
 
@@ -88,17 +95,25 @@ export default class RemoteFileManager {
         return (await (new HttpStreamPool(urls)).getDownloadStream());
     }
 
-    public async postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
-        const metaChannel = await this.app.getMetadataChannel();
+    // TODO: Make other functions work with this.
+    private getBuilderFromFile(file: ServerFile){
         const builder = new AttachmentBuilder(Buffer.from(file.toJson()));
         builder.setName(file.getFileName() + ".txt");
+        return builder;
+    }
 
-        let msg = await metaChannel.send({
-            files: [builder],
+    public async postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
+        const metaChannel = await this.app.getMetadataChannel();
+
+        let msg = await metaChannel.send("Uploading file meta...");
+
+        file.setMetaIdInMetaChannel(msg.id);
+        msg.edit({
+            files: [this.getBuilderFromFile(file)],
         });
 
         if (dispatchEvent) {
-            this.app.emit("fileUploaded", file);
+            this.emit("fileUploaded", file);
         }
 
         return {
@@ -197,7 +212,7 @@ export default class RemoteFileManager {
 
 
 
-    public async deleteFile(file: ServerFile): Promise<IUploadResult> {
+    public async deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
         const filesChannel = await this.app.getFileChannel();
         const metadataChannel = await this.app.getMetadataChannel();
         const messageIds = file.getDiscordMessageIds();
@@ -210,6 +225,10 @@ export default class RemoteFileManager {
         const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
         await metadataMessage.delete();
         file.markDeleted();
+        if (dispatchEvent) {
+            this.emit("fileDeleted", file);
+        }
+
         return {
             success: true,
             message: "File deleted successfully.",

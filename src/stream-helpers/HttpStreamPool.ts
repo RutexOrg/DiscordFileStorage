@@ -1,5 +1,3 @@
-import { AxiosInstance } from "axios";
-import { EventEmitter } from "events";
 import { Readable, PassThrough } from "stream";
 import axios from "axios";
 

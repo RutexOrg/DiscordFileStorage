@@ -35,9 +35,7 @@ export default class ServerFile extends FileBase {
         this.filesPostedInChannelId = filesPostedInChannelId;
     }
 
-    public setMetaIdInMetaChannel(metaId: string): void {
-        this.metaIdInMetaChannel = metaId;
-    }
+
 
     public getFolders(): string[] {
         return this.folders;
@@ -49,6 +47,10 @@ export default class ServerFile extends FileBase {
 
     public getMetaIdInMetaChannel(): string {
         return this.metaIdInMetaChannel;
+    }
+
+    public setMetaIdInMetaChannel(metaId: string): void {
+        this.metaIdInMetaChannel = metaId;
     }
 
     public isMarkedDeleted(): boolean {
@@ -77,6 +79,7 @@ export default class ServerFile extends FileBase {
             totalSize: this.getTotalSize(),
             uploadDate: this.getUploadedDate(),
             filesPostedInChannelId: this.getFilesPostedInChannelId(),
+            metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
             discordMessageIds: this.getDiscordMessageIds(),
             folders: this.folders
         };

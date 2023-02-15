@@ -36,8 +36,13 @@ export default class DiscordFileStorageApp extends Client {
         this.guildId = guildId;
         this.remoteFileManager = new RemoteFileManager(this);
         
-        this.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
+        this.remoteFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
             this.files.push(file);
+        });
+
+
+        this.remoteFileManager.on("fileDeleted", (file: ServerFile) => {
+            this.files = this.files.filter(f => !f.isMarkedDeleted());
         });
     }
 
@@ -168,7 +173,7 @@ export default class DiscordFileStorageApp extends Client {
     }
 
     public async deleteFile(file: ServerFile){
-        return this.remoteFileManager.deleteFile(file);
+        return this.remoteFileManager.deleteFile(file, true);
     }
 
     public async sleep(ms: number) {

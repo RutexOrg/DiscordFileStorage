@@ -72,7 +72,6 @@ process.on("uncaughtException", (err) => {
     console.log(color.red(err.name));
     console.log(color.red(err.message));
     console.log(color.red(err.stack!));
-
 });
 
 main();

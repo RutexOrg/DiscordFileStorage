@@ -5,6 +5,7 @@ import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
 import color from "colors/safe";
 import RamReadableBuffer from "../stream-helpers/RamReadableBuffer";
+import debug from "debug";
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
@@ -26,7 +27,6 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
     private app: DiscordFileStorageApp;
     private cLockManager: v2.LocalLockManager;
     private cPropertyManager: v2.LocalPropertyManager;
-    
     private virtualCreatedFiles: string[] = [];
 
     constructor(client: DiscordFileStorageApp) {
@@ -192,12 +192,13 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
 
-        this.app.getFileManager().deleteFile(file).then(() => {
+        this.app.getFileManager().deleteFile(file, true).then(() => {
             this.virtualCreatedFiles = this.virtualCreatedFiles.filter(vFile => vFile !== file!.getFileName() );
             return callback();
         }).catch(err => {
             return callback(Errors.IllegalArguments);
         });
     }
+
 
 }
