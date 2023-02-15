@@ -55,10 +55,6 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         return this.app.getFiles().find(file => file.getFileName().toLocaleLowerCase() === fileName?.toLocaleLowerCase());
     }
 
-    private getFilenameFromPath(path: v2.Path): string | undefined {
-        return path.toString().split("/").pop();
-    }
-    
     private containsInVirtualCreatedFiles(filename: string): boolean {
         return this.virtualCreatedFiles.includes(filename);
     }
@@ -99,8 +95,9 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         if(path.toString() == "/"){
             return callback(true);
         }
-        this.log(".fastExistCheck", path);
-        let requestedFile = this.getFilenameFromPath(path);
+        // this.log(".fastExistCheck", path);
+        this.log(".fastExistCheck", path.fileName());
+        let requestedFile = path.fileName();
         if(!requestedFile) {
             return callback(false);
         }
@@ -117,7 +114,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(new Error("File not found"));
         }
         
-        this.app.getFileManager().getDownloadableReadStream(file).then(stream => {
+        this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
             this.log(".openReadStream", "Stream opened"); 
             callback(undefined, stream);
         }).catch(err => {
@@ -131,7 +128,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(Errors.InvalidOperation);
         }
 
-        let requestedFile = this.getFilenameFromPath(path);
+        let requestedFile = path.fileName();
         if(!requestedFile) {
             return callback(Errors.IllegalArguments);
         }
@@ -146,7 +143,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
 
     protected _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): void {
         this.log(".openWriteStream", path);
-        let requestedFile = this.getFilenameFromPath(path);
+        let requestedFile = path.fileName()
         if(!requestedFile) {
             return callback(Errors.ResourceNotFound);
         }
@@ -171,11 +168,11 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
         let file = new ServerFile(requestedFile, ctx.estimatedSize, []);
         
-        this.app.getFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
+        this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
             callback(undefined, stream);
             stream.once("close", () => {
-                this.app.getFileManager().postMetaFile(file, true).then(() => {
+                this.app.getDiscordFileManager().postMetaFile(file, true).then(() => {
                     this.log(".openWriteStream", "File uploaded");
                 });
             });
@@ -187,13 +184,13 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
 
 
     protected _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): void {
-        let fileName = this.getFilenameFromPath(path);
+        let fileName = path.fileName();
         let file = this.app.getFiles().find(file => file.getFileName() === fileName);
         if(!file) {
             return callback(Errors.ResourceNotFound);
         }
 
-        this.app.getFileManager().deleteFile(file, true).then(() => {
+        this.app.getDiscordFileManager().deleteFile(file, true).then(() => {
             this.virtualCreatedFiles = this.virtualCreatedFiles.filter(vFile => vFile !== file!.getFileName() );
             return callback();
         }).catch(err => {

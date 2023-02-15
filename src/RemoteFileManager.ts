@@ -1,27 +1,12 @@
 import { AttachmentBuilder } from "discord.js";
 import DiscordFileStorageApp from "./DiscordFileStorageApp";
-import EventQueue from "./stream-helpers/EventQeue";
-import axios from "axios";
 import HttpStreamPool from './stream-helpers/HttpStreamPool';
 import ServerFile from './file/ServerFile';
-import ClientFile from './file/ClientFile';
-import FileManager from './file/FileTransformer';
-import FileTransformer from './file/FileTransformer';
-import { WriteStream, ReadStream } from "fs";
 import {Writable, Readable} from "stream";
 import { EventEmitter } from "events";
 import TypedEmitter from 'typed-emitter';
+import IFIleManager, { IUploadResult } from "./file/IFileManager";
 
-interface IUploadResult {
-    success: boolean;
-    message: string;
-    file: ServerFile;
-}
-
-interface IDownloadResult {
-    success: boolean;
-    message: string;
-}
 
 export const MAX_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
 
@@ -33,12 +18,8 @@ export type RemoteFileManagerEvents = {
 /**
  * Class that handles all the remote file management on discord.
  */
-export default class RemoteFileManager extends (EventEmitter as new () => TypedEmitter<RemoteFileManagerEvents>) {
-
+export default class DiscordFileManager extends (EventEmitter as new () => TypedEmitter<RemoteFileManagerEvents>) implements IFIleManager {
     private app: DiscordFileStorageApp;
-    private axiosInstance = axios.create({
-        responseType: "stream",
-    });
 
     constructor(client: DiscordFileStorageApp) {
         super();
@@ -58,10 +39,9 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         return (await (new HttpStreamPool(urls)).getDownloadStream());
     }
 
-    // TODO: Make other functions work with this.
-    private getBuilderFromFile(file: ServerFile){
-        const builder = new AttachmentBuilder(Buffer.from(file.toJson()));
-        builder.setName(file.getFileName() + ".txt");
+    private getAttachmentBuilderFromBuffer(buff: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, extension: string = "txt"){
+        const builder = new AttachmentBuilder(buff);
+        builder.setName( (chunkNummer ? chunkNummer + "-" : "") + chunkName + (addExtension ? "."+extension : "") );
         return builder;
     }
 
@@ -73,7 +53,7 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         file.setMetaIdInMetaChannel(msg.id);
         msg.edit({
             content: ":white_check_mark: File meta posted successfully.",
-            files: [this.getBuilderFromFile(file)],
+            files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true)],
         });
 
         if (dispatchEvent) {
@@ -94,15 +74,12 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         file.setFilesPostedInChannelId(filesChannel.id);
         let buffer = Buffer.alloc(0);
         return new Writable({
-            write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written to stream.
+            write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
                 if(buffer.length + chunk.length > MAX_CHUNK_SIZE) {
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
-
-                    const attachmentBuilder = new AttachmentBuilder(buffer);
-                    attachmentBuilder.setName(chunkNumber + "-" + file.getFileName());
                     
                     const message = await filesChannel.send({
-                        files: [attachmentBuilder],
+                        files: [this.getAttachmentBuilderFromBuffer(buffer, file.getFileName(), chunkNumber )],
                     });
 
                     file.addDiscordMessageId(message.id);
@@ -120,10 +97,8 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
                     return callback();
                 }
 
-                const attachmentBuilder = new AttachmentBuilder(buffer);
-                attachmentBuilder.setName(chunkNumber + "-" + file.getFileName());
                 let message = await filesChannel.send({
-                    files: [attachmentBuilder],
+                    files: [this.getAttachmentBuilderFromBuffer(buffer, file.getFileName(), chunkNumber )],
                 });
                 file.addDiscordMessageId(message.id);
                 callback();
@@ -139,14 +114,12 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         const messageIds = file.getDiscordMessageIds();
 
         const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
-        const string = ":x: File is being deleted soon... ";
-        await metadataMessage.edit(string);
+        await metadataMessage.edit(":x: File is deleted. " + messageIds.length + " chunks will be deleted....");
 
         for (let i = 0; i < messageIds.length; i++) {
             const messageId = messageIds[i];
             const message = await filesChannel.messages.fetch(messageId);
             await message.delete();
-            await metadataMessage.edit(string + `(${i + 1}/${messageIds.length})`);
         }
         
         await metadataMessage.delete();

@@ -2,7 +2,7 @@ import { ReadStream } from 'fs-extra';
 import { WriteStream } from 'fs-extra';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, GuildBasedChannel, Message, TextBasedChannel, TextChannel } from 'discord.js';
 import color from 'colors/safe';
-import RemoteFileManager from './RemoteFileManager';
+import DiscordFileManager from './RemoteFileManager';
 import axios from 'axios';
 import ServerFile from './file/ServerFile';
 import FileManager from './file/FileTransformer';
@@ -22,7 +22,7 @@ export default class DiscordFileStorageApp extends Client {
         process.env.FILES_CHANNEL!,
     ]
 
-    private remoteFileManager: RemoteFileManager;
+    private discordFileManager: DiscordFileManager;
 
     public static instance: DiscordFileStorageApp;
 
@@ -34,14 +34,13 @@ export default class DiscordFileStorageApp extends Client {
         DiscordFileStorageApp.instance = this;
 
         this.guildId = guildId;
-        this.remoteFileManager = new RemoteFileManager(this);
+        this.discordFileManager = new DiscordFileManager(this);
         
-        this.remoteFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
+        this.discordFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
             this.files.push(file);
         });
 
-
-        this.remoteFileManager.on("fileDeleted", (file: ServerFile) => {
+        this.discordFileManager.on("fileDeleted", (file: ServerFile) => {
             this.files = this.files.filter(f => !f.isMarkedDeleted());
         });
     }
@@ -151,20 +150,20 @@ export default class DiscordFileStorageApp extends Client {
                 throw new Error("No channel id where files are posted");
             }
         }
-        return this.remoteFileManager.postMetaFile(file, distapchEvent);
+        return this.discordFileManager.postMetaFile(file, distapchEvent);
 
     }
 
     public async deleteFile(file: ServerFile){
-        return this.remoteFileManager.deleteFile(file, true);
+        return this.discordFileManager.deleteFile(file, true);
     }
 
     public async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    public getFileManager(): RemoteFileManager {
-        return this.remoteFileManager;
+    public getDiscordFileManager(): DiscordFileManager {
+        return this.discordFileManager;
     }
 
 }

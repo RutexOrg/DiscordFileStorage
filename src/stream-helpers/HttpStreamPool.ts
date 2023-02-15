@@ -4,7 +4,7 @@ import axios from "axios";
 /**
  * Class that combines list of urls into a single Readable stream. 
  */
-export default class HttpStreamPool{
+export default class HttpStreamPool {
   private urls: string[];
 
   private currentUrlIndex = 0;
