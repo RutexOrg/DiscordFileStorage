@@ -8,7 +8,7 @@ import { v2 as webdav } from "webdav-server";
 
 async function main() {
     dotenv.config();
-    
+
     const token = process.env.TOKEN;
     const guildId = process.env.GUILD_ID;
     const metaChannelName = process.env.META_CHANNEL;
@@ -52,9 +52,10 @@ async function main() {
             rootFileSystem: new VirtualDiscordFileSystem(app),
         });
 
-        await webdavServer.start(() => {
+        webdavServer.start(() => {
             console.log(color.green("WebDAV server started"));
         });
+        
         webdavServer.afterRequest((arg, next) => {
             // Display the method, the URI, the returned status code and the returned message
             console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
