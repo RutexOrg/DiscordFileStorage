@@ -8,7 +8,8 @@ Supported functions:
 - Download files.
 - Delete files.
 
-You ```cant modify or rewrite existing``` files. because of limitations of function principle
+You ```cant modify or rewrite existing``` files. because of limitations of function principle. \
+You ```cant create or manage folders```, since they arent supported (yet). 
 
 # State:
 Not even alpha. **Created for fun** from crazy idea. Don't use it. 
