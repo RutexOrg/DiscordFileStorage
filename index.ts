@@ -1,5 +1,5 @@
-import config from "./src/config";
 import dotenv from "dotenv";
+import config from "./src/config";
 import {  GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
@@ -8,8 +8,8 @@ import { v2 as webdav } from "webdav-server";
 
 async function main() {
     dotenv.config();
-
-    const token = process.env.BTOKEN;
+    
+    const token = process.env.TOKEN;
     const guildId = process.env.GUILD_ID;
     const metaChannelName = process.env.META_CHANNEL;
     const filesChannelName = process.env.FILES_CHANNEL;
@@ -37,7 +37,7 @@ async function main() {
     }, guildId!);
 
     console.log(color.yellow("Logging in..."));
-    await app.login(token);
+    await app.login(token!);
     await app.waitForReady();
     await app.prepare();
 
