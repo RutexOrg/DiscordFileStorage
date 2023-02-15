@@ -45,43 +45,6 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         this.app = client;
     }
 
-    public async downloadFile(file: ServerFile, asFile: ClientFile, writableStream?: WriteStream): Promise<IDownloadResult> {
-
-        const filesChannel = await this.app.getFileChannel();
-        const writeStream = writableStream ?? asFile.getWritableStream();
-
-        let chunkNumber = 1;
-        let totalChunks = file.getDiscordMessageIds().length;
-
-        for (const messageId of file.getDiscordMessageIds()) {
-            const message = await filesChannel.messages.fetch(messageId);
-            const attachment = message.attachments.first()!;
-
-            const stream = (await this.axiosInstance.get(attachment.url)).data as Readable;
-            
-
-            console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Downloading chunk ${chunkNumber} of ${totalChunks} chunks.`);
-            stream.pipe(writeStream, { end: chunkNumber === totalChunks });
-            stream.on("end", () => {
-                console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Chunk ${chunkNumber} downloaded.`);
-                chunkNumber++;
-            });
-
-            await new Promise((resolve) => {
-                stream.on("end", () => {
-                    resolve(true);
-                });
-            });
-
-        }
-        console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] File downloaded successfully.`);
-
-        return {
-            message: "File downloaded successfully.",
-            success: true,
-        }
-    }
-
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
         const filesChannel = await this.app.getFileChannel();
         
@@ -109,6 +72,7 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
 
         file.setMetaIdInMetaChannel(msg.id);
         msg.edit({
+            content: ":white_check_mark: File meta posted successfully.",
             files: [this.getBuilderFromFile(file)],
         });
 
@@ -122,48 +86,6 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
             file,
         }
     }
-
-
-    public async uploadFile(f: ClientFile, readStream?: ReadStream): Promise<IUploadResult> {
-        return new Promise(async (resolve, reject) => {
-            let file = FileTransformer.clientToServerFile(f);
-            const filesChannel = await this.app.getFileChannel();
-            const asyncStream = new EventQueue(readStream ?? f.getReadableStream(MAX_CHUNK_SIZE), reject);
-            let chunkNumber = 1;
-            
-            file.setFilesPostedInChannelId(filesChannel.id);
-            
-            asyncStream.on("readable", async () => {
-                if (!asyncStream.stream.readableLength) {
-                    asyncStream.destroy();
-                    return;
-                }
-                console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${asyncStream.stream.readableLength} of ${file.getTotalSize()} bytes.`);
-
-                let chunk = asyncStream.stream.read()!;
-
-                const attachmentBuilder = new AttachmentBuilder(chunk);
-                attachmentBuilder.setName(chunkNumber + "-" + file.getFileName());
-                
-                const message = await filesChannel.send({
-                    files: [attachmentBuilder],
-                });
-
-                file.addDiscordMessageId(message.id);
-                chunkNumber++;
-            });
-
-            asyncStream.on("end", async () => {
-                console.log("File uploaded successfully.");
-                resolve({
-                    success: true,
-                    message: "File uploaded successfully.",
-                    file,
-                });
-            });
-
-        });
-    }
     
     public async getUploadWritableStream(file: ServerFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
@@ -172,8 +94,7 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         file.setFilesPostedInChannelId(filesChannel.id);
         let buffer = Buffer.alloc(0);
         return new Writable({
-            write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written
-                file.setTotalSize(file.getTotalSize() + chunk.length);
+            write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written to stream.
                 if(buffer.length + chunk.length > MAX_CHUNK_SIZE) {
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
 
@@ -217,12 +138,17 @@ export default class RemoteFileManager extends (EventEmitter as new () => TypedE
         const metadataChannel = await this.app.getMetadataChannel();
         const messageIds = file.getDiscordMessageIds();
 
-        for (const messageId of messageIds) {
+        const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        const string = ":x: File is being deleted soon... ";
+        await metadataMessage.edit(string);
+
+        for (let i = 0; i < messageIds.length; i++) {
+            const messageId = messageIds[i];
             const message = await filesChannel.messages.fetch(messageId);
             await message.delete();
+            await metadataMessage.edit(string + `(${i + 1}/${messageIds.length})`);
         }
-
-        const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        
         await metadataMessage.delete();
         file.markDeleted();
         if (dispatchEvent) {

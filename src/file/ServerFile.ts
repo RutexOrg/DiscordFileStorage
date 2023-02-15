@@ -7,6 +7,7 @@ export default class ServerFile extends FileBase {
     private discordMessageIds: string[] = [];
     private filesPostedInChannelId: string = "";
     private metaIdInMetaChannel: string = "";
+    private metaVersion: number = 0;
 
     private markedDeleted: boolean = false;
     private folders: string[];
@@ -35,6 +36,13 @@ export default class ServerFile extends FileBase {
         this.filesPostedInChannelId = filesPostedInChannelId;
     }
 
+    public getMetaVersion(): number {
+        return this.metaVersion;
+    }
+
+    public setMetaVersion(metaVersion: number): void {
+        this.metaVersion = metaVersion;
+    }
 
 
     public getFolders(): string[] {
@@ -80,8 +88,9 @@ export default class ServerFile extends FileBase {
             uploadDate: this.getUploadedDate(),
             filesPostedInChannelId: this.getFilesPostedInChannelId(),
             metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
+            metaVersion: this.metaVersion,
+            folders: this.folders,
             discordMessageIds: this.getDiscordMessageIds(),
-            folders: this.folders
         };
     }
     

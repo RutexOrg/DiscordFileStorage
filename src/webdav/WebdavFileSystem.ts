@@ -81,6 +81,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         return callback(undefined, []);
     }
 
+
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.log(".readDir", path);
         return callback(undefined, this.app.getFiles().map(file => file.getFileName()));
@@ -168,7 +169,7 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         }
 
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
-        let file = new ServerFile(requestedFile, 0, []);
+        let file = new ServerFile(requestedFile, ctx.estimatedSize, []);
         
         this.app.getFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");

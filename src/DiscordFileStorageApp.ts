@@ -155,23 +155,6 @@ export default class DiscordFileStorageApp extends Client {
 
     }
 
-    public async uploadFile(file: ClientFile, stream?: ReadStream){
-        if(this.files.some(f => f.getFileName() == file.getFileName())){
-            throw new Error("File already exists");
-        }
-
-        let resultUpload = await this.remoteFileManager.uploadFile(file, stream);
-        console.log("upload result: " + resultUpload.success);
-        let resultPostMeta = await this.remoteFileManager.postMetaFile(resultUpload.file, false);
-        console.log("post meta result: " + resultPostMeta.success);
-    
-        return resultUpload;
-    }
-
-    public async downloadFile(file: ServerFile, asFile: ClientFile,  writeStream?: WriteStream) {
-        return this.remoteFileManager.downloadFile(file, asFile, writeStream);
-    }
-
     public async deleteFile(file: ServerFile){
         return this.remoteFileManager.deleteFile(file, true);
     }
