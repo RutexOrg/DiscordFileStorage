@@ -176,11 +176,17 @@ export default class Folder {
 
     // same as createHierarchy but creates last element as file
     public createFileHierarchy(path: string, filename: string): void {
-        this.createHierarchy(path);
-        let folder = this.getFolderByPath(path);
-        let parent = folder!.getParent()!;
-        this.removeFolder(folder!);
-        new ServerFile(filename, 0, parent);
+        const folder = this.prepareFileHierarchy(path);
+        if(folder.getFiles().find(file => file.getFileName() == filename)) {
+            throw new Error("File with name "+filename+" already exists");
+        }
+        new ServerFile(filename, 0, folder);
+        
+        // this.createHierarchy(path);
+        // let folder = this.getFolderByPath(path);
+        // let parent = folder!.getParent()!;
+        // this.removeFolder(folder!);
+        // new ServerFile(filename, 0, parent);
     }
 
     // creates folder hierarchy and returns last folder.
@@ -222,16 +228,21 @@ export default class Folder {
         }
     }
 
-    public printHierarchyWithFiles(): void {
-        console.log("Printing ls:");
-        console.log("-------------------");
-        this.folders.forEach(folder => {
-            console.log(folder.getName() + "/");
-        });
+    public printHierarchyWithFiles(initial: boolean = false): void {
+        if(initial) {
+            console.log("Printing hierarchy:")
+            console.log("-------------------");
+        }
+        console.log(this.getAbsolutePath());
         this.files.forEach(file => {
-            console.log(file.getFileName());
+            console.log(this.getAbsolutePath() + "/" + file.getFileName());
         });
-        console.log("-------------------");
+        this.folders.forEach(folder => {
+            folder.printHierarchyWithFiles();
+        });
+        if(initial){
+            console.log("-------------------");
+        }
     }
     
     

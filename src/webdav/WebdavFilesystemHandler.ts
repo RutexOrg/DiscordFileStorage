@@ -44,18 +44,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, this.cPropertyManager);
     }
 
-    private getFile(path: Path): ServerFile | undefined {
-        return this.app.getFileSystem().getRoot().getFileByPath(path.toString());
-    }
-
 
     private log(from: string, data: any){
         console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
     }
     
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        // this.log(".size", path);
-        let file = this.getFile(path);
+        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
         if(!file) {
             // return callback(undefined, this.app.getFiles().reduce((acc, file) => acc + file.getTotalSize(), 0));
             return callback(undefined, 0);
@@ -73,7 +68,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.log(".readDir", path);
         let folder = this.app.getFileSystem().getRoot().getFolderByPath(path.toString())!;
-        folder.printHierarchy(true);
+        folder.printHierarchyWithFiles(true);
         return callback(undefined, folder.getAllEntries());
         
     }
@@ -103,8 +98,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         if(entryInfo.isUnknown){
             return callback(false);
         }
-        let requestedFile = path.fileName();
-
         let existsCheckState = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
         
         if(existsCheckState.isUnknown){
@@ -117,10 +110,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
         this.log(".openReadStream", path);
-        let file = this.getFile(path);
-        if(!file) {
-            return callback(new Error("File not found"));
-        }
+        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString())!;
         
         this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
             this.log(".openReadStream", "Stream opened"); 
@@ -145,11 +135,17 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
+        this.log(".openWriteStream", path);
+        let folder = this.app.getFileSystem().getRoot().prepareFileHierarchy(path.toString());
         let createdFile = this.app.getFileSystem().getRoot().getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
-        let folder = createdFile?.getFolder()!;
+        
+        if(createdFile?.isRemoteValid()){
+            await this.app.getDiscordFileManager().deleteFile(createdFile, false);    
+        }
         folder.removeFile(createdFile!);
-
+        
         if(ctx.estimatedSize == -1){
+            this.app.getFileSystem().getRoot().createFileHierarchy(path.toString(), path.fileName());
             return callback(undefined, new VoidWritableBuffer()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
@@ -172,13 +168,14 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): void {
-        let file = this.getFile(path);
+        this.log(".delete", path);
         let isFileSystemEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
         if(isFileSystemEntry.isFolder){
             this.app.getFileSystem().getRoot().removeFolderHierarchy(path.toString());
             return callback();
         }
-
+        
+        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
         if(!file) {
             return callback(Errors.ResourceNotFound);
         }

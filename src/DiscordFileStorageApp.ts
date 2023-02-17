@@ -17,7 +17,6 @@ export default class DiscordFileStorageApp extends Client {
     private channelsToCreate = [
         process.env.META_CHANNEL!,
         process.env.FILES_CHANNEL!,
-        process.env.FOLDERS_CHANNEL!,
     ]
 
     private discordFileManager: DiscordFileManager;
@@ -33,7 +32,6 @@ export default class DiscordFileStorageApp extends Client {
 
         const metaChannelName = process.env.META_CHANNEL;
         const filesChannelName = process.env.FILES_CHANNEL;
-        const foldersChannelName = process.env.FOLDERS_CHANNEL;
 
         if(!metaChannelName){
             printAndExit("No meta channel name provided. Please set the META_CHANNEL .env variable to your metadata channel name.");
@@ -41,10 +39,6 @@ export default class DiscordFileStorageApp extends Client {
 
         if(!filesChannelName){
             printAndExit("No files channel name provided. Please set the FILES_CHANNEL .env variable to your files channel name.");
-        }
-
-        if(!foldersChannelName){
-            printAndExit("No folders channel name provided. Please set the FOLDERS_CHANNEL .env variable to your folders channel name.");
         }
 
         this.guildId = guildId;
@@ -61,10 +55,6 @@ export default class DiscordFileStorageApp extends Client {
 
     public async getFileChannel(): Promise<TextBasedChannel> {
         return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.FILES_CHANNEL!) as TextBasedChannel;
-    }
-
-    public async getFolderChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.FOLDERS_CHANNEL!) as TextBasedChannel;
     }
 
     public async waitForReady(): Promise<void> {
