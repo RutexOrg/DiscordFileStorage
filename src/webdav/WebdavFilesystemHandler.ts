@@ -209,4 +209,21 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
+    protected _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): void {
+        this.log(".copy", pathFrom + " | " + pathTo);
+        return callback(Errors.InvalidOperation);
+    }
+
+    protected _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): void {
+        this.log(".move", pathFrom + " | " + pathTo);
+        return callback(Errors.InvalidOperation);
+    }
+
+    protected _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): void {
+        this.log(".rename", pathFrom + " | " + newName);
+        return callback(Errors.InvalidOperation);
+    }
+
+
+
 }
