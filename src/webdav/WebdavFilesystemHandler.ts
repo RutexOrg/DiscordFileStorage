@@ -148,8 +148,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         let createdFile = this.app.getFileSystem().getRoot().getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
         let folder = createdFile?.getFolder()!;
         folder.removeFile(createdFile!);
+
         if(ctx.estimatedSize == -1){
-            return callback(undefined, new VoidWritableBuffer());
+            return callback(undefined, new VoidWritableBuffer()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
         // if(1){process.exit()}
@@ -182,7 +183,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
 
-        this.app.getDiscordFileManager().deleteFile(file, true).then(() => {
+        this.app.getDiscordFileManager().deleteFile(file, false).then(() => {
+            this.app.getFileSystem().getRoot().removeFile(file!);
             return callback();
         }).catch(err => {
             return callback(Errors.IllegalArguments);

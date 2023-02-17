@@ -107,6 +107,13 @@ export default class ServerFile extends FileBase {
         return file;
     }
 
+    public getAbsolutePath(): string {
+        return this.folder.getAbsolutePath() + "/" + this.getFileName();
+    }
+
+    public isRemoteValid(): boolean {
+        return this.discordMessageIds.length > 0;
+    }
  
 
 

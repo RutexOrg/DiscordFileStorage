@@ -222,6 +222,18 @@ export default class Folder {
         }
     }
 
+    public printHierarchyWithFiles(): void {
+        console.log("Printing ls:");
+        console.log("-------------------");
+        this.folders.forEach(folder => {
+            console.log(folder.getName() + "/");
+        });
+        this.files.forEach(file => {
+            console.log(file.getFileName());
+        });
+        console.log("-------------------");
+    }
+    
     
 
     public getFilesPaths(map: Map<string, ServerFile> = new Map()): Map<string, ServerFile> {

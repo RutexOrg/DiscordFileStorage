@@ -49,15 +49,6 @@ export default class DiscordFileStorageApp extends Client {
 
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
-        
-        this.discordFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
-            console.log("fileUploaded: " + file.getFileName());
-            this.filesystem.addFileAuto(file);
-        });
-
-        this.discordFileManager.on("fileDeleted", (file: ServerFile) => {
-            this.filesystem.deleteFile(file);
-        });
     }
 
     public async getGuild(): Promise<Guild>{
