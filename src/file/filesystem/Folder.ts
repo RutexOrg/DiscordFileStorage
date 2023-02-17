@@ -13,6 +13,7 @@ export default class Folder {
     private folders: Folder[] = [];
     private parent: Folder | null = null;
     private isRoot;
+    private static root: Folder;
 
     constructor(name: string, parent: Folder | null = null, isRoot: boolean = false) {
         if(!isRoot){
@@ -26,6 +27,10 @@ export default class Folder {
 
         if(parent) {
             parent.addFolder(this);
+        }
+
+        if(isRoot) {
+            Folder.root = this;
         }
 
         this.isRoot = isRoot;
@@ -94,7 +99,7 @@ export default class Folder {
         }
     }
 
-    public addFolder(folder: Folder): void {
+    public addFolder(folder: Folder): Folder {
         if(!this.isSameNameExists(folder.getName())) {
             this.folders.push(folder);
         }else {
@@ -103,6 +108,7 @@ export default class Folder {
         if(folder.getParent() != this) {
             folder.setParent(this);
         }
+        return folder;
     }
 
     public findFileByName(name: string, folder: Folder): ServerFile | undefined{
@@ -125,9 +131,17 @@ export default class Folder {
         return undefined;
     }
 
-
+    private removeFileFromFolder(file: ServerFile, folder: Folder): void {
+        folder.files = folder.files.filter(f => f.getFileName() != file.getFileName());
+    }
+    
     public removeFile(file: ServerFile): void {
-        this.files = this.files.filter(f => f.getFileName() != file.getFileName());
+        file = Folder.root.getFileByPath(file.getAbsolutePath())!;
+        if(!file){
+            throw new Error("File not found");
+        }
+        file.getFolder().removeFileFromFolder(file, file.getFolder());
+
     }
 
     private removeFolderFromHierarchy(folder: Folder, from: Folder): void {
@@ -181,7 +195,7 @@ export default class Folder {
             throw new Error("File with name "+filename+" already exists");
         }
         new ServerFile(filename, 0, folder);
-        
+
         // this.createHierarchy(path);
         // let folder = this.getFolderByPath(path);
         // let parent = folder!.getParent()!;
@@ -230,12 +244,12 @@ export default class Folder {
 
     public printHierarchyWithFiles(initial: boolean = false): void {
         if(initial) {
-            console.log("Printing hierarchy:")
+            console.log("Printing hierarchy :" + this.getAbsolutePath())
             console.log("-------------------");
         }
         console.log(this.getAbsolutePath());
         this.files.forEach(file => {
-            console.log(this.getAbsolutePath() + "/" + file.getFileName());
+            console.log("[F] " +this.getAbsolutePath() + "/" + file.getFileName());
         });
         this.folders.forEach(folder => {
             folder.printHierarchyWithFiles();

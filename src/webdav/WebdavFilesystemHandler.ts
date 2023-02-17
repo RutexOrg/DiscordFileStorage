@@ -5,6 +5,7 @@ import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
 import color from "colors/safe";
 import VoidWritableBuffer from "../stream-helpers/VoidWritableBuffer";
+import VoidReadableBuffer from "../stream-helpers/VoidReadableBuffer";
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
@@ -112,6 +113,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.log(".openReadStream", path);
         let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString())!;
         
+        if(!file.isRemoteValid){
+            this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
+            return callback(undefined, new VoidReadableBuffer());
+        }
+
         this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
             this.log(".openReadStream", "Stream opened"); 
             callback(undefined, stream);
@@ -136,28 +142,36 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         this.log(".openWriteStream", path);
-        let folder = this.app.getFileSystem().getRoot().prepareFileHierarchy(path.toString());
+
         let createdFile = this.app.getFileSystem().getRoot().getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
-        
+        console.log("createdFile", createdFile);
+
+        let folder = createdFile?.getFolder()!;
+        console.log("folder", folder);
+
         if(createdFile?.isRemoteValid()){
             await this.app.getDiscordFileManager().deleteFile(createdFile, false);    
         }
-        folder.removeFile(createdFile!);
         
         if(ctx.estimatedSize == -1){
-            this.app.getFileSystem().getRoot().createFileHierarchy(path.toString(), path.fileName());
+            if(!folder || !createdFile){
+                console.log(color.cyan("Creating file;"));
+                this.app.getFileSystem().getRoot().createFileHierarchy(path.toString(), path.fileName());
+            }
             return callback(undefined, new VoidWritableBuffer()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
-        // if(1){process.exit()}
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
+        folder.removeFile(createdFile!);
+        folder.printHierarchyWithFiles(true);
         let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder);
         
-        this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
+        
+        this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
             callback(undefined, stream);
             stream.once("close", async () => {
-                await this.app.getDiscordFileManager().postMetaFile(file, false);
+                await this.app.getDiscordFileManager().postMetaFile(file!, false);
                 this.log(".openWriteStream", "File uploaded");
             });
         }).catch(err => {
@@ -176,10 +190,16 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
         
         let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
+        this.log(".delete", file);
         if(!file) {
             return callback(Errors.ResourceNotFound);
         }
 
+        if(!file.isRemoteValid()){
+            this.app.getFileSystem().getRoot().removeFile(file!);
+            return callback();
+        }
+        
         this.app.getDiscordFileManager().deleteFile(file, false).then(() => {
             this.app.getFileSystem().getRoot().removeFile(file!);
             return callback();
