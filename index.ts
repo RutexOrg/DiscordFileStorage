@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import config from "./src/config";
+import config from "./config";
 import {  GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
