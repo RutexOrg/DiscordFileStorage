@@ -7,6 +7,7 @@ Supported functions:
 - Upload files. 
 - Download files.
 - Delete files.
+- Modify - but be aware - each time you modify a file, the whole file being uploaded again. So it good only for small or static files. 
 
 You ```cant create or manage folders```, since they arent supported (yet). 
 
