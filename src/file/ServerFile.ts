@@ -1,4 +1,6 @@
 import FileBase from "./FileBase";
+import DiscordFileSystem from "./filesystem/DiscordFileSystem";
+import Folder from "./filesystem/Folder";
 
 /**
  * Represents a file on the server side. This file is stored on the server.
@@ -8,12 +10,14 @@ export default class ServerFile extends FileBase {
     private filesPostedInChannelId: string = "";
     private metaIdInMetaChannel: string = "";
     private metaVersion: number = 0;
+    private folder: Folder;
 
     private markedDeleted: boolean = false;
-    private folders: string[];
-    constructor(filename: string, totalSize: number, folders: string[], uploadedDate: Date = new Date()) {
+
+    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date = new Date()) {
         super(filename, totalSize, uploadedDate);
-        this.folders = folders;
+        this.folder = folder;
+        this.folder.addFile(this);
     }
 
     public getDiscordMessageIds(): string[] {
@@ -44,13 +48,13 @@ export default class ServerFile extends FileBase {
         this.metaVersion = metaVersion;
     }
 
-
-    public getFolders(): string[] {
-        return this.folders;
+    public getFolder(): Folder {
+        return this.folder;
     }
 
-    public setFolders(folders: string[]): void {
-        this.folders = folders;
+    public setFolder(folder: Folder): void {
+        console.trace("Trying to set folder!!!");
+        this.folder = folder;
     }
 
     public getMetaIdInMetaChannel(): string {
@@ -89,19 +93,27 @@ export default class ServerFile extends FileBase {
             filesPostedInChannelId: this.getFilesPostedInChannelId(),
             metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
             metaVersion: this.metaVersion,
-            folders: this.folders,
+            folder: this.folder.getAbsolutePath() + "/" + this.getFileName(),
             discordMessageIds: this.getDiscordMessageIds(),
         };
     }
     
-    public static fromObject(obj: any): ServerFile {
-        const file = new ServerFile(obj.filename, obj.totalSize, obj.folders, new Date(obj.uploadDate));
+    public static fromObject(obj: any, root: DiscordFileSystem): ServerFile {
+        let folder = root.getRoot().prepareFileHierarchy(obj.folder as string);
+        const file = new ServerFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
         file.setDiscordMessageIds(obj.discordMessageIds);
 
         return file;
     }
 
+    public getAbsolutePath(): string {
+        return this.folder.getAbsolutePath() + "/" + this.getFileName();
+    }
+
+    public isRemoteValid(): boolean {
+        return this.discordMessageIds.length > 0;
+    }
  
 
 

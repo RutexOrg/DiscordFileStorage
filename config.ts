@@ -1,4 +1,4 @@
 export default {
-    startWebDavServer: true,
+    startWebdavServer: true,
     webdavPort: 1900,
 }

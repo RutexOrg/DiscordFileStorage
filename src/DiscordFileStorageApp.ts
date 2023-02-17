@@ -1,12 +1,9 @@
-import { ReadStream } from 'fs-extra';
-import { WriteStream } from 'fs-extra';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, GuildBasedChannel, Message, TextBasedChannel, TextChannel } from 'discord.js';
 import color from 'colors/safe';
 import DiscordFileManager from './RemoteFileManager';
 import axios from 'axios';
 import ServerFile from './file/ServerFile';
-import FileManager from './file/FileTransformer';
-import ClientFile from './file/ClientFile';
+import DiscordFileSystem from './file/filesystem/DiscordFileSystem';
 
 
 /**
@@ -14,7 +11,7 @@ import ClientFile from './file/ClientFile';
  */
 export default class DiscordFileStorageApp extends Client {
    
-    private files: Array<ServerFile> = [];
+    private filesystem: DiscordFileSystem = new DiscordFileSystem();
     private guildId: string;
     
     private channelsToCreate = [
@@ -33,17 +30,19 @@ export default class DiscordFileStorageApp extends Client {
         }
         DiscordFileStorageApp.instance = this;
 
+        const metaChannelName = process.env.META_CHANNEL;
+        const filesChannelName = process.env.FILES_CHANNEL;
+
+        if(!metaChannelName){
+            printAndExit("No meta channel name provided. Please set the META_CHANNEL .env variable to your metadata channel name.");
+        }
+
+        if(!filesChannelName){
+            printAndExit("No files channel name provided. Please set the FILES_CHANNEL .env variable to your files channel name.");
+        }
+
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
-        
-        this.discordFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
-            console.log("fileUploaded: " + file.getFileName());
-            this.files.push(file);
-        });
-
-        this.discordFileManager.on("fileDeleted", (file: ServerFile) => {
-            this.files = this.files.filter(f => !f.isMarkedDeleted());
-        });
     }
 
     public async getGuild(): Promise<Guild>{
@@ -117,8 +116,8 @@ export default class DiscordFileStorageApp extends Client {
         return allMessages;
       }
 
-    public getFiles(): Array<ServerFile> {
-        return this.files;
+    public getFileSystem(): DiscordFileSystem {
+        return this.filesystem;
     }
 
     /**
@@ -131,9 +130,8 @@ export default class DiscordFileStorageApp extends Client {
             if(msg.attachments.size > 0){
                 let file = (await axios.get(msg.attachments.first()!.url)).data as object;
                 if(ServerFile.isValidRemoteFile(file)){
-                    const remoteFile = ServerFile.fromObject(file);
+                    const remoteFile = ServerFile.fromObject(file, this.filesystem);
                     remoteFile.setMetaIdInMetaChannel(msg.id);
-                    this.files.push(remoteFile);
                 }else{
                     console.log("Failed to extract valid message data");
                     console.log(file);

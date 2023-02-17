@@ -13,11 +13,11 @@
     "webdav-server": "^2.6.2"
   },
   "scripts": {
-    "start": "tsc && node --no-warnings out/index.js"
+    "start": "tsc && node --no-warnings out/index.js",
+    "testRun": "tsc && node --no-warnings out/test.js"
   },
   "devDependencies": {
     "@types/debug": "^4.1.7",
-    "@types/fs-extra": "^11.0.1",
     "yarn-upgrade-all": "^0.7.2"
   }
 }

@@ -5,7 +5,8 @@ export default class FileBase {
     private filename: string;
     private totalSize: number;
     private uploadedDate: Date;
-
+    private isFileComplete: boolean = true;
+    
     constructor(filename: string, totalSize: number, uploadedDate: Date = new Date()) {
         this.filename = filename;
         this.totalSize = totalSize;

@@ -68,21 +68,6 @@
   dependencies:
     "@types/ms" "*"
 
-"@types/fs-extra@^11.0.1":
-  version "11.0.1"
-  resolved "https://registry.npmjs.org/@types/fs-extra/-/fs-extra-11.0.1.tgz"
-  integrity sha512-MxObHvNl4A69ofaTRU8DFqvgzzv8s9yRtaPPm5gud9HDNvpB3GPQFvNuTWAI59B9huVGV5jXYJwbCsmBsOGYWA==
-  dependencies:
-    "@types/jsonfile" "*"
-    "@types/node" "*"
-
-"@types/jsonfile@*":
-  version "6.1.1"
-  resolved "https://registry.npmjs.org/@types/jsonfile/-/jsonfile-6.1.1.tgz"
-  integrity sha512-GSgiRCVeapDN+3pqA35IkQwasaCh/0YFH5dEF6S88iDvEn901DjOeH3/QPY+XYP1DFzDZPvIvfeEgk+7br5png==
-  dependencies:
-    "@types/node" "*"
-
 "@types/ms@*":
   version "0.7.31"
   resolved "https://registry.yarnpkg.com/@types/ms/-/ms-0.7.31.tgz#31b7ca6407128a3d2bbc27fe2d21b345397f6197"
