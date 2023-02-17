@@ -57,8 +57,10 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         });
 
         if (dispatchEvent) {
+            console.log("Dispatching fileUploaded event")
             this.emit("fileUploaded", file);
         }
+        console.log("return");
 
         return {
             message: "File meta posted successfully.",

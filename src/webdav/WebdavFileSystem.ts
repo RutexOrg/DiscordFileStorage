@@ -1,11 +1,10 @@
 import { Readable, Writable } from "stream";
 import { ResourceType, v2 } from "webdav-server";
-import { Errors } from "webdav-server/lib/index.v2";
+import { Errors, Path } from "webdav-server/lib/index.v2";
 import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
 import color from "colors/safe";
-import RamReadableBuffer from "../stream-helpers/RamReadableBuffer";
-import debug from "debug";
+import VoidWritableBuffer from "../stream-helpers/VoidWritableBuffer";
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
@@ -46,9 +45,9 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         return callback(undefined, this.cPropertyManager);
     }
 
-    private getFile(path: string): ServerFile | undefined {
-        let fileName = path.split("/").pop();
-        if(fileName === undefined) {
+    private getFile(path: Path): ServerFile | undefined {
+        let fileName = path.fileName();
+        if(!fileName) {
             return undefined;
         }
 
@@ -59,32 +58,44 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
         return this.virtualCreatedFiles.includes(filename);
     }
 
+    private addToVirtualCreatedFiles(filename: string): void {
+        if(!this.containsInVirtualCreatedFiles(filename)){
+            this.virtualCreatedFiles.push(filename);
+        }
+    }
+
+    private removeFromVirtualCreatedFiles(filename: string): void {
+        this.virtualCreatedFiles = this.virtualCreatedFiles.filter(file => file !== filename);
+    }
+
+
     private log(from: string, data: any){
         console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
     }
     
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        this.log(".size", path);
-        let file = this.getFile(path.toString());
+        // this.log(".size", path);
+        let file = this.getFile(path);
         if(!file) {
-            return callback(undefined, 0);
+            return callback(undefined, this.app.getFiles().reduce((acc, file) => acc + file.getTotalSize(), 0));
         }
         return callback(undefined, file.getTotalSize());
     }
 
+    // TODO: Implement this method
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
-        this.log(".availableLocks", path);
+        // this.log(".availableLocks", path);
         return callback(undefined, []);
     }
 
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        this.log(".readDir", path);
+        // this.log(".readDir", path);
         return callback(undefined, this.app.getFiles().map(file => file.getFileName()));
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
-        this.log(".type", path);
+        // this.log(".type", path);
         if(path.toString() === "/") {
             return callback(undefined, ResourceType.Directory);
         }
@@ -96,20 +107,17 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(true);
         }
         // this.log(".fastExistCheck", path);
-        this.log(".fastExistCheck", path.fileName());
+        // this.log(".dfastExistCheck", path.fileName());
         let requestedFile = path.fileName();
-        if(!requestedFile) {
-            return callback(false);
-        }
 
-        let existsCheck = this.app.getFiles().map(file => file.getFileName()).includes(requestedFile);
+        let existsCheck = !!this.app.getFiles().map(file => file.getFileName()).find(file => file === requestedFile);
         let existsInVirtualCreatedFiles = this.containsInVirtualCreatedFiles(requestedFile);
         return callback(existsCheck || existsInVirtualCreatedFiles);
     }
 
     protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
         this.log(".openReadStream", path);
-        let file = this.getFile(path.toString());
+        let file = this.getFile(path);
         if(!file) {
             return callback(new Error("File not found"));
         }
@@ -137,44 +145,46 @@ export default class VirtualDiscordFileSystem extends v2.FileSystem {
             return callback(Errors.ResourceAlreadyExists);
         }
 
-        this.virtualCreatedFiles.push(requestedFile);
+        this.addToVirtualCreatedFiles(requestedFile);
         return callback();
     }
 
-    protected _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): void {
-        this.log(".openWriteStream", path);
-        let requestedFile = path.fileName()
-        if(!requestedFile) {
-            return callback(Errors.ResourceNotFound);
-        }
+    async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
+        console.log(color.cyan("-------------------"));
+        this.log(".openWriteStream","");
+        console.dir({
+            mode: ctx.mode,
+            path: path,
+            size: ctx.estimatedSize,
+        });
+        console.log(color.cyan("-------------------"));
+        
+        const serverFile = this.getFile(path);
+        const size = ctx.estimatedSize; // -1 if creating file first
+        const creatingFileFirst = size === -1;
 
 
-        if(this.app.getFiles().map(file => file.getFileName()).includes(requestedFile)) {
-            return callback(Errors.ResourceAlreadyExists);
-        }
 
-        if(!this.containsInVirtualCreatedFiles(requestedFile)) {
-            return callback(Errors.ResourceNotFound);
-        }
-
-        let creatingFileFirst = ctx.mode == "mustCreate";
         if(creatingFileFirst) {
             this.log(".openWriteStream", "Creating file first");
-            let ramReadableBuffer = new RamReadableBuffer();
-            callback(undefined, ramReadableBuffer);
+            callback(undefined, new VoidWritableBuffer());
             return;
         }
+        
+        if(serverFile){
+            await this.app.getDiscordFileManager().deleteFile(serverFile, true);
+        }
 
+        this.addToVirtualCreatedFiles(path.fileName()); // need for fastExistCheck
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
-        let file = new ServerFile(requestedFile, ctx.estimatedSize, []);
+        let file = new ServerFile(path.fileName(), ctx.estimatedSize, []);
         
         this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
             callback(undefined, stream);
-            stream.once("close", () => {
-                this.app.getDiscordFileManager().postMetaFile(file, true).then(() => {
-                    this.log(".openWriteStream", "File uploaded");
-                });
+            stream.once("close", async () => {
+                await this.app.getDiscordFileManager().postMetaFile(file, true);
+                this.log(".openWriteStream", "File uploaded");
             });
         }).catch(err => {
             console.log(err);

@@ -37,6 +37,7 @@ export default class DiscordFileStorageApp extends Client {
         this.discordFileManager = new DiscordFileManager(this);
         
         this.discordFileManager.on("fileUploaded", (file: ServerFile) => { // beging called from RemoteFileManager.postMetaFile
+            console.log("fileUploaded: " + file.getFileName());
             this.files.push(file);
         });
 
