@@ -1,9 +1,11 @@
 import ServerFile from "../ServerFile";
+import colors from "colors/safe";
 
 export interface ElementType {
     isFile?: boolean;
     isFolder?: boolean;
     isUnknown?: boolean;
+    entry?: Folder | ServerFile; // undefined on isUnknown
 }
 
 export default class Folder {
@@ -84,12 +86,14 @@ export default class Folder {
     public getElementTypeByPath(path: string): ElementType {
         if (this.getFolderByPath(path)) {
             return {
-                isFolder: true
+                isFolder: true,
+                entry: this.getFolderByPath(path)
             }
         }
         if (this.getFileByPath(path)) {
             return {
-                isFile: true
+                isFile: true,
+                entry: this.getFileByPath(path)
             }
         }
         return {
@@ -168,8 +172,7 @@ export default class Folder {
         this.removeFolderFromHierarchy(folder, folder.parent!);
     }
 
-    public removeFolderHierarchy(path: string): void {
-        let folder = this.getFolderByPath(path);
+    public removeFolderHierarchy(folder: Folder): void {
         if(folder) {
             this.removeFolder(folder);
         }else{
@@ -242,29 +245,14 @@ export default class Folder {
     }
 
 
-
-    public printHierarchy(initial: boolean = false): void {
-        if(initial) {
-            console.log("Printing hierarchy:")
-            console.log("-------------------");
-        }
-        console.log(this.getAbsolutePath());
-        this.folders.forEach(folder => {
-            folder.printHierarchy();
-        });
-        if(initial){
-            console.log("-------------------");
-        }
-    }
-
     public printHierarchyWithFiles(initial: boolean = false): void {
         if(initial) {
             console.log("Printing hierarchy :" + this.getAbsolutePath())
             console.log("-------------------");
         }
-        console.log(this.getAbsolutePath());
+        console.log(colors.blue("[D] ") +this.getAbsolutePath());
         this.files.forEach(file => {
-            console.log("[F] " +this.getAbsolutePath() + "/" + file.getFileName());
+            console.log(colors.green("[F] ") +this.getAbsolutePath() + "/" + file.getFileName());
         });
         this.folders.forEach(folder => {
             folder.printHierarchyWithFiles();
@@ -285,7 +273,6 @@ export default class Folder {
         });
         return map;
     }
-
 
     // accepts path in format /folder1/folder2/folder3
     // returns folder or undefined if not found
@@ -340,14 +327,15 @@ export default class Folder {
 
 
     // returns path in format /folder1/folder2/folder3
-    public getAbsolutePath(includeInitialSlash: boolean = false): string {
+    public getAbsolutePath(): string {
         let path = "";
         let currentFolder = this.parent;
         while (currentFolder != null) {
             path = currentFolder.getName() + "/" + path;
             currentFolder = currentFolder.getParent();
         }
-        return (includeInitialSlash ? "/" : "")  + path + this.name;
+        
+        return (path.charAt(0) == "/" ? path : "/" + path) + this.name;
     }
 
     // returns array of folders in format ["folder1", "folder2", "folder3"]
@@ -361,7 +349,7 @@ export default class Folder {
         return path.reverse();
     }
 
-    public moveFolder(folder: Folder, newParent: Folder): void {
+    public moveFolder(folder: Folder, toFolder: Folder): void {
         if(folder.isRoot){
             throw new Error("Cannot move root folder");
         }
@@ -371,8 +359,8 @@ export default class Folder {
             prevFolderParent.removeFolder(folder);
         }
 
-        folder.parent = newParent;
-        newParent.addFolder(folder);
+        folder.parent = toFolder;
+        toFolder.addFolder(folder);
     }
 
     public moveFile(file: ServerFile, oldFolder: Folder, newPath: string): void {

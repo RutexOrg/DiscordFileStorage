@@ -70,10 +70,14 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     }
 
     public async updateMetaFile(file: ServerFile): Promise<IUploadResult> {
-        if(!file.isUploaded()){
+        // if(!file.isUploaded()){
+            // throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
+        // }
+        
+        if(!file.getMetaIdInMetaChannel()){
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
-        
+
         const metaChannel = await this.app.getMetadataChannel();
         const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
         await msg.edit({

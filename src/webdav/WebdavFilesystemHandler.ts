@@ -6,6 +6,7 @@ import ServerFile from "../file/ServerFile";
 import VoidWritableBuffer from "../stream-helpers/VoidWritableBuffer";
 import VoidReadableBuffer from "../stream-helpers/VoidReadableBuffer";
 import RamFile from "../file/RamFile";
+import Folder from "../file/filesystem/Folder";
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
  * WARNING! Many methods are not implemented yet or not implemented at all but some very basic functionality is working.
@@ -26,14 +27,15 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     private app: DiscordFileStorageApp;
     private cLockManager: v2.LocalLockManager;
     private cPropertyManager: v2.LocalPropertyManager;
-    
+    private fs: Folder;
+
     constructor(client: DiscordFileStorageApp) {
         super(new VirtualDiscordFileSystemSerializer());
         this.app = client;
         
         this.cLockManager = new v2.LocalLockManager();
         this.cPropertyManager = new v2.LocalPropertyManager();
-        
+        this.fs = this.app.getFileSystem().getRoot();               
     }
 
     
@@ -51,7 +53,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
     
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
+        let file = this.fs.getFileByPath(path.toString());
         if(!file) {
             // return callback(undefined, this.app.getFiles().reduce((acc, file) => acc + file.getTotalSize(), 0));
             return callback(undefined, 0);
@@ -68,7 +70,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.log(".readDir", path);
-        let folder = this.app.getFileSystem().getRoot().getFolderByPath(path.toString())!;
+        let folder = this.fs.getFolderByPath(path.toString())!;
         folder.printHierarchyWithFiles(true);
         return callback(undefined, folder.getAllEntries());
         
@@ -76,7 +78,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
         // this.log(".type", path);
-        const entryInfo = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
+        const entryInfo = this.fs.getElementTypeByPath(path.toString());
         if(entryInfo.isUnknown){
             return callback(Errors.ResourceNotFound);
         }
@@ -95,7 +97,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
-        let existsCheckState = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
+        let existsCheckState = this.fs.getElementTypeByPath(path.toString());
         
         // this.log(".fastExistCheck", exists + " | " + path.toString());
         if(existsCheckState.isUnknown){
@@ -108,22 +110,17 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
         this.log(".openReadStream", path);
-        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString())!;
+        let file = this.fs.getFileByPath(path.toString())!;
         
-        if(file instanceof RamFile){
-            return callback(undefined, file.getReadable());
-        }
 
         if(!file.isUploaded()){
+            console.log(file);
             this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
             return callback(undefined, new VoidReadableBuffer());
         }
 
         this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
             this.log(".openReadStream", "Stream opened"); 
-            stream.on("data", (chunk) => {
-                this.log(".openReadStream", "Stream data: " + chunk.length);   
-            });
             callback(undefined, stream);
         }).catch(err => {
             console.log(err);
@@ -134,12 +131,12 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.log(".create", path + " | " + ctx.type);
         if(ctx.type.isDirectory){
             console.log("Creating folder; ", path.toString());
-            this.app.getFileSystem().getRoot().createHierarchy(path.toString());
+            this.fs.createHierarchy(path.toString());
             return callback();
         }else{
             console.log("Creating file; ", path.toString());
-            this.app.getFileSystem().getRoot().createFileHierarchy(path.toString(), path.fileName());
-            let test = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
+            this.fs.createFileHierarchy(path.toString(), path.fileName());
+            let test = this.fs.getFileByPath(path.toString());
             return callback();
         }
     }
@@ -148,20 +145,20 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.log(".openWriteStream", path);
         this.log("!!!","Debug VSCode save algorithm");
 
-        let createdFile = this.app.getFileSystem().getRoot().getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
-        console.log("createdFile", createdFile);
+        let existingFile = this.fs.getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
+        console.log("createdFile", existingFile);
 
-        let folder = createdFile?.getFolder()!;
+        let folder = existingFile?.getFolder()!;
         console.log("folder", folder);
         
-        if(createdFile?.isUploaded() && ctx.estimatedSize !== -1){
-            await this.app.getDiscordFileManager().deleteFile(createdFile, false);    
+        if(existingFile?.isUploaded() && ctx.estimatedSize !== -1){
+            await this.app.getDiscordFileManager().deleteFile(existingFile, false);    
         }
         
         if(ctx.estimatedSize == -1){
             // if(!folder || !createdFile){
             // console.log("performing prepareFileHierarchy")
-            // let folder = this.app.getFileSystem().getRoot().prepareFileHierarchy(path.toString());
+            // let folder = this.fs.prepareFileHierarchy(path.toString());
             // let ramFile = new RamFile(path.fileName(), 0, folder);
             // }
             // return callback(undefined, ramFile.getWritable()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
@@ -169,10 +166,10 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
-        folder.removeFile(createdFile!);
+        folder.removeFile(existingFile!);
         folder.printHierarchyWithFiles(true);
         let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder);
-        
+        file.setMetaIdInMetaChannel(existingFile?.getMetaIdInMetaChannel()!);
         
         this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
@@ -188,30 +185,31 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
-    protected _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): void {
+    async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
         this.log(".delete", path);
-        let isFileSystemEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
-        if(isFileSystemEntry.isFolder){
-            this.app.getFileSystem().getRoot().removeFolderHierarchy(path.toString());
-            return callback();
-        }
-        
-        let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
-        if(!file) {
+        let entryCheck = this.fs.getElementTypeByPath(path.toString());
+        if(entryCheck.isUnknown){
             return callback(Errors.ResourceNotFound);
         }
 
-        if(!file.isUploaded()){
-            this.app.getFileSystem().getRoot().removeFile(file!);
+        if(entryCheck.isFolder){
+            this.fs.removeFolderHierarchy(entryCheck.entry as Folder);
             return callback();
         }
         
-        this.app.getDiscordFileManager().deleteFile(file, false).then(() => {
-            this.app.getFileSystem().getRoot().removeFile(file!);
+        let file = entryCheck.entry as ServerFile;
+
+        if(!file.isUploaded()){
+            this.fs.removeFile(file!);
             return callback();
-        }).catch(err => {
-            return callback(Errors.IllegalArguments);
-        });
+        }
+        console.log(file);
+        console.log(file.getAbsolutePath());
+        this.fs.printHierarchyWithFiles();
+
+        this.fs.removeFile(file!);
+        await this.app.getDiscordFileManager().deleteFile(file, false);
+        return callback();
     }
 
 
@@ -220,12 +218,12 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(Errors.InvalidOperation);
     }
 
-    // not very clean, TODO: clean up
+    // very dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(".move", pathFrom + " | " + pathTo);
 
-        let sourceEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(pathFrom.toString());
-        let targetEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(pathTo.toString());
+        let sourceEntry = this.fs.getElementTypeByPath(pathFrom.toString());
+        let targetEntry = this.fs.getElementTypeByPath(pathTo.toString());
 
         console.log("sourceEntry", sourceEntry);
         console.log("targetEntry", targetEntry);
@@ -236,27 +234,29 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
  
         if(sourceEntry.isFile){
-            let file = this.app.getFileSystem().getRoot().getFileByPath(pathFrom.toString())!;
+            let file = this.fs.getFileByPath(pathFrom.toString())!;
             
-            let newFolder = this.app.getFileSystem().getRoot().prepareFileHierarchy(pathTo.toString());
+            let newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
             let oldFolder = file.getFolder()!;
             file.setFolder(newFolder);
             file.setFileName(pathTo.fileName());
 
-            console.log("pathTo: " + pathTo.fileName());
-            console.log("absolutePath: " + newFolder.getAbsolutePath(true));
-            this.app.getFileSystem().getRoot().moveFile(file, oldFolder, newFolder.getAbsolutePath(true));
-
+            // console.log("pathTo: " + pathTo.fileName());
+            // console.log("absolutePath: " + newFolder.getAbsolutePath());
+            this.fs.moveFile(file, oldFolder, newFolder.getAbsolutePath());
             await this.app.getDiscordFileManager().updateMetaFile(file);
             return callback(undefined, true);
         }
 
         if(sourceEntry.isFolder){
-            let folder = this.app.getFileSystem().getRoot().getFolderByPath(pathFrom.toString())!; // /test
-            let newFolder = this.app.getFileSystem().getRoot().createHierarchy(pathTo.toString()); // /asd
+            let folder = this.fs.getFolderByPath(pathFrom.toString())!; // /test
+            let newFolder = this.fs.createHierarchy(pathTo.toString()); // /asd
             let parent = folder.getParent()!; // /
             
             parent.removeFolder(folder);
+            folder.getFiles().forEach(file => {
+                file.setFolder(newFolder);
+            });
             newFolder.setFiles(folder.getFiles());
 
             console.log("folder", folder);
@@ -270,7 +270,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(".rename", pathFrom + " | " + newName);
-        let file = this.app.getFileSystem().getRoot().getFileByPath(pathFrom.toString());
+        let file = this.fs.getFileByPath(pathFrom.toString());
         this.app.getDiscordFileManager().renameFile(file!, newName).then(() => {
             return callback(undefined, true);
         }).catch(err => {
