@@ -47,6 +47,13 @@ export default class Folder {
         return this.files;
     }
 
+
+    public setFiles(files: ServerFile[]): void {
+        this.files = files;
+    }
+    
+
+
     public getFolders(): Folder[] {
         return this.folders;
     }
@@ -134,8 +141,13 @@ export default class Folder {
     private removeFileFromFolder(file: ServerFile, folder: Folder): void {
         folder.files = folder.files.filter(f => f.getFileName() != file.getFileName());
     }
+
+    public removeFileFromThisFolder(file: ServerFile): void {
+        this.removeFileFromFolder(file, this);
+    }
     
     public removeFile(file: ServerFile): void {
+        console.log("Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
         file = Folder.root.getFileByPath(file.getAbsolutePath())!;
         if(!file){
             throw new Error("File not found");
@@ -165,14 +177,15 @@ export default class Folder {
         }
     }
 
-    public createHierarchy(path: string): void {
+    public createHierarchy(path: string): Folder {
         if(!path.startsWith("/")){
             throw new Error("Path should start with /");
         }
         let paths = path.split("/");
         paths.shift();
-        if (paths.length == 0) {
-            return;
+
+        if(paths.length == 0) {
+            throw new Error("Path cannot be empty");
         }
 
         let currentFolder: Folder = this;
@@ -186,6 +199,8 @@ export default class Folder {
             }
             currentFolder = folder;
         }
+
+        return currentFolder;
     }
 
     // same as createHierarchy but creates last element as file
@@ -325,14 +340,14 @@ export default class Folder {
 
 
     // returns path in format /folder1/folder2/folder3
-    public getAbsolutePath(): string {
+    public getAbsolutePath(includeInitialSlash: boolean = false): string {
         let path = "";
         let currentFolder = this.parent;
         while (currentFolder != null) {
             path = currentFolder.getName() + "/" + path;
             currentFolder = currentFolder.getParent();
         }
-        return path + this.name;
+        return (includeInitialSlash ? "/" : "")  + path + this.name;
     }
 
     // returns array of folders in format ["folder1", "folder2", "folder3"]
@@ -344,6 +359,36 @@ export default class Folder {
             currentFolder = currentFolder.getParent();
         }
         return path.reverse();
+    }
+
+    public moveFolder(folder: Folder, newParent: Folder): void {
+        if(folder.isRoot){
+            throw new Error("Cannot move root folder");
+        }
+
+        let prevFolderParent = folder.getParent();
+        if(prevFolderParent){
+            prevFolderParent.removeFolder(folder);
+        }
+
+        folder.parent = newParent;
+        newParent.addFolder(folder);
+    }
+
+    public moveFile(file: ServerFile, oldFolder: Folder, newPath: string): void {
+        let newFolder = this.getFolderByPath(newPath);
+        if(!newFolder){
+            newFolder = this.prepareFileHierarchy(newPath);
+        }
+
+        console.log(oldFolder.name);
+
+        oldFolder.files = oldFolder.files.filter(f => f != file);
+        newFolder.addFile(file);
+        file.setFolder(newFolder);
+
+        console.log("afterMove")
+        console.log(oldFolder.getFiles())
     }
 
     

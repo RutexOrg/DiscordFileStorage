@@ -6,6 +6,7 @@ import {Writable, Readable} from "stream";
 import { EventEmitter } from "events";
 import TypedEmitter from 'typed-emitter';
 import IFIleManager, { IUploadResult } from "./file/IFileManager";
+import Folder from "./file/filesystem/Folder";
 
 
 export const MAX_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
@@ -25,7 +26,6 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         super();
         this.app = client;
     }
-
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
         const filesChannel = await this.app.getFileChannel();
         
@@ -68,6 +68,26 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
             file,
         }
     }
+
+    public async updateMetaFile(file: ServerFile): Promise<IUploadResult> {
+        if(!file.isUploaded()){
+            throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
+        }
+        
+        const metaChannel = await this.app.getMetadataChannel();
+        const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        await msg.edit({
+            content: ":white_check_mark: :white_check_mark: File info updated successfully.",
+            files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true)],
+        });
+
+        return {
+            message: "File meta updated successfully.",
+            success: true,
+            file,
+        }
+    }
+
     
     public async getUploadWritableStream(file: ServerFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
@@ -137,6 +157,16 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         }
     }
 
+    public async renameFile(file: ServerFile, newName: string): Promise<IUploadResult> {
+        file.setFileName(newName);
+        await this.updateMetaFile(file);
+
+        return {
+            success: true,
+            message: "File renamed successfully.",
+            file,
+        }
+    }
 
 
 }

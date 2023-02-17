@@ -3,10 +3,9 @@ import { ResourceType, v2 } from "webdav-server";
 import { Errors, Path } from "webdav-server/lib/index.v2";
 import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
-import color from "colors/safe";
 import VoidWritableBuffer from "../stream-helpers/VoidWritableBuffer";
 import VoidReadableBuffer from "../stream-helpers/VoidReadableBuffer";
-
+import RamFile from "../file/RamFile";
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
  * WARNING! Many methods are not implemented yet or not implemented at all but some very basic functionality is working.
@@ -34,6 +33,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         
         this.cLockManager = new v2.LocalLockManager();
         this.cPropertyManager = new v2.LocalPropertyManager();
+        
     }
 
     
@@ -75,7 +75,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
-        this.log(".type", path);
+        // this.log(".type", path);
         const entryInfo = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
         if(entryInfo.isUnknown){
             return callback(Errors.ResourceNotFound);
@@ -95,17 +95,14 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
-        const entryInfo = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
-        if(entryInfo.isUnknown){
-            return callback(false);
-        }
         let existsCheckState = this.app.getFileSystem().getRoot().getElementTypeByPath(path.toString());
         
+        // this.log(".fastExistCheck", exists + " | " + path.toString());
         if(existsCheckState.isUnknown){
             return callback(false);
         }
         let exists = (existsCheckState.isFile || existsCheckState.isFolder) ?? false;
-        this.log(".fastExistCheck", exists + " | " + path.toString());
+
         return callback(exists);
     }
 
@@ -113,13 +110,20 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.log(".openReadStream", path);
         let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString())!;
         
-        if(!file.isRemoteValid){
+        if(file instanceof RamFile){
+            return callback(undefined, file.getReadable());
+        }
+
+        if(!file.isUploaded()){
             this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
             return callback(undefined, new VoidReadableBuffer());
         }
 
         this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
             this.log(".openReadStream", "Stream opened"); 
+            stream.on("data", (chunk) => {
+                this.log(".openReadStream", "Stream data: " + chunk.length);   
+            });
             callback(undefined, stream);
         }).catch(err => {
             console.log(err);
@@ -142,22 +146,25 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         this.log(".openWriteStream", path);
+        this.log("!!!","Debug VSCode save algorithm");
 
         let createdFile = this.app.getFileSystem().getRoot().getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
         console.log("createdFile", createdFile);
 
         let folder = createdFile?.getFolder()!;
         console.log("folder", folder);
-
-        if(createdFile?.isRemoteValid()){
+        
+        if(createdFile?.isUploaded() && ctx.estimatedSize !== -1){
             await this.app.getDiscordFileManager().deleteFile(createdFile, false);    
         }
         
         if(ctx.estimatedSize == -1){
-            if(!folder || !createdFile){
-                console.log(color.cyan("Creating file;"));
-                this.app.getFileSystem().getRoot().createFileHierarchy(path.toString(), path.fileName());
-            }
+            // if(!folder || !createdFile){
+            // console.log("performing prepareFileHierarchy")
+            // let folder = this.app.getFileSystem().getRoot().prepareFileHierarchy(path.toString());
+            // let ramFile = new RamFile(path.fileName(), 0, folder);
+            // }
+            // return callback(undefined, ramFile.getWritable()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
             return callback(undefined, new VoidWritableBuffer()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
@@ -190,12 +197,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
         
         let file = this.app.getFileSystem().getRoot().getFileByPath(path.toString());
-        this.log(".delete", file);
         if(!file) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if(!file.isRemoteValid()){
+        if(!file.isUploaded()){
             this.app.getFileSystem().getRoot().removeFile(file!);
             return callback();
         }
@@ -214,14 +220,64 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(Errors.InvalidOperation);
     }
 
-    protected _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): void {
+    // not very clean, TODO: clean up
+    async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(".move", pathFrom + " | " + pathTo);
+
+        let sourceEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(pathFrom.toString());
+        let targetEntry = this.app.getFileSystem().getRoot().getElementTypeByPath(pathTo.toString());
+
+        console.log("sourceEntry", sourceEntry);
+        console.log("targetEntry", targetEntry);
+
+
+        if(sourceEntry.isUnknown || !targetEntry.isUnknown){
+            return callback(Errors.InvalidOperation);
+        }
+ 
+        if(sourceEntry.isFile){
+            let file = this.app.getFileSystem().getRoot().getFileByPath(pathFrom.toString())!;
+            
+            let newFolder = this.app.getFileSystem().getRoot().prepareFileHierarchy(pathTo.toString());
+            let oldFolder = file.getFolder()!;
+            file.setFolder(newFolder);
+            file.setFileName(pathTo.fileName());
+
+            console.log("pathTo: " + pathTo.fileName());
+            console.log("absolutePath: " + newFolder.getAbsolutePath(true));
+            this.app.getFileSystem().getRoot().moveFile(file, oldFolder, newFolder.getAbsolutePath(true));
+
+            await this.app.getDiscordFileManager().updateMetaFile(file);
+            return callback(undefined, true);
+        }
+
+        if(sourceEntry.isFolder){
+            let folder = this.app.getFileSystem().getRoot().getFolderByPath(pathFrom.toString())!; // /test
+            let newFolder = this.app.getFileSystem().getRoot().createHierarchy(pathTo.toString()); // /asd
+            let parent = folder.getParent()!; // /
+            
+            parent.removeFolder(folder);
+            newFolder.setFiles(folder.getFiles());
+
+            console.log("folder", folder);
+            console.log("newFolder", newFolder);
+            return callback(undefined, false)
+            // return callback(Errors.InvalidOperation);
+        }
+
         return callback(Errors.InvalidOperation);
     }
 
-    protected _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): void {
+    async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(".rename", pathFrom + " | " + newName);
-        return callback(Errors.InvalidOperation);
+        let file = this.app.getFileSystem().getRoot().getFileByPath(pathFrom.toString());
+        this.app.getDiscordFileManager().renameFile(file!, newName).then(() => {
+            return callback(undefined, true);
+        }).catch(err => {
+            console.log(err);   
+            return callback(err);
+        });
+
     }
 
 

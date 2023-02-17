@@ -17,6 +17,11 @@ export default class FileBase {
         return this.filename;
     }
 
+    public setFileName(newName: string) {
+        this.filename = newName;
+    }
+
+
     public getTotalSize(): number {
         return this.totalSize;
     }

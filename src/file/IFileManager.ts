@@ -14,5 +14,8 @@ export default interface IFIleManager {
     getDownloadableReadStream(file: ServerFile): Promise<Readable>;
     getUploadWritableStream(file: ServerFile, size: number): Promise<Writable>;
     postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult>;
-    deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IDeleteResult>;   
+    updateMetaFile(file: ServerFile): Promise<IUploadResult>;
+    deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IDeleteResult>;
+    renameFile(file: ServerFile, newName: string): Promise<IUploadResult>;
+
 }

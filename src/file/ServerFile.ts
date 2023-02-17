@@ -52,9 +52,15 @@ export default class ServerFile extends FileBase {
         return this.folder;
     }
 
-    public setFolder(folder: Folder): void {
-        console.trace("Trying to set folder!!!");
-        this.folder = folder;
+    public setFolder(folder: Folder, updateParents: boolean = false): void {
+        if(updateParents) {
+            this.folder.removeFile(this);
+            this.folder = folder;
+            this.folder.addFile(this);
+        }else{
+            this.folder = folder;
+        }
+
     }
 
     public getMetaIdInMetaChannel(): string {
@@ -111,8 +117,8 @@ export default class ServerFile extends FileBase {
         return this.folder.getAbsolutePath() + "/" + this.getFileName();
     }
 
-    public isRemoteValid(): boolean {
-        return this.discordMessageIds.length > 0;
+    public isUploaded(): boolean {
+        return this.discordMessageIds.length > 0 && !!this.metaIdInMetaChannel;
     }
  
 
