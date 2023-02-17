@@ -3,7 +3,7 @@ import config from "./config";
 import {  GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
-import VirtualDiscordFileSystem from "./src/webdav/WebdavFileSystem";
+import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
 import { v2 as webdav } from "webdav-server";
 
 async function main() {
@@ -11,8 +11,6 @@ async function main() {
 
     const token = process.env.TOKEN;
     const guildId = process.env.GUILD_ID;
-    const metaChannelName = process.env.META_CHANNEL;
-    const filesChannelName = process.env.FILES_CHANNEL;
 
     if (!token) {
         printAndExit("No token provided. Please set the TOKEN .env variable to your bot token.");
@@ -20,14 +18,6 @@ async function main() {
 
     if (!guildId) {
         printAndExit("No guild id provided. Please set the GUILD_ID .env variable to your guild id.");
-    }
-
-    if (!metaChannelName) {
-        printAndExit("No meta channel name provided. Please set the META_CHANNEL .env variable to your metadata channel name.");
-    }
-
-    if (!filesChannelName) {
-        printAndExit("No files channel name provided. Please set the FILES_CHANNEL .env variable to your files channel name.");
     }
 
     const app = new DiscordFileStorageApp({
@@ -46,10 +36,10 @@ async function main() {
 
 
 
-    if (config.startWebDavServer) {
+    if (config.startWebdavServer) {
         const webdavServer = new webdav.WebDAVServer({
             port: config.webdavPort,
-            rootFileSystem: new VirtualDiscordFileSystem(app),
+            rootFileSystem: new WebdavFilesystemHandler(app),
         });
 
         webdavServer.start(() => {
