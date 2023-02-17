@@ -1,15 +1,13 @@
 # DiscordFileStorage
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
-Yes, even ***above 8MB***. \
-Currently tested limit for a single file is about 750MB (+/- 50MB) 
+Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) 
 
 Supported functions: 
 - Upload files. 
 - Download files.
 - Delete files.
 
-You ```cant modify or rewrite existing``` files. because of limitations of function principle. \
 You ```cant create or manage folders```, since they arent supported (yet). 
 
 # State:
