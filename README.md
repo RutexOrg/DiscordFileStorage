@@ -4,13 +4,13 @@ File manager that allows you to upload and download files to and from Discord an
 Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) 
 
 Supported functions: 
-- Upload files. 
-- Download files.
-- Delete files.
+- Upload. 
+- Download.
+- Delete.
 - Modify - **but be aware** - each time you modify a file, the whole file being uploaded again. So it good only for small or static files. 
+- Manage folders
 
-You ```cant create or manage folders```, since they arent supported (yet). 
-
+.
 # State:
 Not even alpha. **Created for fun**. 
 
