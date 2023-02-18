@@ -113,13 +113,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         this.log(".create", path + " | " + ctx.type);
         if(ctx.type.isDirectory){
-            //console.log("Creating folder; ", path.toString());
             this.fs.createHierarchy(path.toString());
             return callback();
         }else{
-            //console.log("Creating file; ", path.toString());
+            console.log("Creating file; ", path.toString());
             this.fs.createFileHierarchy(path.toString(), path.fileName());
-            let test = this.fs.getFileByPath(path.toString());
             return callback();
         }
     }
@@ -130,7 +128,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         
 
         if(!file.isUploaded() && file.getFileType() == "ram"){
-            //console.log(file);
             this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
             return callback(undefined, (file as RamFile).getReadable());
         }
@@ -142,7 +139,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             //console.log(err);
         });
     }
-
 
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
@@ -167,7 +163,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, ramFile.getWritable()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
-        folder.removeFile(existingFile!);
+
+        if(existingFile?.getFileType() == "ram"){
+            (existingFile as RamFile).cleanup(true);
+        }else{
+            folder.removeFile(existingFile!);
+        }
+
         folder.printHierarchyWithFiles(true);
         let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder);
         file.setMetaIdInMetaChannel(existingFile?.getMetaIdInMetaChannel()!);

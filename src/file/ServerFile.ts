@@ -52,6 +52,10 @@ export default class ServerFile extends FileBase {
         return this.folder;
     }
 
+    public setNullFolder(removeFile: boolean = false): void {
+        this.folder = null as any;
+    }
+
     public setFolder(folder: Folder, updateParents: boolean = false): void {
         if(updateParents) {
             this.folder.removeFile(this);

@@ -165,6 +165,8 @@ export default class Folder {
     }
 
     private removeFileFromFolder(file: ServerFile, folder: Folder): void {
+        let ff = folder.files.find(f => f.getFileName() == file.getFileName())!;
+        ff.setNullFolder();
         folder.files = folder.files.filter(f => f.getFileName() != file.getFileName());
     }
 
