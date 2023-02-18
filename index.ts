@@ -41,7 +41,6 @@ async function main() {
         const webdavServer = new WebdavServer({
             port: config.webdavPort,
             rootFileSystem: new WebdavFilesystemHandler(app),
-            hostname: "0.0.0.0",
         });
 
         webdavServer.start(() => {
