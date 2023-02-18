@@ -106,9 +106,9 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                         files: [this.getAttachmentBuilderFromBuffer(buffer, file.getFileName(), chunkNumber )],
                     });
 
-                    file.addDiscordMessageId(message.id);
+                    file.addDiscordMessageId(message.id);;
                     chunkNumber++;
-                    buffer = chunk;
+                    buffer = Buffer.from(chunk);
                     callback();
                 }else{
                     buffer = Buffer.concat([buffer, chunk]);
