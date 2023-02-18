@@ -107,26 +107,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         return callback(exists);
     }
-
-    protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
-        this.log(".openReadStream", path);
-        let file = this.fs.getFileByPath(path.toString())!;
-        
-
-        if(!file.isUploaded()){
-            console.log(file);
-            this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
-            return callback(undefined, new VoidReadableBuffer());
-        }
-
-        this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
-            this.log(".openReadStream", "Stream opened"); 
-            callback(undefined, stream);
-        }).catch(err => {
-            console.log(err);
-        });
-    }
-
+    
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         this.log(".create", path + " | " + ctx.type);
         if(ctx.type.isDirectory){
@@ -141,31 +122,49 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
     }
 
+    protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
+        this.log(".openReadStream", path);
+        let file = this.fs.getFileByPath(path.toString())!;
+        
+
+        if(!file.isUploaded() && file.getFileType() == "ram"){
+            console.log(file);
+            this.log(".openReadStream", "File is not uploaded, returning empty dummy stream");
+            return callback(undefined, (file as RamFile).getReadable());
+        }
+
+        this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
+            this.log(".openReadStream", "Stream opened"); 
+            callback(undefined, stream);
+        }).catch(err => {
+            console.log(err);
+        });
+    }
+
+
+
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         this.log(".openWriteStream", path);
-        this.log("!!!","Debug VSCode save algorithm");
+        this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
 
-        let existingFile = this.fs.getFileByPath(path.toString()); // being created in create() to complete rest of requests. since we now ready to upload, we can remove it from the file system and replace with real file. 
-        console.log("createdFile", existingFile);
+        let existingFile = this.fs.getFileByPath(path.toString()); // being created in create() . 
+        // console.log("createdFile", existingFile);
 
         let folder = existingFile?.getFolder()!;
-        console.log("folder", folder);
+        // console.log("folder", folder);
         
-        if(existingFile?.isUploaded() && ctx.estimatedSize !== -1){
+        // first creating file in the ram to be able to say system that file is created and ready to be written to.
+        // once we have the size, we can replace the ram file with the real file and upload it to discord.
+        if(existingFile?.getFileType() == "remote" && existingFile?.isUploaded() && ctx.estimatedSize !== -1){
             await this.app.getDiscordFileManager().deleteFile(existingFile, false);    
         }
         
         if(ctx.estimatedSize == -1){
-            // if(!folder || !createdFile){
-            // console.log("performing prepareFileHierarchy")
-            // let folder = this.fs.prepareFileHierarchy(path.toString());
-            // let ramFile = new RamFile(path.fileName(), 0, folder);
-            // }
-            // return callback(undefined, ramFile.getWritable()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
-            return callback(undefined, new VoidWritableBuffer()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
+            folder.removeFile(existingFile!);
+            let ramFile = new RamFile(path.fileName(), 0, folder);
+            return callback(undefined, ramFile.getWritable()); // since we dont support state, we can just return a void stream and create it when we have the size and the file is ready to be uploaded
         }
 
-        this.log(".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
         folder.removeFile(existingFile!);
         folder.printHierarchyWithFiles(true);
         let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder);
