@@ -7,7 +7,7 @@ Supported functions:
 - Upload. 
 - Download.
 - Delete.
-- Modify - **but be aware** - each time you modify a file, the whole file being uploaded again. So it good only for small or static files. 
+- Modify - **but be aware** - each time you modify a file, the whole file being uploaded again. So it good only for small and static files. 
 - Manage folders
 
 Empty folders and newly created files without content will be deleted between restarts, since they cached only in memory.  
