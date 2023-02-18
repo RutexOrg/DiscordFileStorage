@@ -5,6 +5,7 @@ import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
 import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
 import { v2 as webdav } from "webdav-server";
+import WebdavServer from "./src/webdav/WebdavServer";
 
 async function main() {
     dotenv.config();
@@ -37,7 +38,7 @@ async function main() {
 
 
     if (config.startWebdavServer) {
-        const webdavServer = new webdav.WebDAVServer({
+        const webdavServer = new WebdavServer({
             port: config.webdavPort,
             rootFileSystem: new WebdavFilesystemHandler(app),
         });
@@ -48,9 +49,9 @@ async function main() {
         
         webdavServer.afterRequest((arg, next) => {
             // Display the method, the URI, the returned status code and the returned message
-            // console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
+            console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
             // If available, display the body of the response
-            // console.log(arg.responseBody);
+            console.log(arg.responseBody);
             next();
         });
     }

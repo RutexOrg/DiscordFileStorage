@@ -45,6 +45,10 @@ export default class Folder {
         return this.name;
     }
 
+    public setName(name: string): void {
+        this.name = name;
+    }
+
     public getFiles(): ServerFile[] {
         return this.files;
     }
@@ -64,6 +68,24 @@ export default class Folder {
         let entries: string[] = [];
         this.folders.forEach(folder => entries.push(folder.getName()));
         this.files.forEach(file => entries.push(file.getFileName()));
+        return entries;
+    }
+
+    public getAllEntriesRecursive(folder: Folder = Folder.root): ElementType[] {
+        let entries: ElementType[] = [];
+        folder.getFolders().forEach(folder => {
+            entries.push({
+                isFolder: true,
+                entry: folder
+            });
+            entries = entries.concat(this.getAllEntriesRecursive(folder));
+        });
+        folder.getFiles().forEach(file => {
+            entries.push({
+                isFile: true,
+                entry: file
+            });
+        });
         return entries;
     }
 
@@ -262,8 +284,6 @@ export default class Folder {
         }
     }
     
-    
-
     public getFilesPaths(map: Map<string, ServerFile> = new Map()): Map<string, ServerFile> {
         this.files.forEach(file => {
             map.set(this.getAbsolutePath() + "/" + file.getFileName(), file);
@@ -379,6 +399,5 @@ export default class Folder {
         console.log(oldFolder.getFiles())
     }
 
-    
 
 }

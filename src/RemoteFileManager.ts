@@ -26,6 +26,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         super();
         this.app = client;
     }
+
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
         const filesChannel = await this.app.getFileChannel();
         
@@ -70,16 +71,13 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     }
 
     public async updateMetaFile(file: ServerFile): Promise<IUploadResult> {
-        // if(!file.isUploaded()){
-            // throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
-        // }
-        
-        if(!file.getMetaIdInMetaChannel()){
+        if(!file.isUploaded()){
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
 
         const metaChannel = await this.app.getMetadataChannel();
         const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        
         await msg.edit({
             content: ":white_check_mark: :white_check_mark: File info updated successfully.",
             files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true)],
@@ -171,6 +169,5 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
             file,
         }
     }
-
 
 }

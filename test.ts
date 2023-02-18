@@ -1,9 +1,9 @@
-import DiscordFileSystem from "./src/file/filesystem/DiscordFileSystem";
+import FolderTree from "./src/file/filesystem/FolderTree";
 import Folder from "./src/file/filesystem/Folder";
 import ServerFile from "./src/file/ServerFile";
 
 async function main(){
-    let fs = new DiscordFileSystem().getRoot();
+    let fs = new FolderTree().getRoot();
     let a = new Folder("a");
     let b = new Folder("b");
 

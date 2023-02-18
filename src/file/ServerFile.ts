@@ -1,5 +1,5 @@
 import FileBase from "./FileBase";
-import DiscordFileSystem from "./filesystem/DiscordFileSystem";
+import FolderTree from "./filesystem/FolderTree";
 import Folder from "./filesystem/Folder";
 
 /**
@@ -104,7 +104,7 @@ export default class ServerFile extends FileBase {
         };
     }
     
-    public static fromObject(obj: any, root: DiscordFileSystem): ServerFile {
+    public static fromObject(obj: any, root: FolderTree): ServerFile {
         let folder = root.getRoot().prepareFileHierarchy(obj.folder as string);
         const file = new ServerFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
