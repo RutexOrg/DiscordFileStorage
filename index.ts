@@ -5,6 +5,7 @@ import color from "colors/safe";
 import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
 import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
 import { v2 as webdav } from "webdav-server";
+import WebdavServer from "./src/webdav/WebdavServer";
 
 async function main() {
     dotenv.config();
@@ -37,7 +38,7 @@ async function main() {
 
 
     if (config.startWebdavServer) {
-        const webdavServer = new webdav.WebDAVServer({
+        const webdavServer = new WebdavServer({
             port: config.webdavPort,
             rootFileSystem: new WebdavFilesystemHandler(app),
         });

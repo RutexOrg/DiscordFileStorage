@@ -99,6 +99,19 @@ axios@^1.3.2:
     form-data "^4.0.0"
     proxy-from-env "^1.1.0"
 
+base64-js@^1.3.1:
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/base64-js/-/base64-js-1.5.1.tgz#1b1b440160a5bf7ad40b650f095963481903930a"
+  integrity sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==
+
+buffer@^6.0.3:
+  version "6.0.3"
+  resolved "https://registry.yarnpkg.com/buffer/-/buffer-6.0.3.tgz#2ace578459cc8fbe2a70aaa8f52ee63b6a74c6c6"
+  integrity sha512-FTiCpNxtwiZZHEZbcbTIcZjERVICn9yq/pDFkTl95/AxzD1naBctN7YO68riM/gLSDY7sdrMby8hofADYuuqOA==
+  dependencies:
+    base64-js "^1.3.1"
+    ieee754 "^1.2.1"
+
 busboy@^1.6.0:
   version "1.6.0"
   resolved "https://registry.npmjs.org/busboy/-/busboy-1.6.0.tgz"
@@ -222,6 +235,13 @@ ms@2.1.2:
   version "2.1.2"
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
+
+mutable-buffer@^4.0.2:
+  version "4.0.2"
+  resolved "https://registry.yarnpkg.com/mutable-buffer/-/mutable-buffer-4.0.2.tgz#610a22a4e628ce98b7a4813729d0fc52a49ebcdf"
+  integrity sha512-KmdusLZjoMEOClFleHXmOhXTcJwe8ePesZKm4fSU9yhatuRLbS/8MoiWGr23SZaofR8mnpRlgTO4Gcj/86A4sQ==
+  dependencies:
+    buffer "^6.0.3"
 
 peek-readable@^5.0.0:
   version "5.0.0"

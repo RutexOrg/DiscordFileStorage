@@ -9,12 +9,14 @@
     "debug": "^4.3.4",
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.3",
+    "mutable-buffer": "^4.0.2",
     "typed-emitter": "^2.1.0",
     "webdav-server": "^2.6.2"
   },
   "scripts": {
     "start": "tsc && node --no-warnings out/index.js",
-    "testRun": "tsc && node --no-warnings out/test.js"
+    "testRun": "tsc && node --no-warnings out/test.js",
+    "build": "tsc"
   },
   "devDependencies": {
     "@types/debug": "^4.1.7",
