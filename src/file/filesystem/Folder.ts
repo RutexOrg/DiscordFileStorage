@@ -237,7 +237,7 @@ export default class Folder {
         if(folder.getFiles().find(file => file.getFileName() == filename)) {
             throw new Error("File with name "+filename+" already exists");
         }
-        new ServerFile(filename, 0, folder);
+        new ServerFile(filename, 0, folder, new Date());
 
         // this.createHierarchy(path);
         // let folder = this.getFolderByPath(path);

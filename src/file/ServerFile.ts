@@ -20,7 +20,7 @@ export default class ServerFile extends FileBase {
 
     private markedDeleted: boolean = false;
 
-    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date = new Date()) {
+    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date) {
         super(filename, totalSize, uploadedDate);
         this.folder = folder;
         this.folder.addFile(this);

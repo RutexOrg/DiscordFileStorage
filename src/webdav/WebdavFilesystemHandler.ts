@@ -165,7 +165,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         folder.printHierarchyWithFiles(true);
-        let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder);
+        let file = new ServerFile(path.fileName(), ctx.estimatedSize, folder, new Date());
         file.setMetaIdInMetaChannel(existingFile?.getMetaIdInMetaChannel()!);
         
         this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize).then(stream => {

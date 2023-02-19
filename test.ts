@@ -7,16 +7,16 @@ async function main(){
     let a = new Folder("a");
     let b = new Folder("b");
 
-    let a1 = new ServerFile("a.txt", 0, a);
-    let b1 = new ServerFile("b.txt", 0, b);
+    // let a1 = new ServerFile("a.txt", 0, a);
+    // let b1 = new ServerFile("b.txt", 0, b);
     
-    fs.addFolder(a);
-    fs.addFolder(b);
+    // fs.addFolder(a);
+    // fs.addFolder(b);
 
-    fs.moveFolder(b, a);
+    // fs.moveFolder(b, a);
 
-    console.log(b1.getAbsolutePath())
+    // console.log(b1.getAbsolutePath())
 
-    fs.printHierarchyWithFiles(true);
+    // fs.printHierarchyWithFiles(true);
 }
 main();
