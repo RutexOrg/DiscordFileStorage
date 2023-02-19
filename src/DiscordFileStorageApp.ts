@@ -140,23 +140,6 @@ export default class DiscordFileStorageApp extends Client {
         }
     }
 
-    public async postMetaFile(file: ServerFile, strict: boolean = true, distapchEvent: boolean) {
-        if (strict) {
-            if (file.getDiscordMessageIds.length == 0) {
-                throw new Error("No discord message ids");
-            }
-            if (!file.getFilesPostedInChannelId()) {
-                throw new Error("No channel id where files are posted");
-            }
-        }
-        return this.discordFileManager.postMetaFile(file, distapchEvent);
-
-    }
-
-    public async deleteFile(file: ServerFile) {
-        return this.discordFileManager.deleteFile(file, true);
-    }
-
     public async sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

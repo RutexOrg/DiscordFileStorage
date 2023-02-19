@@ -39,8 +39,10 @@ export default class RamFile extends ServerFile {
 
 
     public rm(){
-        this.getFolder().removeFile(this);
-        this.setFolder(null as any);
+        if(this.getFolder() !== null) {
+            this.getFolder()!.removeFile(this);
+            this.setFolder(null as any);
+        }
     }
 
     public cleanup(rm: boolean = false): void {

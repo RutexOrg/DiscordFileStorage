@@ -57,8 +57,6 @@ export default class Folder {
     public setFiles(files: ServerFile[]): void {
         this.files = files;
     }
-    
-
 
     public getFolders(): Folder[] {
         return this.folders;
@@ -175,12 +173,15 @@ export default class Folder {
     }
     
     public removeFile(file: ServerFile): void {
+        if(file.getFolder() == null){
+            throw new Error("File is not in any folder, its already removed");
+        }
         console.log("Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
         file = Folder.root.getFileByPath(file.getAbsolutePath())!;
         if(!file){
             throw new Error("File not found");
         }
-        file.getFolder().removeFileFromFolder(file, file.getFolder());
+        file.getFolder()!.removeFileFromFolder(file, file.getFolder()!);
 
     }
 

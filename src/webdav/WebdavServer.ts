@@ -7,6 +7,7 @@ import Folder from "../file/filesystem/Folder";
 export default class WebdavServer extends webdav.WebDAVServer {
     constructor(options: webdav.WebDAVServerOptions) {
         super(options);
+        // TODO: add support for direct zip download of folders via http.
         
         // const defaultGetCallback = this.methods.get;
         // this.method("get", {

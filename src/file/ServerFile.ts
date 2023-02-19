@@ -10,7 +10,7 @@ export default class ServerFile extends FileBase {
     private filesPostedInChannelId: string = "";
     private metaIdInMetaChannel: string = "";
     private metaVersion: number = 0;
-    private folder: Folder;
+    private folder: Folder | null;
 
     private markedDeleted: boolean = false;
 
@@ -48,7 +48,7 @@ export default class ServerFile extends FileBase {
         this.metaVersion = metaVersion;
     }
 
-    public getFolder(): Folder {
+    public getFolder(): Folder | null {
         return this.folder;
     }
 
@@ -57,7 +57,7 @@ export default class ServerFile extends FileBase {
     }
 
     public setFolder(folder: Folder, updateParents: boolean = false): void {
-        if(updateParents) {
+        if(updateParents && this.folder != null) {
             this.folder.removeFile(this);
             this.folder = folder;
             this.folder.addFile(this);
@@ -96,6 +96,10 @@ export default class ServerFile extends FileBase {
     }
 
     toObject(): any {
+        if(this.folder == null) {
+            throw new Error("Folder is null");
+        }
+
         return {
             filename: this.getFileName(),
             totalSize: this.getTotalSize(),
@@ -118,6 +122,10 @@ export default class ServerFile extends FileBase {
     }
 
     public getAbsolutePath(): string {
+        if(this.folder == null) {
+            throw new Error("Folder is null");
+        }
+        
         return this.folder.getAbsolutePath() + "/" + this.getFileName();
     }
 
