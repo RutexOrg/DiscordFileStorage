@@ -7,9 +7,9 @@ import { EventEmitter } from "events";
 import TypedEmitter from 'typed-emitter';
 import IFIleManager, { IUploadResult } from "./file/IFileManager";
 import Folder from "./file/filesystem/Folder";
+import { MutableBuffer } from "mutable-buffer";
 
-
-export const MAX_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
+export const MAX_REAL_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
 
 export type RemoteFileManagerEvents = {
     fileUploaded: (file: ServerFile) => void;
@@ -94,37 +94,41 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     public async getUploadWritableStream(file: ServerFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
         let chunkNumber = 1;
-        let totalChunks = Math.ceil(size / MAX_CHUNK_SIZE);
+        let totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
         file.setFilesPostedInChannelId(filesChannel.id);
-        let buffer = Buffer.alloc(0);
+
+        let buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
         return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
-                if(buffer.length + chunk.length > MAX_CHUNK_SIZE) {
+                if(buffer.size + chunk.length < MAX_REAL_CHUNK_SIZE) {
+                    buffer.write(chunk, encoding);
+                }else{
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
-                    
                     const message = await filesChannel.send({
-                        files: [this.getAttachmentBuilderFromBuffer(buffer, file.getFileName(), chunkNumber )],
+                        files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
                     });
 
                     file.addDiscordMessageId(message.id);;
                     chunkNumber++;
-                    buffer = Buffer.from(chunk);
-                    callback();
-                }else{
-                    buffer = Buffer.concat([buffer, chunk]);
-                    callback();
+
+                    buffer.clear();
+                    buffer.write(chunk, encoding);
                 }
+                callback();                                               
             },
             final: async (callback) => {
                 console.warn("final");
-                if(buffer.length === 0) {
-                    return callback();
-                }
 
-                let message = await filesChannel.send({
-                    files: [this.getAttachmentBuilderFromBuffer(buffer, file.getFileName(), chunkNumber )],
-                });
-                file.addDiscordMessageId(message.id);
+                if(buffer.size > 0) {
+                    console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
+                    const message = await filesChannel.send({
+                        files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
+                    });
+                    
+                    file.addDiscordMessageId(message.id);
+                }
+                buffer.clear();
+                buffer = null as any;
                 callback();
             }
         });
