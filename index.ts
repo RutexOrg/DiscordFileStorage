@@ -9,6 +9,7 @@ import WebdavServer from "./src/webdav/WebdavServer";
 
 async function main() {
     dotenv.config();
+    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any; // TODO: test this
 
     const token = process.env.TOKEN;
     const guildId = process.env.GUILD_ID;
