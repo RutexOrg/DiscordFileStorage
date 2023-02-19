@@ -96,12 +96,10 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         let buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
         return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
-                if(buffer.size + chunk.length < MAX_REAL_CHUNK_SIZE) {
-                    buffer.write(chunk, encoding);
-                }else{
+                if(buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
                     const message = await filesChannel.send({
-                        files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
+                        files: [this.getAttachmentBuilderFromBuffer(buffer.flush(), file.getFileName(), chunkNumber )],
                     });
 
                     file.addAttachmentInfo({
@@ -113,6 +111,8 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
 
                     buffer.clear();
                     buffer.write(chunk, encoding);
+                }else{
+                    buffer.write(chunk, encoding);
                 }
                 callback();                                               
             },
@@ -122,7 +122,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                     
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
                     const message = await filesChannel.send({
-                        files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
+                        files: [this.getAttachmentBuilderFromBuffer(buffer.flush(), file.getFileName(), chunkNumber )],
                     });
                     
                     file.addAttachmentInfo({

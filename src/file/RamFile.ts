@@ -19,7 +19,7 @@ export default class RamFile extends ServerFile {
     }
 
     public getReadable(): Readable {
-        return Readable.from(this.data.nativeBuffer);
+        return Readable.from(this.data.flush());
     }
 
     public getWritable(): Writable {
