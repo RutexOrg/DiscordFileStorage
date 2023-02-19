@@ -45,8 +45,8 @@ Typescript has been tested with version 4 and installed globally.
 
 ___
 
-Once server started, the webdav server will be available on port 1900. 
+Once server started, the webdav server will be available on port 3000. 
 
 
-Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:1900 and use discord as a file storage.
+Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use discord as a file storage.
 
