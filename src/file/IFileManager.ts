@@ -11,8 +11,10 @@ export interface IUploadResult {
 export interface IDeleteResult extends IUploadResult {};
 
 export default interface IFIleManager {
-    getDownloadableReadStream(file: ServerFile): Promise<Readable>;
+    // getDownloadableReadStream(file: ServerFile): Promise<Readable>;
+    getDownloadableReadStream(file: ServerFile, callback: (stream: Readable) => void): void;
     getUploadWritableStream(file: ServerFile, size: number): Promise<Writable>;
+    
     postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult>;
     updateMetaFile(file: ServerFile): Promise<IUploadResult>;
     deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IDeleteResult>;

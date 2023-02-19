@@ -51,15 +51,19 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     private log(from: string, data: any){
-        //console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
+        console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
     }
     
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        let file = this.fs.getFileByPath(path.toString());
-        if(!file) {
-            // return callback(undefined, this.app.getFiles().reduce((acc, file) => acc + file.getTotalSize(), 0));
-            return callback(undefined, 0);
+        // this.log(".size", path);
+        let entryInfo = this.fs.getElementTypeByPath(path.toString());
+        if(entryInfo.isUnknown){
+            return callback(Errors.ResourceNotFound);
         }
+        if(entryInfo.isFolder){
+            return callback(Errors.InvalidOperation); // TODO: some client (e.g. filezilla) tries to get size of folder. This is not supported yet.
+        }
+        let file = entryInfo.entry as ServerFile;
         return callback(undefined, file.getTotalSize());
     }
 
@@ -84,7 +88,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         if(entryInfo.isUnknown){
             return callback(Errors.ResourceNotFound);
         }
-        
         // //console.log(path.toString(), elementInfo)
 
         let resType;
@@ -132,11 +135,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, (file as RamFile).getReadable());
         }
 
-        this.app.getDiscordFileManager().getDownloadableReadStream(file).then(stream => {
+        this.app.getDiscordFileManager().getDownloadableReadStream(file, (stream: Readable) => {
             this.log(".openReadStream", "Stream opened"); 
             callback(undefined, stream);
-        }).catch(err => {
-            //console.log(err);
         });
     }
 
@@ -182,7 +183,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
                 this.log(".openWriteStream", "File uploaded");
             });
         }).catch(err => {
-            //console.log(err);
+            console.log(err);
             return callback(err);
         });
     }
