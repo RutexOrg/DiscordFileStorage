@@ -2,11 +2,16 @@ import FileBase from "./FileBase";
 import FolderTree from "./filesystem/FolderTree";
 import Folder from "./filesystem/Folder";
 
+export interface IAttachShortInfo {
+    id: string;
+    url: string;
+}
+
 /**
  * Represents a file on the server side. This file is stored on the server.
  */
 export default class ServerFile extends FileBase {
-    private discordMessageIds: string[] = [];
+    private attachmentInfos: IAttachShortInfo[] = [];
     private filesPostedInChannelId: string = "";
     private metaIdInMetaChannel: string = "";
     private metaVersion: number = 0;
@@ -20,16 +25,16 @@ export default class ServerFile extends FileBase {
         this.folder.addFile(this);
     }
 
-    public getDiscordMessageIds(): string[] {
-        return this.discordMessageIds;
+    public getAttachmentInfos(): IAttachShortInfo[] {
+        return this.attachmentInfos;
     }
 
-    public addDiscordMessageId(discordMessageId: string): void {
-        this.discordMessageIds.push(discordMessageId);
+    public addAttachmentInfo(discordMessageId: IAttachShortInfo): void {
+        this.attachmentInfos.push(discordMessageId);
     }
 
-    public setDiscordMessageIds(discordMessageIds: string[]): void {
-        this.discordMessageIds = discordMessageIds;
+    public setAttachmentInfos(attachmentInfos: IAttachShortInfo[]): void {
+        this.attachmentInfos = attachmentInfos;
     }
 
     public getFilesPostedInChannelId(): string {
@@ -92,7 +97,7 @@ export default class ServerFile extends FileBase {
             obj.totalSize && 
             obj.uploadDate && 
             obj.filesPostedInChannelId && 
-            obj.discordMessageIds
+            obj.attachmentInfos
     }
 
     toObject(): any {
@@ -108,7 +113,7 @@ export default class ServerFile extends FileBase {
             metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
             metaVersion: this.metaVersion,
             folder: this.folder.getAbsolutePath() + this.getFileName(),
-            discordMessageIds: this.getDiscordMessageIds(),
+            attachmentInfos: this.getAttachmentInfos(),
         };
     }
     
@@ -116,7 +121,7 @@ export default class ServerFile extends FileBase {
         let folder = root.getRoot().prepareFileHierarchy(obj.folder as string);
         const file = new ServerFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
-        file.setDiscordMessageIds(obj.discordMessageIds);
+        file.setAttachmentInfos(obj.attachmentInfos);
 
         return file;
     }
@@ -130,7 +135,7 @@ export default class ServerFile extends FileBase {
     }
 
     public isUploaded(): boolean {
-        return this.discordMessageIds.length > 0 && !!this.metaIdInMetaChannel;
+        return this.attachmentInfos.length > 0 && !!this.metaIdInMetaChannel;
     }
  
 

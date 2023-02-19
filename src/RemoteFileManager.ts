@@ -30,14 +30,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
         const filesChannel = await this.app.getFileChannel();
         
-        let urls: string[] = [];
-        for (const messageId of file.getDiscordMessageIds()) {
-            const message = await filesChannel.messages.fetch(messageId);
-            const attachment = message.attachments.first()!;
-            urls.push(attachment.url);
-        }
-        
-        return (await (new HttpStreamPool(urls)).getDownloadStream());
+        return (await (new HttpStreamPool(file.getAttachmentInfos().map(e => e.url))).getDownloadStream());
     }
 
     private getAttachmentBuilderFromBuffer(buff: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, extension: string = "txt"){
@@ -108,7 +101,11 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                         files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
                     });
 
-                    file.addDiscordMessageId(message.id);;
+                    file.addAttachmentInfo({
+                        id: message.id,
+                        url: message.attachments.first()!.url,
+                    });
+
                     chunkNumber++;
 
                     buffer.clear();
@@ -117,15 +114,19 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                 callback();                                               
             },
             final: async (callback) => {
-                console.warn("final");
 
                 if(buffer.size > 0) {
+                    console.warn("final chunk...");
+                    
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
                     const message = await filesChannel.send({
                         files: [this.getAttachmentBuilderFromBuffer(buffer.nativeBuffer, file.getFileName(), chunkNumber )],
                     });
                     
-                    file.addDiscordMessageId(message.id);
+                    file.addAttachmentInfo({
+                        id: message.id,
+                        url: message.attachments.first()!.url,
+                    });
                 }
                 buffer.clear();
                 buffer = null as any;
@@ -139,14 +140,14 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     public async deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
         const filesChannel = await this.app.getFileChannel();
         const metadataChannel = await this.app.getMetadataChannel();
-        const messageIds = file.getDiscordMessageIds();
+        const messageIds = file.getAttachmentInfos();
 
         const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
         await metadataMessage.edit(":x: File is deleted. " + messageIds.length + " chunks will be deleted....");
 
         for (let i = 0; i < messageIds.length; i++) {
-            const messageId = messageIds[i];
-            const message = await filesChannel.messages.fetch(messageId);
+            const attachmentInfo = messageIds[i];
+            const message = await filesChannel.messages.fetch(attachmentInfo.id); // TODO: delete without fetching?
             await message.delete();
         }
         
