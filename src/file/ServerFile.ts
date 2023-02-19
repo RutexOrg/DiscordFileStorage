@@ -112,7 +112,7 @@ export default class ServerFile extends FileBase {
             filesPostedInChannelId: this.getFilesPostedInChannelId(),
             metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
             metaVersion: this.metaVersion,
-            folder: this.folder.getAbsolutePath() + this.getFileName(),
+            folder: this.getAbsolutePath(),
             attachmentInfos: this.getAttachmentInfos(),
         };
     }
