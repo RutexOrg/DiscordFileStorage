@@ -27,20 +27,17 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         this.app = client;
     }
 
-    // TODO: detect socket close and cleanup
-    public async getDownloadableReadStream(file: ServerFile, callback: (stream: Readable) => void) {
+    public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
         const filesChannel = await this.app.getFileChannel();
-        const httpStreamPool = new HttpStreamPool();
-        callback(httpStreamPool.getReadable());
-
-        for (const messageId of file.getDiscordMessageIds()) {
-            console.log("Fetching message " + messageId);
-            const message = await filesChannel.messages.fetch(messageId);
-            httpStreamPool.addUrl(message.attachments.first()!.url);
-        }
-        console.log("Marking httpStreamPool as finished");
-        httpStreamPool.markFinished();
         
+        let urls: string[] = [];
+        for (const messageId of file.getDiscordMessageIds()) {
+            const message = await filesChannel.messages.fetch(messageId);
+            const attachment = message.attachments.first()!;
+            urls.push(attachment.url);
+        }
+        
+        return (await (new HttpStreamPool(urls)).getDownloadStream());
     }
 
     private getAttachmentBuilderFromBuffer(buff: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, extension: string = "txt"){

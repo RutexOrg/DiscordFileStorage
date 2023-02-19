@@ -55,7 +55,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
     
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        // this.log(".size", path);
         let entryInfo = this.fs.getElementTypeByPath(path.toString());
         if(entryInfo.isUnknown){
             return callback(Errors.ResourceNotFound);
@@ -83,12 +82,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
-        // this.log(".type", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
-        if(entryInfo.isUnknown){
-            return callback(Errors.ResourceNotFound);
-        }
-        // //console.log(path.toString(), elementInfo)
 
         let resType;
         if(entryInfo.isFile){
@@ -125,7 +119,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
     }
 
-    protected _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): void {
+    async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
         this.log(".openReadStream", path);
         let file = this.fs.getFileByPath(path.toString())!;
         
@@ -135,10 +129,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, (file as RamFile).getReadable());
         }
 
-        this.app.getDiscordFileManager().getDownloadableReadStream(file, (stream: Readable) => {
-            this.log(".openReadStream", "Stream opened"); 
-            callback(undefined, stream);
-        });
+        const stream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
+        this.log(".openReadStream", "Stream opened"); 
+        callback(undefined, stream);
     }
 
 
@@ -153,8 +146,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         // //console.log("folder", folder);
         
         // first creating file in the ram to be able to say system that file is created and ready to be written to.
-        // once we have the size, we can replace the ram file with the real file and upload it to discord.
-        if(existingFile?.getFileType() == "remote" && existingFile?.isUploaded() && ctx.estimatedSize !== -1){
+        if(existingFile?.getFileType() == "remote" && existingFile?.isUploaded()){
             await this.app.getDiscordFileManager().deleteFile(existingFile, false);    
         }
         
@@ -178,6 +170,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize).then(stream => {
             this.log(".openWriteStream", "Stream opened");
             callback(undefined, stream);
+
             stream.once("close", async () => {
                 await this.app.getDiscordFileManager().postMetaFile(file!, false);
                 this.log(".openWriteStream", "File uploaded");
