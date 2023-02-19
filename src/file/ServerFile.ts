@@ -5,6 +5,7 @@ import Folder from "./filesystem/Folder";
 export interface IAttachShortInfo {
     id: string;
     url: string;
+    proxyUrl?: string;
 }
 
 /**

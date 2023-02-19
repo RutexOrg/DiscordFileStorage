@@ -41,6 +41,10 @@ export default class FileBase {
         return this.uploadedDate;
     }
 
+    public refreshUploadDate() {
+        this.uploadedDate = new Date();
+    }
+
 
     setTotalSize(totalSize: number): void {
         this.totalSize = totalSize;

@@ -44,6 +44,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
 
         let msg = await metaChannel.send("Uploading file meta...");
 
+        file.refreshUploadDate();
         file.setMetaIdInMetaChannel(msg.id);
         msg.edit({
             content: ":white_check_mark: File meta posted successfully.",
@@ -67,10 +68,12 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         if(!file.isUploaded()){
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
+        
+        file.refreshUploadDate();
 
         const metaChannel = await this.app.getMetadataChannel();
         const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
-        
+
         await msg.edit({
             content: ":white_check_mark: :white_check_mark: File info updated successfully.",
             files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true)],
@@ -114,9 +117,8 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                 callback();                                               
             },
             final: async (callback) => {
-
                 if(buffer.size > 0) {
-                    console.warn("final chunk...");
+                    console.info("final chunk...");
                     
                     console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
                     const message = await filesChannel.send({
@@ -126,6 +128,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                     file.addAttachmentInfo({
                         id: message.id,
                         url: message.attachments.first()!.url,
+                        proxyUrl: message.attachments.first()!.proxyURL,
                     });
                 }
                 buffer.clear();
@@ -134,7 +137,6 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
             }
         });
     }
-
 
 
     public async deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {

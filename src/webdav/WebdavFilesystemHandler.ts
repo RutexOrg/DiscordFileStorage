@@ -288,7 +288,19 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, true);
     }
 
-    
+    protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
+        let entryCheck = this.fs.getElementTypeByPath(path.toString());
+        if(entryCheck.isUnknown){
+            return callback(Errors.ResourceNotFound);
+        }
+
+        if(entryCheck.isFolder){
+            return callback(undefined, 0);
+        }
+
+        let file = entryCheck.entry as ServerFile;
+        return callback(undefined, file.getUploadedDate().valueOf());
+    }
 
 
 
