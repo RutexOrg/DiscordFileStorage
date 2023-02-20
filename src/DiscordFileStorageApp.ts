@@ -106,6 +106,7 @@ export default class DiscordFileStorageApp extends Client {
             const messages = [... (await channel.messages.fetch(options)).values()];
 
             allMessages = allMessages.concat(messages);
+            console.log("got block of " + messages.length + " messages")
             if (messages.length < 100) {
                 break;
             }
@@ -124,6 +125,8 @@ export default class DiscordFileStorageApp extends Client {
      * loadFiles
      */
     public async loadFilesToCache() {
+        console.log(color.yellow("Fetching files..."));
+
         const metaDataChannelId = (await this.getMetadataChannel()).id;
         let messages = (await this.getAllMessages(metaDataChannelId));
         for (let msg of messages) {
@@ -136,6 +139,8 @@ export default class DiscordFileStorageApp extends Client {
                     console.log("Failed to extract valid message data");
                     console.log(file);
                 }
+            }else{
+                console.log("Message has no attachments");
             }
         }
     }

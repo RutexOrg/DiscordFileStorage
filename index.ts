@@ -33,7 +33,6 @@ async function main() {
     await app.waitForReady();
     await app.prepare();
 
-    console.log(color.yellow("Fetching files..."));
     await app.loadFilesToCache();
 
 
@@ -44,10 +43,18 @@ async function main() {
             rootFileSystem: new WebdavFilesystemHandler(app),
         });
 
-        webdavServer.start(() => {
-            console.log(color.green("WebDAV server started"));
+        await webdavServer.startAsync(config.webdavPort);
+        console.log(color.green("WebDAV server started at port " + config.webdavPort + "."));
+
+        webdavServer.beforeRequest((arg, next) => {
+            let pathInfo = arg.requested.path;
+            if(pathInfo.paths[0] === "get"){
+                console.log("wtf");
+            }
+
+            next();
         });
-        
+
         webdavServer.afterRequest((arg, next) => {
             // Display the method, the URI, the returned status code and the returned message
             // console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);

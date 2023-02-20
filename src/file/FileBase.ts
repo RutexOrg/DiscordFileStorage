@@ -1,3 +1,5 @@
+import mime from "mime-types";
+
 export type FileType = "remote" | "ram";
 
 /**
@@ -46,8 +48,12 @@ export default class FileBase {
     }
 
 
-    setTotalSize(totalSize: number): void {
+    public setTotalSize(totalSize: number): void {
         this.totalSize = totalSize;
+    }
+
+    public getMimeType(): string {
+        return mime.lookup(this.filename) || "application/octet-stream";
     }
     
 }

@@ -69,13 +69,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // TODO: Implement this method
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
-        // this.log(".availableLocks", path);
+        // //this.log(".availableLocks", path);
         return callback(undefined, []);
     }
 
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        this.log(ctx.context, ".readDir", path);
+        //this.log(ctx.context, ".readDir", path);
         let folder = this.fs.getFolderByPath(path.toString())!;
         folder.printHierarchyWithFiles(true);
         return callback(undefined, folder.getAllEntries());
@@ -96,10 +96,22 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, resType);
     }
 
+    protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
+        this.log(ctx.context, ".mimeType", path);
+        let entryInfo = this.fs.getElementTypeByPath(path.toString());
+        if(entryInfo.isUnknown || entryInfo.isFolder){
+            throw new Error("Cannot get mime type of folder or unknown element");
+        }
+
+        let file = entryInfo.entry as ServerFile;
+        return callback(undefined, file.getMimeType());
+
+    }
+
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
         let existsCheckState = this.fs.getElementTypeByPath(path.toString());
         
-        // this.log(".fastExistCheck", exists + " | " + path.toString());
+        // //this.log(".fastExistCheck", exists + " | " + path.toString());
         if(existsCheckState.isUnknown){
             return callback(false);
         }
@@ -109,7 +121,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
     
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
-        this.log(ctx.context, ".create", path + " | " + ctx.type);
+        //this.log(ctx.context, ".create", path + " | " + ctx.type);
         if(ctx.type.isDirectory){
             this.fs.createHierarchy(path.toString());
             return callback();
@@ -121,24 +133,23 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        this.log(ctx.context, ".openReadStream", path);
+        //this.log(ctx.context, ".openReadStream", path);
         let file = this.fs.getFileByPath(path.toString())!;
         
 
         if(!file.isUploaded() && file.getFileType() == "ram"){
-            this.log(ctx.context, ".openReadStream", "File is not uploaded, returning empty dummy stream");
+            //this.log(ctx.context, ".openReadStream", "File is not uploaded, returning empty dummy stream");
             return callback(undefined, (file as RamFile).getReadable());
         }
 
         const stream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
-        this.log(ctx.context, ".openReadStream", "Stream opened"); 
+        //this.log(ctx.context, ".openReadStream", "Stream opened"); 
         callback(undefined, stream);
     }
 
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
-        this.log(ctx.context, ".openWriteStream", path);
-        this.log(ctx.context, ".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
+        //this.log(ctx.context, ".openWriteStream", "Creating write stream: " + ctx.estimatedSize );
 
         let existingFile = this.fs.getFileByPath(path.toString()); // being created in create() . 
         // //console.log("createdFile", existingFile);
@@ -174,7 +185,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
             stream.once("close", async () => {
                 await this.app.getDiscordFileManager().postMetaFile(file!, false);
-                this.log(ctx.context, ".openWriteStream", "File uploaded");
+                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
             });
         }).catch(err => {
             console.log(err);
@@ -184,7 +195,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
-        this.log(ctx.context, ".delete", path);
+        //this.log(ctx.context, ".delete", path);
         let entryCheck = this.fs.getElementTypeByPath(path.toString());
         if(entryCheck.isUnknown){
             return callback(Errors.ResourceNotFound);
@@ -212,13 +223,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): void {
-        this.log(ctx.context, ".copy", pathFrom + " | " + pathTo);
+        //this.log(ctx.context, ".copy", pathFrom + " | " + pathTo);
         return callback(Errors.InvalidOperation);
     }
 
     // very dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        this.log(ctx.context, ".move", pathFrom + " | " + pathTo);
+        //this.log(ctx.context, ".move", pathFrom + " | " + pathTo);
 
         let sourceEntry = this.fs.getElementTypeByPath(pathFrom.toString());
         let targetEntry = this.fs.getElementTypeByPath(pathTo.toString());
@@ -269,7 +280,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        this.log(ctx.context, ".rename", pathFrom + " | " + newName);
+        //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
         let entryCheck = this.fs.getElementTypeByPath(pathFrom.toString());
         if(entryCheck.isUnknown){
             return callback(Errors.ResourceNotFound);

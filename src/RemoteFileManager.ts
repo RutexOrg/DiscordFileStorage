@@ -105,16 +105,13 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                     file.addAttachmentInfo({
                         id: message.id,
                         url: message.attachments.first()!.url,
+                        proxyUrl: message.attachments.first()!.proxyURL,
                     });
-
                     chunkNumber++;
-
-                    buffer.clear();
-                    buffer.write(chunk, encoding);
-                }else{
-                    buffer.write(chunk, encoding);
-                }
-                callback();                                               
+                }                                              
+                
+                buffer.write(chunk, encoding);
+                callback(); 
             },
             final: async (callback) => {
                 if(buffer.size > 0) {
@@ -131,7 +128,6 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
                         proxyUrl: message.attachments.first()!.proxyURL,
                     });
                 }
-                buffer.clear();
                 buffer = null as any;
                 callback();
             }
