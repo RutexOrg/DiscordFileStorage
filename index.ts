@@ -12,7 +12,6 @@ import root from "app-root-path";
 import appRootPath from "app-root-path";
 async function main() {
     dotenv.config();
-    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any; // TODO: test this
 
     const token = process.env.TOKEN;
     const guildId = process.env.GUILD_ID;
@@ -52,13 +51,15 @@ async function main() {
             // generate self-signed certificate: openssl req -x509 -newkey rsa:4096 -keyout privkey.pem -out cert.pem -days 365 -nodes
             checkIfFileExists(root.resolve("/certs/privkey.pem"), "Please set ssl ./certs/privKey.pem or generate a self-signed certificate");
             checkIfFileExists(root.resolve("/certs/cert.pem"), "Please set ssl ./certs/cert.pem or generate a self-signed certificate");
-            checkIfFileExists(root.resolve("/certs/chain.pem"), "./certs/chain.pem", "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
+            checkIfFileExists(root.resolve("/certs/chain.pem"), "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
 
             serverLaunchOptions.https = {
                 key: fs.readFileSync(root.resolve("/certs/privkey.pem")),
                 cert: fs.readFileSync(root.resolve("/certs/cert.pem")),
                 ca: fs.readFileSync(root.resolve("/certs/chain.pem")),
             }
+        }else{
+            process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any; // in case if we started the server without https on machine with any bounded domain name and https cert, enabled cert verification will fail in some cases. so we disable this check.
         }
         
         const webdavServer = new WebdavServer(serverLaunchOptions);
