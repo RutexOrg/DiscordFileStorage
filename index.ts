@@ -8,8 +8,11 @@ import { v2 as webdav } from "webdav-server";
 import WebdavServer from "./src/webdav/WebdavServer";
 import fs from "node:fs";
 import root from "app-root-path";
+ 
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
+//Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
+// Idk how to fix it now, so let it be just disabled.
 
-import appRootPath from "app-root-path";
 async function main() {
     dotenv.config();
 
