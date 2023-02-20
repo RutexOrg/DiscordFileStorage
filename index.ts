@@ -6,6 +6,7 @@ import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp
 import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
 import { v2 as webdav } from "webdav-server";
 import WebdavServer from "./src/webdav/WebdavServer";
+import fs from "node:fs";
 
 async function main() {
     dotenv.config();
@@ -38,10 +39,27 @@ async function main() {
 
 
     if (config.startWebdavServer) {
-        const webdavServer = new WebdavServer({
+        const serverLaunchOptions: webdav.WebDAVServerOptions = {
             port: config.webdavPort,
             rootFileSystem: new WebdavFilesystemHandler(app),
-        });
+        }
+
+        if(process.env.ENABLE_HTTPS){
+            console.log("Detected ENABLE_HTTPS env variable. Starting webdav server with https enabled.");
+            
+            // generate self-signed certificate: openssl req -x509 -newkey rsa:4096 -keyout privkey.pem -out cert.pem -days 365 -nodes
+            checkIfFileExists("./certs/cert.pem", "Please set ssl ./certs/cert.pem or generate a self-signed certificate");
+            checkIfFileExists("./certs/privKey.pem", "Please set ssl ./certs/privKey.pem or generate a self-signed certificate");
+            checkIfFileExists("./certs/chain.pem", "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
+
+            serverLaunchOptions.https = {
+                key: readFile("./certs/privkey.pem"),
+                cert: readFile("./certs/cert.pem"),
+                ca: readFile("./certs/chain.pem"),
+            }
+        }
+        
+        const webdavServer = new WebdavServer(serverLaunchOptions);
 
         await webdavServer.startAsync(config.webdavPort);
         console.log(color.green("WebDAV server started at port " + config.webdavPort + "."));
@@ -64,6 +82,17 @@ async function main() {
         });
     }
 
+}
+
+function checkIfFileExists(path: string, assertString: string = ""): boolean  {
+    if(!fs.statSync(path).isFile()){
+        throw new Error("File "+ path +" is not found" + (assertString.length > 0 ? ": " + assertString : "" ));
+    }
+    return true;
+}
+
+function readFile(path: string): Buffer {
+    return fs.readFileSync(path);
 }
 
 process.on("uncaughtException", (err) => {
