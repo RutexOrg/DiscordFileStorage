@@ -90,6 +90,11 @@
   dependencies:
     "@types/node" "*"
 
+app-root-path@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/app-root-path/-/app-root-path-3.1.0.tgz#5971a2fc12ba170369a7a1ef018c71e6e47c2e86"
+  integrity sha512-biN3PwB2gUtjaYy/isrU3aNWI5w+fAfvHkSvCKeQGxhmYpwKFUxudR3Yya+KqVRHBmEDYh+/lTozYCFbmzX4nA==
+
 asynckit@^0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/asynckit/-/asynckit-0.4.0.tgz#c79ed97f7f34cb8f2ba1bc9790bcc366474b4b79"

@@ -7,7 +7,9 @@ import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
 import { v2 as webdav } from "webdav-server";
 import WebdavServer from "./src/webdav/WebdavServer";
 import fs from "node:fs";
+import root from "app-root-path";
 
+import appRootPath from "app-root-path";
 async function main() {
     dotenv.config();
     process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any; // TODO: test this
@@ -48,14 +50,14 @@ async function main() {
             console.log("Detected ENABLE_HTTPS env variable. Starting webdav server with https enabled.");
             
             // generate self-signed certificate: openssl req -x509 -newkey rsa:4096 -keyout privkey.pem -out cert.pem -days 365 -nodes
-            checkIfFileExists("./certs/cert.pem", "Please set ssl ./certs/cert.pem or generate a self-signed certificate");
-            checkIfFileExists("./certs/privKey.pem", "Please set ssl ./certs/privKey.pem or generate a self-signed certificate");
-            checkIfFileExists("./certs/chain.pem", "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
+            checkIfFileExists(root.resolve("/certs/privkey.pem"), "Please set ssl ./certs/privKey.pem or generate a self-signed certificate");
+            checkIfFileExists(root.resolve("/certs/cert.pem"), "Please set ssl ./certs/cert.pem or generate a self-signed certificate");
+            checkIfFileExists(root.resolve("/certs/chain.pem"), "./certs/chain.pem", "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
 
             serverLaunchOptions.https = {
-                key: readFile("./certs/privkey.pem"),
-                cert: readFile("./certs/cert.pem"),
-                ca: readFile("./certs/chain.pem"),
+                key: fs.readFileSync(root.resolve("/certs/privkey.pem")),
+                cert: fs.readFileSync(root.resolve("/certs/cert.pem")),
+                ca: fs.readFileSync(root.resolve("/certs/chain.pem")),
             }
         }
         
@@ -89,10 +91,6 @@ function checkIfFileExists(path: string, assertString: string = ""): boolean  {
         throw new Error("File "+ path +" is not found" + (assertString.length > 0 ? ": " + assertString : "" ));
     }
     return true;
-}
-
-function readFile(path: string): Buffer {
-    return fs.readFileSync(path);
 }
 
 process.on("uncaughtException", (err) => {
