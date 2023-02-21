@@ -14,7 +14,7 @@
 # DiscordFileStorage
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
-Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB). \
+Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB).
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify) \
@@ -48,7 +48,7 @@ Copy the link and visit it. Follow the instructions to invite the bot to your se
 
 ## __Setup__
 1. Install [NodeJS](https://nodejs.org/en/), [Yarn](https://yarnpkg.com/), [Typescript](https://www.typescriptlang.org). \
-Typescript has been tested with version 4 and yarn with version 1.22.10. \
+Typescript has been tested with version 4 and yarn with version 1.22.10.
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
 4. Create a file named ``.env`` in the root of the project. There example of the file named as ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
