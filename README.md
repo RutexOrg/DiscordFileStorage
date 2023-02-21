@@ -1,13 +1,13 @@
 ## Table of Contents
-- [ DiscordFileStorage](#[-discordfilestorage)
-- [ State](#[-state)
-- [ How to setup and play with this](#[-how-to-setup-and-play-with-this)
-   - [ __Discord server creation__](#[-__discord-server-creation__)
-   - [ __Bot Creation__](#[-__bot-creation__)
-   - [ __Setup__](#[-__setup__)
-   - [ __SSL__](#[-__ssl__)
-- [ Last steps](#[-last-steps)
-- [ Known issues](#[-known-issues)
+- [DiscordFileStorage](#discordfilestorage)
+- [State](#state)
+- [How to setup and play with this](#how-to-setup-and-play-with-this)
+   - [Discord server creation](#discord-server-creation)
+   - [Bot Creation](#bot-creation)
+   - [Setup](#setup)
+   - [SSL](#ssl)
+- [Last steps](#last-steps)
+- [Known issues](#known-issues)
 ---
 
 
@@ -31,10 +31,10 @@ Has been tested __ONLY on Windows 10__.
 
 # How to setup and play with this
 
-## __Discord server creation__
+## Discord server creation
 Create a Guild (server) for the bot to use. Save its id. You can also use existing server.
 
-## __Bot Creation__
+## Bot Creation
 Create a bot with admin permissions and invite it to your server. If you already have a bot, you can use it.
 1. [Create](https://discord.com/developers/applications) a app.
 3. Once you created app, you should be in the app menu. Go to ``BOT`` tab and create a bot.
@@ -46,7 +46,7 @@ Create a bot with admin permissions and invite it to your server. If you already
 8. In the bottom you will find url.  Your url should look like this: ``https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot``.
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
-## __Setup__
+## Setup
 1. Install [NodeJS](https://nodejs.org/en/), [Yarn](https://yarnpkg.com/), [Typescript](https://www.typescriptlang.org). \
 Typescript has been tested with version 4 and yarn with version 1.22.10.
 2. Clone this repo.
@@ -54,7 +54,7 @@ Typescript has been tested with version 4 and yarn with version 1.22.10.
 4. Create a file named ``.env`` in the root of the project. There example of the file named as ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
 5. To run the bot, run ``yarn start``. This will compile the project and start the bot.
 
-## __SSL__
+## SSL
 Warning! At the moment SSL support is not complete. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests \
 If you want to use SSL, you have to generate a certificate. You can use [this](https://www.sslforfree.com/) service or [this](https://letsencrypt.org/) one. You can also use your own certificate. 
 
