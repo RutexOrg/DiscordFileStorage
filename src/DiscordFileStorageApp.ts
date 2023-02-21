@@ -5,42 +5,39 @@ import axios from 'axios';
 import ServerFile from './file/ServerFile';
 import FolderTree from './file/filesystem/FolderTree';
 
+export interface DiscordFileStorageAppOptions extends ClientOptions {
+    metaChannelName: string;
+    filesChannelName: string;
+}
 
 /**
  * Main class of the DiscordFileStorageApp. It is a Discord.js client with some additional functionality.
  */
 export default class DiscordFileStorageApp extends Client {
 
-    private filesystem: FolderTree = new FolderTree();
     private guildId: string;
-
-    private channelsToCreate = [
-        process.env.META_CHANNEL!,
-        process.env.FILES_CHANNEL!,
-    ]
-
+    private metaChannelName: string;
+    private filesChannelId: string;
+    private channelsToCreate: Array<string>;
     private discordFileManager: DiscordFileManager;
+    private filesystem: FolderTree = new FolderTree();
 
+    
     public static instance: DiscordFileStorageApp;
 
-    constructor(options: ClientOptions, guildId: string) {
+
+    constructor(options: DiscordFileStorageAppOptions, guildId: string) {
         super(options);
         if (DiscordFileStorageApp.instance) {
             throw new Error("DiscordFileStorageApp already exists");
         }
         DiscordFileStorageApp.instance = this;
 
-        const metaChannelName = process.env.META_CHANNEL;
-        const filesChannelName = process.env.FILES_CHANNEL;
-
-        if (!metaChannelName) {
-            printAndExit("No meta channel name provided. Please set the META_CHANNEL .env variable to your metadata channel name.");
-        }
-
-        if (!filesChannelName) {
-            printAndExit("No files channel name provided. Please set the FILES_CHANNEL .env variable to your files channel name.");
-        }
-
+        const metaChannelName = options.metaChannelName;
+        const filesChannelName = options.filesChannelName;
+        this.channelsToCreate = [metaChannelName, filesChannelName];
+        this.metaChannelName = metaChannelName;
+        this.filesChannelId = filesChannelName;
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
     }
@@ -50,11 +47,11 @@ export default class DiscordFileStorageApp extends Client {
     };
 
     public async getMetadataChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.META_CHANNEL!) as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name == this.metaChannelName) as TextBasedChannel;
     }
 
     public async getFileChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name == process.env.FILES_CHANNEL!) as TextBasedChannel;
+        return (await this.getGuild()).channels.cache.find(channel => channel.name == this.filesChannelId) as TextBasedChannel;
     }
 
     public async waitForReady(): Promise<void> {
@@ -125,13 +122,19 @@ export default class DiscordFileStorageApp extends Client {
      * loadFiles
      */
     public async loadFilesToCache() {
-        console.log(color.yellow("Fetching files..."));
+        console.log(color.yellow("Fetching files... This may take a while if there are a lot of files"))
 
         const metaDataChannelId = (await this.getMetadataChannel()).id;
         let messages = (await this.getAllMessages(metaDataChannelId));
-        for (let msg of messages) {
+
+        for (let i = 0; i < messages.length; i++) {
+            process.stdout.write(color.yellow("Loading files... " + i + "/" + messages.length) + '\r');
+            const msg = messages[i];
             if (msg.attachments.size > 0) {
                 let file = (await axios.get(msg.attachments.first()!.url)).data as object;
+
+                // process.stdout.write("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name + '\r');
+
                 if (ServerFile.isValidRemoteFile(file)) {
                     const remoteFile = ServerFile.fromObject(file, this.filesystem);
                     remoteFile.setMetaIdInMetaChannel(msg.id);

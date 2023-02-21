@@ -234,10 +234,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         let sourceEntry = this.fs.getElementTypeByPath(pathFrom.toString());
         let targetEntry = this.fs.getElementTypeByPath(pathTo.toString());
 
-        //console.log("sourceEntry", sourceEntry);
-        //console.log("targetEntry", targetEntry);
-
-
         if(sourceEntry.isUnknown || !targetEntry.isUnknown){
             return callback(Errors.InvalidOperation);
         }
