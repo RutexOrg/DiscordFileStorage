@@ -1,13 +1,13 @@
 ## Table of Contents
-- [DiscordFileStorage](#discordfilestorage)
-- [State](#state)
-- [How to setup and play with this](#how-to-setup-and-play-with-this)
-   - [Discord server creation](#discord-server-creation)
-   - [Bot Creation](#bot-creation)
-   - [Setup](#setup)
-   - [SSL](#ssl)
-- [Last steps](#last-steps)
-- [Known issues](#known-issues)
+- [ DiscordFileStorage](#[-discordfilestorage)
+- [ State](#[-state)
+- [ How to setup and play with this](#[-how-to-setup-and-play-with-this)
+   - [ Discord server creation](#[-discord-server-creation)
+   - [ Bot Creation](#[-bot-creation)
+   - [ Setup](#[-setup)
+   - [ SSL](#[-ssl)
+- [ Last steps](#[-last-steps)
+- [ Known issues](#[-known-issues)
 ---
 
 
@@ -47,8 +47,7 @@ Create a bot with admin permissions and invite it to your server. If you already
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
 ## Setup
-1. Install [NodeJS](https://nodejs.org/en/), [Yarn](https://yarnpkg.com/), [Typescript](https://www.typescriptlang.org). \
-Typescript has been tested with version 4 and yarn with version 1.22.10.
+1. Install [NodeJS (Tested on 18)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/), [Typescript (Tested on 4.8.3)](https://www.typescriptlang.org).
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
 4. Create a file named ``.env`` in the root of the project. There example of the file named as ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
