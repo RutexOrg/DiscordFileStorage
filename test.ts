@@ -5,18 +5,15 @@ import ServerFile from "./src/file/ServerFile";
 async function main(){
     let fs = new FolderTree().getRoot();
     let a = new Folder("a");
-    let b = new Folder("b");
+    let b = new Folder("b", a);
 
-    // let a1 = new ServerFile("a.txt", 0, a);
-    // let b1 = new ServerFile("b.txt", 0, b);
+    let b1 = new ServerFile("b.txt", 0, b, new Date());
     
-    // fs.addFolder(a);
-    // fs.addFolder(b);
+    fs.addFolder(a);
+    let f = fs.createHierarchy("/c");
 
-    // fs.moveFolder(b, a);
-
-    // console.log(b1.getAbsolutePath())
-
-    // fs.printHierarchyWithFiles(true);
+    fs.moveFolder(a, f);
+    
+    fs.printHierarchyWithFiles(true);
 }
 main();

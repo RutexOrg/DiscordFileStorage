@@ -272,7 +272,7 @@ export default class Folder {
 
     public printHierarchyWithFiles(initial: boolean = false): void {
         if(initial) {
-            console.log("Printing hierarchy :" + this.getAbsolutePath())
+            console.log("Printing hierarchy: " + this.getAbsolutePath())
             console.log("-------------------");
         }
         console.log(colors.blue("[D] ") +this.getAbsolutePath());

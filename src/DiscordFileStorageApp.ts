@@ -5,6 +5,7 @@ import axios from 'axios';
 import ServerFile from './file/ServerFile';
 import FolderTree from './file/filesystem/FolderTree';
 
+
 export interface DiscordFileStorageAppOptions extends ClientOptions {
     metaChannelName: string;
     filesChannelName: string;
@@ -103,7 +104,7 @@ export default class DiscordFileStorageApp extends Client {
             const messages = [... (await channel.messages.fetch(options)).values()];
 
             allMessages = allMessages.concat(messages);
-            console.log("got block of " + messages.length + " messages")
+            console.log("[getAllMessages] got block of " + messages.length + " messages")
             if (messages.length < 100) {
                 break;
             }
@@ -126,14 +127,15 @@ export default class DiscordFileStorageApp extends Client {
 
         const metaDataChannelId = (await this.getMetadataChannel()).id;
         let messages = (await this.getAllMessages(metaDataChannelId));
-
+        console.log("Got " + messages.length + " meta information messages, parsing...");
+        console.log();
         for (let i = 0; i < messages.length; i++) {
-            process.stdout.write(color.yellow("Loading files... " + i + "/" + messages.length) + '\r');
             const msg = messages[i];
+            
             if (msg.attachments.size > 0) {
                 let file = (await axios.get(msg.attachments.first()!.url)).data as object;
-
-                // process.stdout.write("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name + '\r');
+                
+                console.log("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name);
 
                 if (ServerFile.isValidRemoteFile(file)) {
                     const remoteFile = ServerFile.fromObject(file, this.filesystem);

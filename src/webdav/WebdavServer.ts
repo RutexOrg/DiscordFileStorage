@@ -35,6 +35,9 @@ export default class WebdavServer extends webdav.WebDAVServer {
         //     },
         // })
     }
-    
+
+    async startAsync(): Promise<Server<typeof IncomingMessage, typeof ServerResponse>> {
+        return super.startAsync(this.options.port!);
+    }
 
 }
