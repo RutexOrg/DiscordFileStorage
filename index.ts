@@ -20,7 +20,7 @@ async function main() {
     const filesChannelName = checkEnvVariableIsset("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.");
     const metaChannelName = checkEnvVariableIsset("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.");
 
-    const webdavPort = checkEnvVariableIsset("PORT", "Please set the PORT to your webdav server port.") as number;
+    const webdavPort = checkEnvVariableIsset("PORT", "Please set the PORT to your webdav server port.", "number") as number;
 
     const startWebdavServer = checkEnvVariableIsset("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.") as boolean;
     const enableHttps = checkEnvVariableIsset("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean") as boolean;
