@@ -47,7 +47,7 @@ Create a bot with admin permissions and invite it to your server. If you already
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
 ## Setup
-1. Install [NodeJS (Tested on 18)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/), [Typescript (Tested on 4.8.3)](https://www.typescriptlang.org).
+1. Install [NodeJS (Tested on 18)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
 4. Create a file named ``.env`` in the root of the project. There example of the file named as ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
