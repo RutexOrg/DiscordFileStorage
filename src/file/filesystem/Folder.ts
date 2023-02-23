@@ -14,7 +14,7 @@ export default class Folder {
     private files: ServerFile[] = [];
     private folders: Folder[] = [];
     private parent: Folder | null = null;
-    private isRoot;
+    private isRoot: boolean;
     private static root: Folder;
 
     constructor(name: string, parent: Folder | null = null, isRoot: boolean = false) {
