@@ -23,6 +23,7 @@
   "scripts": {
     "start": "tsc && node --no-warnings out/index.js",
     "build": "tsc",
+    "runner": "tsc && node --no-warnings out/runner.js",
     "test": "testyts"
   },
   "devDependencies": {

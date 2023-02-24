@@ -100,7 +100,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.log(ctx.context, ".mimeType", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
         if(entryInfo.isUnknown || entryInfo.isFolder){
-            throw new Error("Cannot get mime type of folder or unknown element");
+            return callback(Errors.NoMimeTypeForAFolder)
         }
 
         const file = entryInfo.entry as ServerFile;
@@ -230,7 +230,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(Errors.InvalidOperation);
     }
 
-    // very dirty, TODO: clean up
+    // very, VERY dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(ctx.context, ".move", pathFrom + " | " + pathTo);
 
@@ -259,20 +259,27 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         if(sourceEntry.isFolder){
-            const folder = sourceEntry.entry as Folder;
-            const newFolder = this.fs.createHierarchy(pathTo.toString()); 
-            const parent = folder.getParent()!;
-            
-            parent.removeFolder(folder);
-            folder.getFiles().forEach(file => {
-                file.setFolder(newFolder);
-            });
-            newFolder.setFiles(folder.getFiles());
+            const oldFolder = sourceEntry.entry as Folder;
+            const newFolder = this.fs.prepareFolderHierarchy(pathTo.toString());
 
-            console.log("folder", folder);
-            console.log("newFolder", newFolder);
+            oldFolder.getFiles().forEach(file => {
+                newFolder.addFile(file);
+            });
+
+            newFolder.setFolders(oldFolder.getFolders(), true);
+
+            oldFolder.removeThisFolder();
+            oldFolder.setParentFolder(null);
+
+            // TODO: maybe paths should be cached only in client and let user do path managing manually to avoid this loop?
+            // or we should to extra table of folders and bind path to folderId to avoid this loop?
+            for(let file of newFolder.getallEntriesRecursiveThis()){
+                if(file.isFile && (file.entry as ServerFile).isUploaded()){
+                    await this.app.getDiscordFileManager().updateMetaFile(file.entry as ServerFile);
+                }
+            }
+
             return callback(undefined, false)
-            // return callback(Errors.InvalidOperation);
         }
 
         return callback(Errors.InvalidOperation);

@@ -2,4 +2,4 @@ out/
 node_modules/
 .env
 certs/
-test.ts
+runner.ts

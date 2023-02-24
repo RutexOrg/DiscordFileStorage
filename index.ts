@@ -25,6 +25,8 @@ async function main() {
     const startWebdavServer = checkEnvVariableIsset("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.") as boolean;
     const enableHttps = checkEnvVariableIsset("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean") as boolean;
 
+    const skipPreload = checkEnvVariableIsset("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean") as boolean;
+
     const app = new DiscordFileStorageApp({
         intents: [
             GatewayIntentBits.MessageContent,
@@ -37,7 +39,13 @@ async function main() {
     await app.login(token!);
     await app.waitForReady();
     await app.prepare();
-    await app.loadFilesToCache();
+    
+    if(!skipPreload){
+        console.log(color.yellow("Preloading files..."));
+        await app.loadFilesToCache();
+    }else{
+        console.log(color.yellow("Skipping preload..."));
+    }
 
     if (startWebdavServer) {
         const serverLaunchOptions: webdav.WebDAVServerOptions = {
@@ -102,7 +110,7 @@ function checkIfFileExists(path: string, soft: boolean, assertString: string = "
     return true;
 }
 
-function checkEnvVariableIsset(name: string, assertString: string, type: "string" | "number" | "boolean" = "string"): any {
+function checkEnvVariableIsset(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: typeof type): any {
     const value = process.env[name]!;
     if (!value) {
         printAndExit("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");

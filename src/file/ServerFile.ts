@@ -1,6 +1,5 @@
 import FileBase from "./FileBase";
-import FolderTree from "./filesystem/FolderTree";
-import Folder from "./filesystem/Folder";
+import Folder, { FolderTree } from "./filesystem/Folder";
 
 export interface IAttachShortInfo {
     id: string;
@@ -66,7 +65,7 @@ export default class ServerFile extends FileBase {
         if(updateParents && this.folder != null) {
             this.folder.removeFile(this);
             this.folder = folder;
-            this.folder.addFile(this);
+            folder.addFile(this);
         }else{
             this.folder = folder;
         }

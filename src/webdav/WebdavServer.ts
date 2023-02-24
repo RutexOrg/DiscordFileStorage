@@ -1,8 +1,4 @@
 import { HTTPCodes, v2 as webdav } from "webdav-server";
-import FolderTree from "../file/filesystem/FolderTree";
-import WebdavFilesystemHandler from "./WebdavFilesystemHandler";
-import util from "node:util";
-import Folder from "../file/filesystem/Folder";
 import { Server, IncomingMessage, ServerResponse } from "http";
 
 export default class WebdavServer extends webdav.WebDAVServer {

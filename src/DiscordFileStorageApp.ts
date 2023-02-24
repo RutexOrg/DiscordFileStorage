@@ -3,7 +3,7 @@ import color from 'colors/safe';
 import DiscordFileManager from './RemoteFileManager';
 import axios from 'axios';
 import ServerFile from './file/ServerFile';
-import FolderTree from './file/filesystem/FolderTree';
+import { FolderTree } from './file/filesystem/Folder';
 
 
 export interface DiscordFileStorageAppOptions extends ClientOptions {
