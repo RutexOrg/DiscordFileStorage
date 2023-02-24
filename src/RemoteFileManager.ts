@@ -11,19 +11,14 @@ import { MutableBuffer } from "mutable-buffer";
 
 export const MAX_REAL_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
 
-export type RemoteFileManagerEvents = {
-    fileUploaded: (file: ServerFile) => void;
-    fileDeleted: (file: ServerFile) => void;
-}
 
 /**
  * Class that handles all the remote file management on discord.
  */
-export default class DiscordFileManager extends (EventEmitter as new () => TypedEmitter<RemoteFileManagerEvents>) implements IFIleManager {
+export default class DiscordFileManager implements IFIleManager {
     private app: DiscordFileStorageApp;
 
     constructor(client: DiscordFileStorageApp) {
-        super();
         this.app = client;
     }
 
@@ -39,7 +34,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         return builder;
     }
 
-    public async postMetaFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
+    public async postMetaFile(file: ServerFile): Promise<IUploadResult> {
         const metaChannel = await this.app.getMetadataChannel();
 
         let msg = await metaChannel.send("Uploading file meta...");
@@ -51,10 +46,6 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
             files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true)],
         });
 
-        if (dispatchEvent) {
-            console.log("Dispatching fileUploaded event")
-            this.emit("fileUploaded", file);
-        }
         console.log("return");
 
         return {
@@ -135,7 +126,7 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
     }
 
 
-    public async deleteFile(file: ServerFile, dispatchEvent: boolean): Promise<IUploadResult> {
+    public async deleteFile(file: ServerFile): Promise<IUploadResult> {
         const filesChannel = await this.app.getFileChannel();
         const metadataChannel = await this.app.getMetadataChannel();
         const messageIds = file.getAttachmentInfos();
@@ -151,9 +142,6 @@ export default class DiscordFileManager extends (EventEmitter as new () => Typed
         
         await metadataMessage.delete();
         file.markDeleted();
-        if (dispatchEvent) {
-            this.emit("fileDeleted", file);
-        }
 
         return {
             success: true,

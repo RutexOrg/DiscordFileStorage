@@ -9,7 +9,6 @@ export default class FileBase {
     private filename: string;
     private totalSize: number;
     private uploadedDate: Date;
-    private isFileComplete: boolean = true;
     private type: FileType = "remote";
 
     constructor(filename: string, totalSize: number, uploadedDate: Date = new Date()) {
