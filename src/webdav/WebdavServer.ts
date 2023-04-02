@@ -1,35 +1,37 @@
 import { HTTPCodes, v2 as webdav } from "webdav-server";
 import { Server, IncomingMessage, ServerResponse } from "http";
 
+export interface IUserData {
+    username: string;
+    password: string;
+}
+
+export interface ServerOptions extends webdav.WebDAVServerOptions {
+    users?: IUserData[];
+    enableAuth?: boolean;
+};
+
 export default class WebdavServer extends webdav.WebDAVServer {
-    constructor(options: webdav.WebDAVServerOptions) {
+    private constructor(options: ServerOptions) {
         super(options);
-        // TODO: add support for direct zip download of folders via http.
+    }
+
+    public static createServer(options: ServerOptions): WebdavServer {
+        const userManager = new webdav.SimpleUserManager();
+        const privManager = new webdav.SimplePathPrivilegeManager();
         
-        // const defaultGetCallback = this.methods.get;
-        // this.method("get", {
-        //     unchunked: (ctx, data, callback) => {
-        //         let path = ctx.requested.path;
-        //         let entry = (this.rootFileSystem() as WebdavFilesystemHandler).getFs().getElementTypeByPath(path.toString());
+        if (options.users) {
+            options.users.forEach((user) => {
+                const webdavUser = userManager.addUser(user.username, user.password, true);
+                privManager.setRights(webdavUser, "/", ["all"]);
+            });
+        }
 
-        //         if(entry.isFolder){
-        //             let fileEntry =entry.entry as Folder;
-        //             console.log(fileEntry);
-        //             ctx.setCode(HTTPCodes.OK);
-
-        //         }
-        //         return defaultGetCallback.unchunked!(ctx, data, callback);
-        //     },
-
-        //     isValidFor: (ctx, type) => {
-        //         let path = ctx.requested.path;
-        //         let entry = (this.rootFileSystem() as WebdavFilesystemHandler).getFs().getElementTypeByPath(path.toString());
-        //         if(entry.isFolder){
-        //             return true;
-        //         }
-        //         return defaultGetCallback.isValidFor!(ctx, type);
-        //     },
-        // })
+        return new WebdavServer({
+            privilegeManager: options.enableAuth ? privManager : undefined,
+            httpAuthentication: options.enableAuth ? new webdav.HTTPDigestAuthentication(userManager, "Webdav Server") : undefined,
+            ...options,
+        });
     }
 
     async startAsync(): Promise<Server<typeof IncomingMessage, typeof ServerResponse>> {

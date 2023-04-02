@@ -3,10 +3,9 @@ dotenv.config();
 
 import { GatewayIntentBits } from "discord.js";
 import color from "colors/safe";
-import DiscordFileStorageApp, { printAndExit } from "./src/DiscordFileStorageApp";
+import DiscordFileStorageApp, { print, printAndExit } from "./src/DiscordFileStorageApp";
 import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler";
-import { v2 as webdav } from "webdav-server";
-import WebdavServer from "./src/webdav/WebdavServer";
+import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer";
 import fs from "node:fs";
 import root from "app-root-path";
 
@@ -15,17 +14,33 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 // Idk how to fix it now, so let it be just disabled.
 
 async function main() {
-    const token = checkEnvVariableIsset("TOKEN", "Please set the TOKEN to your bot token.");
-    const guildId = checkEnvVariableIsset("GUILD_ID", "Please set the GUILD_ID to your guild id.");
-    const filesChannelName = checkEnvVariableIsset("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.");
-    const metaChannelName = checkEnvVariableIsset("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.");
+    const token = checkEnvVariableIsSet("TOKEN", "Please set the TOKEN to your bot token.");
+    const guildId = checkEnvVariableIsSet("GUILD_ID", "Please set the GUILD_ID to your guild id.");
+    const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.");
+    const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.");
 
-    const webdavPort = checkEnvVariableIsset("PORT", "Please set the PORT to your webdav server port.", "number") as number;
+    const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number") as number;
 
-    const startWebdavServer = checkEnvVariableIsset("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.") as boolean;
-    const enableHttps = checkEnvVariableIsset("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean") as boolean;
+    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.") as boolean;
+    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean") as boolean;
 
-    const skipPreload = checkEnvVariableIsset("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean") as boolean;
+    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean") as boolean;
+
+    
+    const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false);
+    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string")
+
+    const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption.", "boolean", false);
+    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password.", "string");    
+
+    if (enableEncrypt && !encryptPassword) {
+        printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password at least 1 character long.");
+    }
+
+    // regex: key:value,key:value,...
+    if(!(/^(?:\w+:\w+,)*\w+:\w+$/i).test(users)){
+        printAndExit("USERS env variable is not in correct format. Please use format username:password,username:password");
+    }
 
     const app = new DiscordFileStorageApp({
         intents: [
@@ -33,23 +48,26 @@ async function main() {
         ],
         filesChannelName: filesChannelName,
         metaChannelName: metaChannelName,
+        
+        shouldEncrypt: enableEncrypt,
+        encryptPassword: encryptPassword,
     }, guildId!);
 
     console.log(color.yellow("Logging in..."));
     await app.login(token!);
     await app.waitForReady();
     await app.prepare();
-    
-    if(!skipPreload){
+
+    if (!skipPreload) {
         console.log(color.yellow("Preloading files..."));
         await app.loadFilesToCache();
-    }else{
+    } else {
         console.log(color.yellow("Skipping preload..."));
     }
 
     if (startWebdavServer) {
-        const serverLaunchOptions: webdav.WebDAVServerOptions = {
-            port: webdavPort,
+        const serverLaunchOptions: ServerOptions = {
+            port: webdavPort,   
             rootFileSystem: new WebdavFilesystemHandler(app),
         }
 
@@ -59,7 +77,7 @@ async function main() {
             // generate self-signed certificate: openssl req -x509 -newkey rsa:4096 -keyout privkey.pem -out cert.pem -days 365 -nodes
             checkIfFileExists(root.resolve("/certs/privkey.pem"), false, "Please set ssl ./certs/privKey.pem or generate a self-signed certificate");
             checkIfFileExists(root.resolve("/certs/cert.pem"), false, "Please set ssl ./certs/cert.pem or generate a self-signed certificate");
-            checkIfFileExists(root.resolve("/certs/chain.pem"), true, "Please set ssl ./certs/chain.pem or generate a self-signed certificate");
+            checkIfFileExists(root.resolve("/certs/chain.pem"), true, "If you have chain file, please set ssl ./certs/chain.pem or generate a self-signed certificate");
 
             serverLaunchOptions.https = {
                 key: readFileSyncOrUndefined(root.resolve("/certs/privkey.pem")),
@@ -68,7 +86,23 @@ async function main() {
             }
         }
 
-        const webdavServer = new WebdavServer(serverLaunchOptions);
+   
+
+        if (enableAuth) {
+            console.log("Detected AUTH env variable. Starting webdav server with auth enabled.");
+            serverLaunchOptions.enableAuth = true;
+            serverLaunchOptions.users = users.split(",").map((user) => {
+                const [username, password] = user.split(":");
+                console.log(color.yellow("Adding user: " + username));
+                return {
+                    username: username,
+                    password: password,
+                }
+            });
+        }
+
+        console.log("Starting webdav server...");
+        const webdavServer = WebdavServer.createServer(serverLaunchOptions);
 
         await webdavServer.startAsync();
         console.log(color.green("WebDAV server started at port " + webdavPort + "."));
@@ -83,13 +117,13 @@ async function main() {
         //     next();
         // });
 
-        // webdavServer.afterRequest((arg, next) => {
-        // Display the method, the URI, the returned status code and the returned message
-        // console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
-        // If available, display the body of the response
-        // console.log(arg.responseBody);
-        // next();
-        // });
+        webdavServer.afterRequest((arg, next) => {
+            // Display the method, the URI, the returned status code and the returned message
+            console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
+            // If available, display the body of the response
+            console.log(arg.responseBody);
+            next();
+        });
     }
 
 }
@@ -110,9 +144,13 @@ function checkIfFileExists(path: string, soft: boolean, assertString: string = "
     return true;
 }
 
-function checkEnvVariableIsset(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: typeof type): any {
+function checkEnvVariableIsSet(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: any): any {
     const value = process.env[name]!;
     if (!value) {
+        if (defaultValue !== undefined) {
+            print("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
+            return defaultValue;
+        }
         printAndExit("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     };
 
@@ -136,6 +174,10 @@ function checkEnvVariableIsset(name: string, assertString: string, type: "string
         return number;
     }
 
+    if(type == "string" && value.length == 0){
+        printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
+    }
+
     return value;
 
 }
@@ -151,12 +193,18 @@ function readFileSyncOrUndefined(path: string): string | undefined {
 
 
 
-process.on("uncaughtException", (err) => {
-    console.log(color.red("Uncaught exception"));
-    console.log(color.red(err.name));
-    console.log(color.red(err.message));
-    console.log(color.red(err.stack!));
-    printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
-});
 
-main();
+
+try {
+    main();
+}catch(err){
+    console.dir(err);
+}
+
+// process.on("uncaughtException", (err) => {
+//     console.log(color.red("Uncaught exception"));
+//     console.log(color.red(err.name));
+//     console.log(color.red(err.message));
+//     console.log(color.red(err.stack!));
+//     printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
+// });

@@ -1,10 +1,12 @@
 import { Readable, Writable } from "stream";
 import { ResourceType, v2 } from "webdav-server";
-import { Errors } from "webdav-server/lib/index.v2";
+import { Errors, IUser } from "webdav-server/lib/index.v2";
 import DiscordFileStorageApp from "../DiscordFileStorageApp";
 import ServerFile from "../file/ServerFile";
 import RamFile from "../file/RamFile";
 import Folder from "../file/filesystem/Folder";
+import AESStreamHelper from "../stream-helpers/AESStreamHelper";
+import { PassThrough } from "stream";
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
@@ -24,23 +26,21 @@ export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializ
 
 export default class WebdavFilesystemHandler extends v2.FileSystem {
     private app: DiscordFileStorageApp;
-    private cLockManager: v2.LocalLockManager;
-    private cPropertyManager: v2.LocalPropertyManager;
+    private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
+    private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
+    private aesStreamHelper: AESStreamHelper = new AESStreamHelper();
     private fs: Folder;
 
     constructor(client: DiscordFileStorageApp) {
         super(new VirtualDiscordFileSystemSerializer());
         this.app = client;
-        
-        this.cLockManager = new v2.LocalLockManager();
-        this.cPropertyManager = new v2.LocalPropertyManager();
-        this.fs = this.app.getFileSystem().getRoot();               
+        this.fs = this.app.getFileSystem().getRoot();
     }
 
     public getFs(): Folder {
         return this.fs;
     }
-    
+
     protected _lockManager(path: v2.Path, ctx: v2.LockManagerInfo, callback: v2.ReturnCallback<v2.ILockManager>): void {
         return callback(undefined, this.cLockManager);
     }
@@ -50,17 +50,25 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
-    private log(ctx: v2.RequestContext, from: string, data: any){
+    private log(ctx: v2.RequestContext, from: string, data: any) {
         console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
     }
-    
+
+    private shouldEncrypt(): boolean {
+        return this.app.shouldEncryptFiles();
+    }
+
+    private setupPassword() {
+        this.aesStreamHelper.setPassword(this.app.getEncryptPassword());
+    }
+
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
 
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
-        if(entryInfo.isUnknown){
+        if (entryInfo.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
-        if(entryInfo.isFolder){
+        if (entryInfo.isFolder) {
             return callback(Errors.InvalidOperation); // TODO: some client (e.g. filezilla) tries to get size of folder. This is not supported yet.
         }
         const file = entryInfo.entry as ServerFile;
@@ -79,16 +87,17 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const folder = this.fs.getFolderByPath(path.toString())!;
         folder.printHierarchyWithFiles(true);
         return callback(undefined, folder.getAllEntries());
-        
+
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
+        // console.log(ctx.context.user);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
 
         let resType;
-        if(entryInfo.isFile){
+        if (entryInfo.isFile) {
             resType = ResourceType.File;
-        } else if(entryInfo.isFolder){
+        } else if (entryInfo.isFolder) {
             resType = ResourceType.Directory;
         } else {
             resType = ResourceType.NoResource
@@ -99,7 +108,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
         this.log(ctx.context, ".mimeType", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
-        if(entryInfo.isUnknown || entryInfo.isFolder){
+        if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.NoMimeTypeForAFolder)
         }
 
@@ -110,46 +119,56 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
         const existsCheckState = this.fs.getElementTypeByPath(path.toString());
-        
+
         // //this.log(".fastExistCheck", exists + " | " + path.toString());
-        if(existsCheckState.isUnknown){
+        if (existsCheckState.isUnknown) {
             return callback(false);
         }
         const exists = (existsCheckState.isFile || existsCheckState.isFolder) ?? false;
 
         return callback(exists);
     }
-    
+
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         //this.log(ctx.context, ".create", path + " | " + ctx.type);
-        if(ctx.type.isDirectory){
+        if (ctx.type.isDirectory) {
             this.fs.createHierarchy(path.toString());
             return callback();
-        }else{
+        } else {
             console.log("Creating file; ", path.toString());
             this.fs.createFileHierarchy(path.toString(), path.fileName());
             return callback();
         }
     }
 
+    // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
         //this.log(ctx.context, ".openReadStream", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
-        if(entryInfo.isUnknown || entryInfo.isFolder){
+        if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.ResourceNotFound);
         }
 
         const file = entryInfo.entry as ServerFile;
-        
 
-        if(!file.isUploaded() && file.getFileType() == "ram"){
+        if (!file.isUploaded() && file.getFileType() == "ram") {
             //this.log(ctx.context, ".openReadStream", "File is not uploaded, returning empty dummy stream");
             return callback(undefined, (file as RamFile).getReadable());
         }
 
-        const stream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
-        //this.log(ctx.context, ".openReadStream", "Stream opened"); 
-        callback(undefined, stream);
+        console.log("fetch: ", file);
+        const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
+
+        const passThroughtStream = new PassThrough();
+        if (this.shouldEncrypt()) {
+            this.setupPassword();
+            console.log("Decrypting file");
+
+            readStream.pipe(this.aesStreamHelper.createDecryptStream(passThroughtStream));
+        } else {
+            readStream.pipe(passThroughtStream);
+        }
+        callback(undefined, passThroughtStream);
     }
 
 
@@ -159,40 +178,50 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         const folder = existingFile?.getFolder()!;
         console.log("folder", folder);
-        
+
         // first creating file in the ram to be able to say system that file is created and ready to be written to.
-        if(existingFile?.getFileType() == "remote" && existingFile?.isUploaded()){
-            await this.app.getDiscordFileManager().deleteFile(existingFile);    
+        if (existingFile?.getFileType() == "remote" && existingFile?.isUploaded()) {
+            await this.app.getDiscordFileManager().deleteFile(existingFile);
         }
-        
-        if(ctx.estimatedSize == -1){ // windows explorer does not provide estimated size if file is newly created. so we put in into ram to be able to say that file is created and give it back to open on client and modify it.
+
+        if (ctx.estimatedSize == -1) { // windows explorer does not provide estimated size if file is newly created. so we put in into ram to be able to say that file is created and give it back to open on client and modify it.
             folder.removeFile(existingFile!);
             const ramFile = new RamFile(path.fileName(), 0, folder);
-            return callback(undefined, ramFile.getWritable()); 
+            return callback(undefined, ramFile.getWritable());
         }
 
 
-        if(existingFile?.getFileType() == "ram"){
+        if (existingFile?.getFileType() == "ram") {
             (existingFile as RamFile).cleanup(true);
-        }else{
+        } else {
             folder.removeFile(existingFile!);
         }
 
         folder.printHierarchyWithFiles(true);
         const file = new ServerFile(path.fileName(), ctx.estimatedSize, folder, new Date());
         file.setMetaIdInMetaChannel(existingFile?.getMetaIdInMetaChannel()!);
-        
-        this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize).then(stream => {
-            this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
-            callback(undefined, stream);
 
-            stream.once("close", async () => {
-                await this.app.getDiscordFileManager().postMetaFile(file!);
-                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
-            });
-        }).catch(err => {
-            console.log(err);
-            return callback(err);
+
+        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
+
+        this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
+        callback(undefined, new Writable({
+            write: (chunk, encoding, callback) => {
+                if (this.shouldEncrypt()) {
+                    this.setupPassword();
+                    chunk = this.aesStreamHelper.encryptChunk(chunk);
+                }
+                writeStream.write(chunk, encoding, callback);
+            },
+            final: (callback) => {
+                writeStream.end(callback);
+            }
+        }));
+
+
+        writeStream.once("close", async () => {
+            await this.app.getDiscordFileManager().postMetaFile(file!);
+            this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
     }
 
@@ -200,18 +229,18 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
         //this.log(ctx.context, ".delete", path);
         const entryCheck = this.fs.getElementTypeByPath(path.toString());
-        if(entryCheck.isUnknown){
+        if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if(entryCheck.isFolder){
+        if (entryCheck.isFolder) {
             this.fs.removeFolderHierarchy(entryCheck.entry as Folder);
             return callback();
         }
-        
+
         const file = entryCheck.entry as ServerFile;
 
-        if(!file.isUploaded()){
+        if (!file.isUploaded()) {
             this.fs.removeFile(file!);
             return callback();
         }
@@ -237,13 +266,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const sourceEntry = this.fs.getElementTypeByPath(pathFrom.toString());
         const targetEntry = this.fs.getElementTypeByPath(pathTo.toString());
 
-        if(sourceEntry.isUnknown || !targetEntry.isUnknown){
+        if (sourceEntry.isUnknown || !targetEntry.isUnknown) {
             return callback(Errors.InvalidOperation);
         }
- 
-        if(sourceEntry.isFile){
+
+        if (sourceEntry.isFile) {
             const file = sourceEntry.entry as ServerFile;
-            
+
             const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
             const oldFolder = file.getFolder()!;
             file.setFolder(newFolder);
@@ -252,13 +281,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             console.log("pathTo: " + pathTo.fileName());
             console.log("absolutePath: " + newFolder.getAbsolutePath());
             this.fs.moveFile(file, oldFolder, newFolder.getAbsolutePath());
-            if(file.isUploaded()){
-               await this.app.getDiscordFileManager().updateMetaFile(file);
+            if (file.isUploaded()) {
+                await this.app.getDiscordFileManager().updateMetaFile(file);
             }
             return callback(undefined, true);
         }
 
-        if(sourceEntry.isFolder){
+        if (sourceEntry.isFolder) {
             const oldFolder = sourceEntry.entry as Folder;
             const newFolder = this.fs.prepareFolderHierarchy(pathTo.toString());
 
@@ -273,8 +302,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
             // TODO: maybe paths should be cached only in client and let user do path managing manually to avoid this loop?
             // or we should to extra table of folders and bind path to folderId to avoid this loop?
-            for(let file of newFolder.getallEntriesRecursiveThis()){
-                if(file.isFile && (file.entry as ServerFile).isUploaded()){
+            for (let file of newFolder.getallEntriesRecursiveThis()) {
+                if (file.isFile && (file.entry as ServerFile).isUploaded()) {
                     await this.app.getDiscordFileManager().updateMetaFile(file.entry as ServerFile);
                 }
             }
@@ -288,11 +317,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
         const entryCheck = this.fs.getElementTypeByPath(pathFrom.toString());
-        if(entryCheck.isUnknown){
+        if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if(entryCheck.isFolder){
+        if (entryCheck.isFolder) {
             const folder = entryCheck.entry as Folder;
             folder.setName(newName);
             return callback(undefined, true);
@@ -300,7 +329,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         const file = entryCheck.entry as ServerFile;
         file.setFileName(newName);
-        if(file.isUploaded()){
+        if (file.isUploaded()) {
             await this.app.getDiscordFileManager().updateMetaFile(file);
         }
         return callback(undefined, true);
@@ -308,11 +337,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
         const entryCheck = this.fs.getElementTypeByPath(path.toString());
-        if(entryCheck.isUnknown){
+        if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if(entryCheck.isFolder){
+        if (entryCheck.isFolder) {
             return callback(undefined, 0);
         }
 

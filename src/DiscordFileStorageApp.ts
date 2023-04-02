@@ -5,10 +5,12 @@ import axios from 'axios';
 import ServerFile from './file/ServerFile';
 import { FolderTree } from './file/filesystem/Folder';
 
-
 export interface DiscordFileStorageAppOptions extends ClientOptions {
     metaChannelName: string;
     filesChannelName: string;
+
+    shouldEncrypt: boolean;
+    encryptPassword?: string;
 }
 
 /**
@@ -23,6 +25,8 @@ export default class DiscordFileStorageApp extends Client {
     private discordFileManager: DiscordFileManager;
     private filesystem: FolderTree = new FolderTree();
 
+    private shouldEncrypt: boolean = false;
+    private encryptPassword: string = "";
     
     public static instance: DiscordFileStorageApp;
 
@@ -34,14 +38,29 @@ export default class DiscordFileStorageApp extends Client {
         }
         DiscordFileStorageApp.instance = this;
 
-        const metaChannelName = options.metaChannelName;
-        const filesChannelName = options.filesChannelName;
-        this.channelsToCreate = [metaChannelName, filesChannelName];
-        this.metaChannelName = metaChannelName;
-        this.filesChannelId = filesChannelName;
+        this.channelsToCreate = [
+            options.metaChannelName, 
+            options.filesChannelName
+        ];
+
+        this.metaChannelName = options.metaChannelName;
+        this.filesChannelId = options.filesChannelName;
+        
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
+
+        this.shouldEncrypt = options.shouldEncrypt;
+        this.encryptPassword = options.encryptPassword;
     }
+
+    public shouldEncryptFiles(): boolean {
+        return this.shouldEncrypt;
+    }
+
+    public getEncryptPassword(): string {
+        return this.encryptPassword;
+    }
+
 
     public async getGuild(): Promise<Guild> {
         return this.guilds.cache.get(this.guildId)!.fetch();
@@ -90,8 +109,8 @@ export default class DiscordFileStorageApp extends Client {
         }
     }
 
-    async getAllMessages(id: string): Promise<Message[]> {
-        const channel = await this.channels.fetch(id) as TextChannel;
+    async getAllMessages(channelId: string): Promise<Message[]> {
+        const channel = await this.channels.fetch(channelId) as TextChannel;
         let allMessages: Message[] = [];
         let lastId: string | undefined;
 
@@ -161,9 +180,12 @@ export default class DiscordFileStorageApp extends Client {
 }
 
 
-
 export function printAndExit(message: string, exitCode: number = 1) {
     console.log(color.red(message));
     process.exit(exitCode);
 }
 
+
+export function print(message: string) {
+    console.log(color.green(message));
+}
