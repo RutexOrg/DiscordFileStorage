@@ -6,6 +6,7 @@ export interface AESStreamHelperOptions {
     algorithm?: string;
 }
 
+// thanks to https://github.com/wangsijie/aes-encrypt-stream
 export default class AESStreamHelper {
     private password!: Buffer;
     private algorithm = 'aes-256-ctr';
