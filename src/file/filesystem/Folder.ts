@@ -452,14 +452,11 @@ export default class Folder {
             newFolder = this.prepareFileHierarchy(newPath);
         }
 
-        console.log(oldFolder.name);
 
         oldFolder.files = oldFolder.files.filter(f => f != file);
         newFolder.addFile(file);
         file.setFolder(newFolder);
 
-        console.log("afterMove")
-        console.log(oldFolder.getFiles())
     }
 
 
@@ -467,13 +464,11 @@ export default class Folder {
 
 
 export class FolderTree {
-
     private root: Folder;
 
     constructor() {
         this.root = new Folder("", null);
     }
-
 
     public getRoot(): Folder {
         return this.root;
