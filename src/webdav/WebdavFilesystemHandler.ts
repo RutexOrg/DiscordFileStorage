@@ -170,7 +170,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         if (!file.isUploaded() && file.getFileType() == "ram") {
             //this.log(ctx.context, ".openReadStream", "File is not uploaded, returning empty dummy stream");
-            return callback(undefined, (file as RamFile).getReadable());
+            return callback(undefined, (file as RamFile).getReadable(true));
         }
 
         console.log("fetch: ", file);

@@ -74,7 +74,7 @@ Once server started, the webdav server will be available on port 3000.
 Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use discord as a file storage.
 
 # Known issues
-1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  
+1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  WILL BE FIXED.
 2. Problems with stability. Sometimes it may hang or drop the connections on various clients.
 3. Problems with downloading big (~200 MB) files from windows explorer directly. I dont know why for the moment, but i try to do some work in future. For this reason, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files but this is not a 100% solution.
 4. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont need ssl or you dont care about security, you can use it.
