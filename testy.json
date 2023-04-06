@@ -1,12 +1,13 @@
 {
-    "include": [
-        "**/*.spec.ts"
-    ],
-    "tsconfig": "./tsconfig.json",
-    "reporters": {
-      "standard": {
-        "color": true
-      }
-    },
-    "timeout": 10000
+	"include": [
+		"**/*.spec.ts"
+	],
+	"tsconfig": "./tsconfig.json",
+	"reporters": {
+		"standard": {
+			"color": true
+		}
+	},
+	"timeout": 10000,
+	"setupFile": "setup.ts"
 }
