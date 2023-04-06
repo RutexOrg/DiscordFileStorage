@@ -1,5 +1,5 @@
-import FileBase from "./FileBase";
-import Folder, { FolderTree } from "./filesystem/Folder";
+import FileBase from "./FileBase.js";
+import Folder, { FolderTree } from "./filesystem/Folder.js";
 
 export interface IAttachShortInfo {
     id: string;
@@ -7,10 +7,23 @@ export interface IAttachShortInfo {
     proxyUrl?: string;
 }
 
+export interface IServerFile {
+    filename: string;
+    totalSize: number;
+    folder: string;
+    uploadDate: Date;
+    attachmentInfos: IAttachShortInfo[];
+    filesPostedInChannelId: string;
+    metaIdInMetaChannel: string;
+    metaVersion: number;
+    markedDeleted: boolean;
+}
+
 /**
  * Represents a file on the server side. This file is stored on the server.
  */
 export default class ServerFile extends FileBase {
+
     private attachmentInfos: IAttachShortInfo[] = [];
     private filesPostedInChannelId: string = "";
     private metaIdInMetaChannel: string = "";
@@ -100,7 +113,7 @@ export default class ServerFile extends FileBase {
             obj.attachmentInfos
     }
 
-    toObject(): any {
+    toObject(): IServerFile {
         if(this.folder == null) {
             throw new Error("Folder is null");
         }
@@ -114,11 +127,12 @@ export default class ServerFile extends FileBase {
             metaVersion: this.metaVersion,
             folder: this.getAbsolutePath(),
             attachmentInfos: this.getAttachmentInfos(),
+            markedDeleted: this.markedDeleted,
         };
     }
     
-    public static fromObject(obj: any, root: FolderTree): ServerFile {
-        let folder = root.getRoot().prepareFileHierarchy(obj.folder as string);
+    public static fromObject(obj: IServerFile, root: FolderTree): ServerFile {
+        let folder = root.getRoot().prepareFileHierarchy(obj.folder);
         const file = new ServerFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
         file.setAttachmentInfos(obj.attachmentInfos);

@@ -1,9 +1,9 @@
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, GuildBasedChannel, Message, TextBasedChannel, TextChannel } from 'discord.js';
-import color from 'colors/safe';
-import DiscordFileManager from './RemoteFileManager';
+import color from 'colors/safe.js';
+import DiscordFileManager from './RemoteFileManager.js';
 import axios from 'axios';
-import ServerFile from './file/ServerFile';
-import { FolderTree } from './file/filesystem/Folder';
+import ServerFile from './file/ServerFile.js';
+import { FolderTree } from './file/filesystem/Folder.js';
 
 export interface DiscordFileStorageAppOptions extends ClientOptions {
     metaChannelName: string;
@@ -26,7 +26,7 @@ export default class DiscordFileStorageApp extends Client {
     private filesystem: FolderTree = new FolderTree();
 
     private shouldEncrypt: boolean = false;
-    private encryptPassword: string = "";
+    private encryptPassword;
     
     public static instance: DiscordFileStorageApp;
 
@@ -50,7 +50,7 @@ export default class DiscordFileStorageApp extends Client {
         this.discordFileManager = new DiscordFileManager(this);
 
         this.shouldEncrypt = options.shouldEncrypt;
-        this.encryptPassword = options.encryptPassword;
+        this.encryptPassword = options.encryptPassword ?? "";
     }
 
     public shouldEncryptFiles(): boolean {
@@ -157,7 +157,7 @@ export default class DiscordFileStorageApp extends Client {
                 console.log("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name);
 
                 if (ServerFile.isValidRemoteFile(file)) {
-                    const remoteFile = ServerFile.fromObject(file, this.filesystem);
+                    const remoteFile = ServerFile.fromObject(file as any, this.filesystem);
                     remoteFile.setMetaIdInMetaChannel(msg.id);
                 } else {
                     console.log("Failed to extract valid message data");

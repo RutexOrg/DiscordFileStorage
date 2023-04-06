@@ -1,12 +1,12 @@
-import { Readable, Writable } from "stream";
+import { Readable, Writable, Transform, PassThrough } from "stream";
 import { ResourceType, v2 } from "webdav-server";
-import { Errors, IUser } from "webdav-server/lib/index.v2";
-import DiscordFileStorageApp from "../DiscordFileStorageApp";
-import ServerFile from "../file/ServerFile";
-import RamFile from "../file/RamFile";
-import Folder from "../file/filesystem/Folder";
-import AESStreamHelper from "../stream-helpers/AESStreamHelper";
-import { PassThrough } from "stream";
+import { Errors, IUser } from "webdav-server/lib/index.v2.js";
+import DiscordFileStorageApp from "../DiscordFileStorageApp.js";
+import ServerFile from "../file/ServerFile.js";
+import RamFile from "../file/RamFile.js";
+import Folder from "../file/filesystem/Folder.js";
+import crypto from "crypto";
+
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
@@ -28,8 +28,25 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     private app: DiscordFileStorageApp;
     private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
-    private aesStreamHelper: AESStreamHelper = new AESStreamHelper();
     private fs: Folder;
+
+    private createDecryptor(){
+        const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword());
+        decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
+            console.log("decipher error", err);
+        });
+
+        return decipher;
+    }
+
+    private createEncryptor(){
+        const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword());
+        chiper.once("error", (err) => {
+            console.log("chiper error", err);
+        });
+
+        return chiper;
+    }
 
     constructor(client: DiscordFileStorageApp) {
         super(new VirtualDiscordFileSystemSerializer());
@@ -58,13 +75,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return this.app.shouldEncryptFiles();
     }
 
-    private setupPassword() {
-        this.aesStreamHelper.setPassword(this.app.getEncryptPassword());
-    }
 
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        if (path.isRoot()) {
+            return callback(undefined, this.fs.getTotalSize());
+        }
+
         if (entryInfo.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
@@ -85,7 +102,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         //this.log(ctx.context, ".readDir", path);
         const folder = this.fs.getFolderByPath(path.toString())!;
-        folder.printHierarchyWithFiles(true);
+        folder.printHierarchyWithFiles(true, ".readDir");
         return callback(undefined, folder.getAllEntries());
 
     }
@@ -106,7 +123,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
-        this.log(ctx.context, ".mimeType", path);
+        // this.log(ctx.context, ".mimeType", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.NoMimeTypeForAFolder)
@@ -157,18 +174,16 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         console.log("fetch: ", file);
+        const pt = new PassThrough();
         const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
 
-        const passThroughtStream = new PassThrough();
         if (this.shouldEncrypt()) {
-            this.setupPassword();
-            console.log("Decrypting file");
-
-            readStream.pipe(this.aesStreamHelper.createDecryptStream(passThroughtStream));
-        } else {
-            readStream.pipe(passThroughtStream);
+            readStream.pipe(this.createDecryptor()).pipe(pt);
+        }else{
+            readStream.pipe(pt);
         }
-        callback(undefined, passThroughtStream);
+
+        callback(undefined, pt);
     }
 
 
@@ -201,28 +216,27 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const file = new ServerFile(path.fileName(), ctx.estimatedSize, folder, new Date());
         file.setMetaIdInMetaChannel(existingFile?.getMetaIdInMetaChannel()!);
 
-
+        const pt = new PassThrough();
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
 
         this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
-        callback(undefined, new Writable({
-            write: (chunk, encoding, callback) => {
-                if (this.shouldEncrypt()) {
-                    this.setupPassword();
-                    chunk = this.aesStreamHelper.encryptChunk(chunk);
-                }
-                writeStream.write(chunk, encoding, callback);
-            },
-            final: (callback) => {
-                writeStream.end(callback);
-            }
-        }));
 
 
-        writeStream.once("close", async () => {
+        
+   
+        if (this.shouldEncrypt()) {
+            pt.pipe(this.createEncryptor()).pipe(writeStream);
+        }else{
+            pt.pipe(writeStream);
+        }
+        
+        pt.once("close", async () => {
             await this.app.getDiscordFileManager().postMetaFile(file!);
             this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
+
+        callback(undefined, pt);
+
     }
 
 
@@ -252,6 +266,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         await this.app.getDiscordFileManager().deleteFile(file);
         return callback();
     }
+
 
 
     protected _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): void {

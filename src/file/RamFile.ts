@@ -1,8 +1,9 @@
 import { Writable } from 'stream';
 import { Readable } from 'stream';
-import Folder from "./filesystem/Folder";
-import ServerFile from "./ServerFile";
-import { MutableBuffer } from 'mutable-buffer';
+import Folder from "./filesystem/Folder.js";
+import ServerFile from "./ServerFile.js";
+import MutableBuffer from "./helper/MutableBuffer.js"
+
 /**
  * A file that is stored in ram.
  */
@@ -13,7 +14,7 @@ export default class RamFile extends ServerFile {
 
     constructor(filename: string, totalSize: number, folder: Folder, maxSize: number = 128000 * 8, uploadedDate: Date = new Date()) {
         super(filename, totalSize, folder, uploadedDate);
-        this.data = new MutableBuffer(maxSize);
+        this.data = new MutableBuffer(maxSize) as any;
         this.maxSize = maxSize;
         this.setFileType("ram");
     }

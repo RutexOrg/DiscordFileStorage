@@ -1,5 +1,5 @@
-import ServerFile from "../ServerFile";
-import colors from "colors/safe";
+import ServerFile from "../ServerFile.js";
+import colors from "colors/safe.js";
 
 export interface ElementType {
     isFile?: boolean;
@@ -65,7 +65,7 @@ export default class Folder {
 
     public setFiles(files: ServerFile[], updateParents: boolean): void {
         for(let i = 0; i < files.length; i++) {
-            files[i].getFolder().removeFile(files[i]);
+            files[i].getFolder()!.removeFile(files[i]);
             files[i].setFolder(this, updateParents);
         }
         this.files = files;
@@ -235,7 +235,7 @@ export default class Folder {
     }
 
     public removeThisFolder(): void {
-        let parent = this.getParent();
+        let parent = this.getParent()!;
         parent.folders = parent.folders.filter(f => f.name != this.name);
     }
 
@@ -330,9 +330,9 @@ export default class Folder {
         return currentFolder;
     }
 
-    public printHierarchyWithFiles(initial: boolean = false): void {
+    public printHierarchyWithFiles(initial: boolean = false, debugText: string = ""): void {
         if(initial) {
-            console.log("Printing hierarchy: " + this.getAbsolutePath())
+            console.log("Printing hierarchy: " + this.getAbsolutePath(), debugText)
             console.log("-------------------");
         }
         console.log(colors.blue("[D] ") +this.getAbsolutePath());
@@ -457,6 +457,17 @@ export default class Folder {
         newFolder.addFile(file);
         file.setFolder(newFolder);
 
+    }
+
+    public getTotalSize(): number {
+        let size = 0;
+        this.files.forEach(file => {
+            size += file.getTotalSize();
+        });
+        this.folders.forEach(folder => {
+            size += folder.getTotalSize();
+        });
+        return size;
     }
 
 
