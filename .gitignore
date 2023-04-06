@@ -4,3 +4,5 @@ node_modules/
 certs/
 runner.ts
 yarn-error.log
+tmp*
+testfile-downloaded.txt
