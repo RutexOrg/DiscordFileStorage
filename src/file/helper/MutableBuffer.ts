@@ -5,9 +5,8 @@ const DEFAULT_BLOCK_SIZE = 1024;
 
 type WriteData = BaseMutableBuffer | string | Buffer | ArrayLike<number> | ArrayBuffer | SharedArrayBuffer;
 
-export default class BaseMutableBuffer {
-  static Buffer: typeof Buffer;
 
+export class BaseMutableBuffer {
   static readonly target: string;
 
   protected _initialSize: number;
@@ -250,6 +249,7 @@ export default class BaseMutableBuffer {
     return this.size;
   }
 
+
   trim() {
     if (this.size <= 0) {
       return this.size;
@@ -317,6 +317,11 @@ export default class BaseMutableBuffer {
     }
     return this.size;
   }
+}
+
+export default class MutableBuffer extends BaseMutableBuffer {
+  static readonly target = 'node';
+  static Buffer = Buffer;
 }
 
 function isBuffer(obj: any): obj is Buffer {
