@@ -1,5 +1,5 @@
 import { Readable, PassThrough } from "stream";
-import axios from "axios";
+import client from "../AxiosInstance.js";
 
 /**
  * Class that combines list of urls into a single Readable stream. 
@@ -25,7 +25,7 @@ export default class HttpStreamPool {
 		const passThrough = new PassThrough();
 
 		const streamFile = async (url: string) => {
-			const response = await axios.get(url, { responseType: "stream" });
+			const response = await client.get(url, { responseType: "stream" });
 			response.data.once("error", (err: Error) => {
 				console.log("Error downloading " + url)
 				console.log(err);

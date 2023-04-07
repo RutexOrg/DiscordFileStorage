@@ -8,7 +8,7 @@ import { Readable, Writable } from "stream";
 import fs from "fs";
 import path from "path";
 import crypro from "crypto";
-import axios from "axios";
+import axios from "../src/AxiosInstance.js";
 
 const DOMAIN = "localhost";
 const PORT = 3000;
