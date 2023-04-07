@@ -23,7 +23,7 @@
   "scripts": {
     "start": "tsc && node --no-warnings out/index.js",
     "build": "tsc",
-    "test": "yarn build && mocha out\\tests\\"
+    "test": "yarn build && mocha out/tests/"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",

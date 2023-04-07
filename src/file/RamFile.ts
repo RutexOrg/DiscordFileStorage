@@ -2,7 +2,7 @@ import { Writable } from 'stream';
 import { Readable } from 'stream';
 import Folder from "./filesystem/Folder.js";
 import ServerFile from "./ServerFile.js";
-import MutableBuffer from "./helper/MutableBuffer.js"
+import MutableBuffer from "../helper/MutableBuffer.js"
 
 /**
  * A file that is stored in ram.

@@ -5,7 +5,7 @@ import DiscordFileStorageApp from "./DiscordFileStorageApp.js";
 import HttpStreamPool from './stream-helpers/HttpStreamPool.js';
 import ServerFile from './file/ServerFile.js';
 import IFIleManager, { IUploadResult } from "./file/IFileManager.js";
-import MutableBuffer from "./file/helper/MutableBuffer.js";
+import MutableBuffer from "./helper/MutableBuffer.js";
 
 export const MAX_REAL_CHUNK_SIZE: number = 8 * 1000 * 1000; // 8 MB, discord limit. 
 

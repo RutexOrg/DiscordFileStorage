@@ -1,5 +1,5 @@
 import { Readable, PassThrough } from "stream";
-import client from "../AxiosInstance.js";
+import client from "../helper/AxiosInstance.js";
 
 /**
  * Class that combines list of urls into a single Readable stream. 
