@@ -1,13 +1,15 @@
 ## Table of Contents
-- [ DiscordFileStorage](#[-discordfilestorage)
-- [ State](#[-state)
-- [ How to setup and play with this](#[-how-to-setup-and-play-with-this)
-   - [ Discord server creation](#[-discord-server-creation)
-   - [ Bot Creation](#[-bot-creation)
-   - [ Setup](#[-setup)
-   - [ SSL](#[-ssl)
-- [ Last steps](#[-last-steps)
-- [ Known issues](#[-known-issues)
+- [ DiscordFileStorage](#discordfilestorage)
+- [ State](#state)
+- [ How to setup and play with this](#how-to-setup-and-play-with-this)
+   - [ Discord server creation](#discord-server-creation)
+   - [ Bot Creation](#bot-creation)
+   - [ Setup](#setup)
+   - [ SSL](#ssl)
+   - [ Encryption](#encryption)
+   - [ Authorization](#authorization)
+- [ Last steps](#last-steps)
+- [ Known issues](#known-issues)
 ---
 
 
@@ -28,7 +30,7 @@ Please look at the [Known issues](#known-issues) section for more information.
 # State
 Not even alpha. **Created for fun**. Dont use it in production, since it *active development* and *contains bugs*.  Use it only for testing and playing around.
 
-Has been tested __ONLY on Windows 10__.
+Has been tested __MAINLY on Windows 10__ and on __dolphin UNIX explorer__.
 
 Please look at the [Known issues](#known-issues) section for more information.
 
@@ -57,7 +59,7 @@ Copy the link and visit it. Follow the instructions to invite the bot to your se
 5. To run the bot, run ``yarn start``. This will compile the project and start the bot.
 
 ## SSL
-Warning! At the moment SSL support is not complete. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests \
+Warning! At the moment SSL support **is not complete**. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests. \
 If you want to use SSL, you have to generate a certificate. You can use [this](https://www.sslforfree.com/) service or [this](https://letsencrypt.org/) one. You can also use your own certificate. 
 
 
@@ -66,6 +68,21 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 3. Put your certificate and private key to ``certs`` folder. (You have to create manually, its included in ``.gitignore``).
 4. Enable HTTPS in ``.env`` file. Set ``ENABLE_HTTPS`` to ``true``.
 
+## Encryption
+Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
+To enable encryption:
+1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
+2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. **Warning**. If you lose this password, you will not be able to decrypt your files.
+
+
+
+**Warning**. Still being tested. If you see any error like ``decipher Error: Unsupported state or unable to authenticate data``, this is **normal**, the decrypted file **isnt corrupted** (you can check this with any hashing tool yourself).  I will try to fix this in the future.
+
+## Authorization
+You can set authorization for the server. To do this, set ``AUTH`` to ``true`` in ``.env`` file.
+
+Then add your username and password to ``.env`` file. Set ``USERS`` to ``username:password``. You can add multiple users, just separate them with ``,``. For example: ``USERS=username1:password1,username2:password2``. At the moment, only basic authorization is supported. 
+
 
 ___
 # Last steps
@@ -73,8 +90,24 @@ Once server started, the webdav server will be available on port 3000.
 
 Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use discord as a file storage.
 
+You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
+
 # Known issues
-1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  WILL BE FIXED.
-2. Problems with stability. Sometimes it may hang or drop the connections on various clients.
-3. Problems with downloading big (~200 MB) files from windows explorer directly. I dont know why for the moment, but i try to do some work in future. For this reason, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files but this is not a 100% solution.
-4. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont need ssl or you dont care about security, you can use it.
+
+
+1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  **WILL BE FIXED.**
+
+2. Boot taking a lot of time with a lot of files. This is because of the fact that the bot is caching all files in memory and doing a lot http requests to discord to get file metadata. **WILL BE FIXED.**
+
+
+3. Problems with stability. Sometimes it may hang or drop the connections on various clients. At this point just restart the server...
+
+
+4. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
+This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit. Script may be found in: ***scripts/webdav.reg*** \
+If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
+**You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
+
+
+5. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+
