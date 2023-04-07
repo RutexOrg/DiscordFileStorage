@@ -111,3 +111,4 @@ If you still having issues with this, i recommend to use [WinSCP](https://winscp
 
 5. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
 
+6. Some bugs in multiuser parallel uploading and downloading. **WILL BE FIXED.**
