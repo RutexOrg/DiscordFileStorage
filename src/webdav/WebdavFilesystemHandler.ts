@@ -224,7 +224,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         if (existingFile?.getFileType() == "ram") {
             (existingFile as RamFile).cleanup(true);
-            console.log(".openWriteStream, ram file cleanup: ", existingFile.getAbsolutePath(), " with actual file...");
+            console.log(".openWriteStream, ram file cleanup: ", existingFile, " with actual file...");
         } else {
             folder.removeFile(existingFile!);
         }
