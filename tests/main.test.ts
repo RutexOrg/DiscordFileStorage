@@ -79,7 +79,7 @@ process.on("uncaughtException", (err) => {
 
 
 
-describe("Discord File Storage unit tests", function () {
+describe("DICloud basic functions test", function () {
 	let fileLogStream: Writable = fs.createWriteStream("logs/console_log.log", {
 		flags: "w+"
 	});

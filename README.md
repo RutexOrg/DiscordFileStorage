@@ -1,33 +1,30 @@
 ## Table of Contents
-- [ DiscordFileStorage](#discordfilestorage)
-- [ State](#state)
-- [ How to setup and play with this](#how-to-setup-and-play-with-this)
-   - [ Discord server creation](#discord-server-creation)
-   - [ Bot Creation](#bot-creation)
-   - [ Setup](#setup)
-   - [ SSL](#ssl)
-   - [ Encryption](#encryption)
-   - [ Authorization](#authorization)
-- [ Last steps](#last-steps)
-- [ Known issues](#known-issues)
+- [DICloud](#dicloud)
+- [State and details](#state-and-details)
+- [How to setup and play with this](#how-to-setup-and-play-with-this)
+   - [Discord server creation](#discord-server-creation)
+   - [Bot Creation](#bot-creation)
+   - [Setup](#setup)
+   - [SSL](#ssl)
+   - [Encryption](#encryption)
+   - [Authorization](#authorization)
+- [Last steps](#last-steps)
+- [Known issues](#known-issues)
 ---
 
 
-# DiscordFileStorage
+# DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
 Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 1 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify) \
-**but be aware** - each time you modify a file, the whole file being uploaded again. So it good only for small and static files. 
 - Manage folders (Create, Delete, Rename, Move)
-
-Empty folders and newly created files without content will be deleted between restarts, since they cached only in memory.  
 
 Please look at the [Known issues](#known-issues) section for more information.
 
-# State
+# State and details
 Not even alpha. **Created for fun**. Dont use it in production, since it *active development* and *contains bugs*.  Use it only for testing and playing around.
 
 Has been tested __MAINLY on Windows 10__ and on __dolphin UNIX explorer__.
@@ -88,7 +85,7 @@ ___
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
-Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use discord as a file storage.
+Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive.
 
 You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
 
@@ -97,8 +94,9 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 
 1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  **WILL BE FIXED.**
 
-2. Boot taking a lot of time with a lot of files. This is because of the fact that the bot is caching all files in memory and doing a lot http requests to discord to get file metadata. **WILL BE FIXED.**
+2. Boot taking a lot of time with a lot of files. This is because of the fact that the server is caching all files in memory and doing a lot http requests to discord to load files into memory. **WILL BE FIXED.**
 
+3. Empty folders and newly created files without content will be deleted between restarts, since they cached only in memory.  **WILL BE FIXED IN FUTURE**, not a priority for now.
 
 
 3. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
