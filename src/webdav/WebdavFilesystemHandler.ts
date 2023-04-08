@@ -238,7 +238,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             pt.pipe(writeStream);
         }
         
-        pt.once("close", async () => {
+        writeStream.once("finish", async () => {
             await this.app.getDiscordFileManager().postMetaFile(file!);
             this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
