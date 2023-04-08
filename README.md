@@ -100,15 +100,13 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 2. Boot taking a lot of time with a lot of files. This is because of the fact that the bot is caching all files in memory and doing a lot http requests to discord to get file metadata. **WILL BE FIXED.**
 
 
-3. Problems with stability. Sometimes it may hang or drop the connections on various clients. At this point just restart the server...
 
-
-4. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
+3. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
 This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit. Script may be found in: ***scripts/webdav.reg*** \
 If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
 **You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
 
 
-5. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+4. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
 
-6. Some bugs in multiuser parallel uploading and downloading. **WILL BE FIXED.**
+5. Some bugs in multiuser parallel uploading and downloading. **WILL BE FIXED

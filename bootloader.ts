@@ -199,7 +199,7 @@ process.on("uncaughtException", (err) => {
     console.log(color.red(err.name));
     console.log(color.red(err.message));
     console.log(color.red(err.stack!));
-    printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
+    // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
 });
 
 process.on("unhandledRejection", (reason, promise) => {

@@ -1,16 +1,41 @@
 import { Readable, PassThrough } from "stream";
 import client from "../helper/AxiosInstance.js";
+import { IAttachShortInfo } from "../file/ServerFile.js";
+import { AxiosResponse } from "axios";
+
+
+
+export const patchEmitter = (emitter: any) => {
+	let oldEmit = emitter.emit;
+
+	emitter.emit = function () {
+		let emitArgs = arguments;
+		let eventName = emitArgs[0];
+
+		switch (eventName) {
+			default: {
+				console.log("event: " + eventName, "\n", Array.from(emitArgs).splice(0, 2));
+			}
+		}
+
+		oldEmit.apply(emitter, arguments as any);
+	} as any;
+}
+
 
 /**
  * Class that combines list of urls into a single Readable stream. 
  */
 export default class HttpStreamPool {
-	private urls: string[];
-
+	private urls: IAttachShortInfo[];
+	private totalSize: number;
+	private gotSize = 0;
 	private currentUrlIndex = 0;
+	private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
-	constructor(urls: string[]) {
-		this.urls = urls;
+	constructor(info: IAttachShortInfo[], totalSize: number) {
+		this.urls = info;
+		this.totalSize = totalSize;
 	}
 
 	/**
@@ -20,49 +45,59 @@ export default class HttpStreamPool {
 	 * @returns Readable stream that emits data from all urls sequentially. 
 	 */
 	public async getDownloadStream(): Promise<Readable> {
-		console.log("Starting download of " + this.urls.length + " files")
-		this.currentUrlIndex = 0;
-		const passThrough = new PassThrough();
+		const stream = new PassThrough();
+		const self = this;
 
-		const streamFile = async (url: string) => {
-			const response = await client.get(url, { responseType: "stream" });
-			response.data.once("error", (err: Error) => {
-				console.log("Error downloading " + url)
-				console.log(err);
-			});
 
-			response.data.once("end", () => {
-				console.log("Downloaded " + url)
-			});
-
-			response.data.pipe(passThrough, { end: false });
-			
-			await new Promise((resolve, reject) => {
-				response.data.on("end", () => {
-					console.log("Downloaded " + url)
-					this.currentUrlIndex++;
-					if (this.currentUrlIndex < this.urls.length) {
-						streamFile(this.urls[this.currentUrlIndex]);
-					} else {
-						passThrough.end();
-						console.log("All files downloaded");
-					}
-					resolve(true);
+		let next = async () => {
+			if (self.currentUrlIndex >= self.urls.length) {
+				stream.once("unpipe", () => {
+					stream.destroy();
+					console.log("Downloading finished.");
 				});
-				response.data.on("error", ()=>{
-					console.log("Error downloading " + url)
-					passThrough.end();
-					reject();
+				return;
+			}
+
+			let url = self.urls[self.currentUrlIndex];
+			let res: AxiosResponse;
+			try {
+				res = await client.get(url.url, {
+					responseType: "stream",
+					headers: {
+						"User-Agent": self.userAgent,
+					},
+					timeout: 10000,
 				});
+			} catch (err) {
+				console.error(err);
+				stream.emit("error", err);
+				return;
+			}
+
+			res.data.on("data", (chunk: Buffer) => {
+				self.gotSize += chunk.length;
+				console.log("got: " + self.gotSize + " of " + self.totalSize);
+				stream.emit("progress", self.gotSize, self.totalSize);
 			});
 
-			console.log("done downloading");
+			res.data.on("end", () => {
+				self.currentUrlIndex++;
+				next();
+			});
+
+			res.data.on("error", (err: Error) => {
+				console.error(err);
+				stream.emit("error", err);
+			});
+
+			res.data.pipe(stream, { end: false });
 		}
 
-		streamFile(this.urls[this.currentUrlIndex]);
 
-		return passThrough;
+
+		next();
+
+		return stream;
 	}
-
 
 }

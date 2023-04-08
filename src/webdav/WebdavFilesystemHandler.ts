@@ -31,7 +31,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     private fs: Folder;
 
     private createDecryptor(){
-        const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword());
+        const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword(), {
+            autoDestroy: false
+        });
         decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
             console.log("Decipher", err);
         });
@@ -40,7 +42,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     private createEncryptor(){
-        const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword());
+        const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword(), {
+            autoDestroy: false
+        });
         chiper.once("error", (err) => {
             console.log("Chiper", err);
         });

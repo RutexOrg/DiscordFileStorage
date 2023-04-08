@@ -79,12 +79,18 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
 
-
+    // truncates a string to a certain length. 
+    // truncate("hello world", 5) => "hello",
+    // truncate("hello world", 2) => "he"
+    private truncate(str: string, n: number) {
+        return (str.length > n) ? str.substr(0, n - 1) : str;
+    }
+    
     private async uploadFileChunkAndAttachToFile(buffer: typeof MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: ServerFile) {
         console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
-                this.getAttachmentBuilderFromBufferWithoutExt((buffer as any).flush(), file.getFileName(), chunkNumber, this.app.shouldEncryptFiles())
+                this.getAttachmentBuilderFromBufferWithoutExt((buffer as any).flush(), this.truncate(file.getFileName(), 15), chunkNumber, this.app.shouldEncryptFiles())
             ],
         });
 
@@ -92,11 +98,12 @@ export default class DiscordFileManager implements IFIleManager {
             id: message.id,
             url: message.attachments.first()!.url,
             proxyUrl: message.attachments.first()!.proxyURL,
+            length: buffer.length,
         });
     }
 
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
-        return (await (new HttpStreamPool(file.getAttachmentInfos().map(e => e.url))).getDownloadStream());
+        return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getTotalSize())).getDownloadStream());
     }
 
 

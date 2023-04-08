@@ -4,7 +4,8 @@ import Folder, { FolderTree } from "./filesystem/Folder.js";
 export interface IAttachShortInfo {
     id: string;
     url: string;
-    proxyUrl?: string;
+    proxyUrl: string;
+    length: number;
 }
 
 export interface IServerFile {
