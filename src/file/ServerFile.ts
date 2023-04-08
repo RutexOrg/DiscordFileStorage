@@ -110,7 +110,7 @@ export default class ServerFile extends FileBase {
             obj.totalSize && 
             obj.uploadDate && 
             obj.filesPostedInChannelId && 
-            obj.attachmentInfos
+            obj.attachmentInfos && obj.attachmentInfos.length > 0
     }
 
     toObject(): IServerFile {

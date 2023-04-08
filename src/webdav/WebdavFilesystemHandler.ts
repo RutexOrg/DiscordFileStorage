@@ -179,9 +179,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
         if (this.shouldEncrypt()) {
-            readStream.pipe(this.createDecryptor()).pipe(pt).on("error", (err) => {
-                pt.destroy(err);
-            });
+            readStream.pipe(this.createDecryptor()).pipe(pt);
         }else{
             readStream.pipe(pt);
         }
@@ -233,8 +231,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
         this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
 
-
-        
    
         if (this.shouldEncrypt()) {
             pt.pipe(this.createEncryptor()).pipe(writeStream);

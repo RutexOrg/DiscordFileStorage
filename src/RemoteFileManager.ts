@@ -81,7 +81,6 @@ export default class DiscordFileManager implements IFIleManager {
 
 
     private async uploadFileChunkAndAttachToFile(buffer: typeof MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: ServerFile) {
-        MutableBuffer
         console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
