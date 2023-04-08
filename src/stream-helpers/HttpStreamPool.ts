@@ -49,8 +49,11 @@ export default class HttpStreamPool {
 					}
 					resolve(true);
 				});
-				response.data.on("error", reject);
-				response.data.on("error", ()=>{console.log("Error downloading " + url)});
+				response.data.on("error", ()=>{
+					console.log("Error downloading " + url)
+					passThrough.end();
+					reject();
+				});
 			});
 
 			console.log("done downloading");

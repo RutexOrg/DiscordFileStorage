@@ -144,8 +144,7 @@ export default class ServerFile extends FileBase {
         if(this.folder == null) {
             throw new Error("Folder is null");
         }
-        
-        return this.folder.getAbsolutePath() + "/" + this.getFileName();
+        return this.folder.getAbsolutePath() + this.getFileName();
     }
 
     public isUploaded(): boolean {

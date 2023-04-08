@@ -159,6 +159,8 @@ export default class DiscordFileStorageApp extends Client {
                 if (ServerFile.isValidRemoteFile(file)) {
                     const remoteFile = ServerFile.fromObject(file as any, this.filesystem);
                     remoteFile.setMetaIdInMetaChannel(msg.id);
+
+                    console.log("Loaded file " + remoteFile.getFileName() + " at " + remoteFile.getAbsolutePath());
                 } else {
                     console.log("Failed to extract valid message data");
                     console.log(file);

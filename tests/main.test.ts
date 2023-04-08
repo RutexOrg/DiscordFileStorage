@@ -20,24 +20,33 @@ function md5(buffer: Buffer) {
 
 
 async function fillWileWithData(sizeInBytes: number, stream: Writable) {
-	const buffer = Buffer.alloc(sizeInBytes);
-	for (let i = 0; i < sizeInBytes; i++) {
-		buffer[i] = Math.floor(Math.random() * 256);
+	return new Promise((resolve, reject) => {
+			
+		const buffer = Buffer.alloc(sizeInBytes);
+		for (let i = 0; i < sizeInBytes; i++) {
+			buffer[i] = Math.floor(Math.random() * 256);
+		}
+		stream.write(buffer);
+		stream.on("finish", () => {
+			resolve(true);
+		});
+		stream.on("error", (err) => {
+			reject(err);
+		});
+		stream.end();
+	});
+}
+
+function randomString(n: number = 16) {
+	let result = "";
+	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	const charactersLength = characters.length;
+	for (let i = 0; i < n; i++) {
+		result += characters.charAt(Math.floor(Math.random() * charactersLength));
 	}
-	stream.write(buffer);
-	stream.end();
+	return result;
 }
 
-async function generateTempFileInFs(sizeInBytes: number, filename: string): Promise<string> {
-	const tmpDir = fs.mkdtempSync("tmp");
-	const filePath = `${tmpDir}/${filename}`;
-	const fileSize = 1024 * 1024 * 10; // 10 MB
-	const writeStream = fs.createWriteStream(filePath);
-
-	await fillWileWithData(fileSize, writeStream);
-
-	return `${tmpDir}/${filename}`
-}
 
 function generateRandomString(n: number = 16) {
 	let result = "";
@@ -49,13 +58,41 @@ function generateRandomString(n: number = 16) {
 	return result;
 }
 
+if(process.env["NODE_NO_WARNINGS"] == null) {
+	console.warn("NODE_NO_WARNINGS is not set. This will cause warnings to be printed to the console. Set NODE_NO_WARNINGS=1 to suppress these warnings.");
+}
+
+process.on("unhandledRejection", (reason, promise) => {
+	console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+	console.error("Uncaught Exception at:", err);
+});
+
+
+
 describe("Discord File Storage unit tests", function () {
+	let fileLogStream: Writable = fs.createWriteStream("logs/console_log.log", {
+		flags: "w+"
+	});
 
 	let logStub: SinonStub;
 	let warnStub: SinonStub;
 
 	before(() => {
-		logStub = sinon.stub(console, "log");
+		logStub = sinon.stub(console, "log").callsFake((...args) => {
+			// remove escape codes
+			args = args.map((arg) => {
+				if(typeof arg !== "string") {
+					return arg;
+				}
+				return arg.replace(/\x1b\[[0-9;]*m/g, "");
+			});
+
+			fileLogStream.write(args.join(" ") + "\n");
+		});
+
 		warnStub = sinon.stub(console, "warn");
 	});
 
@@ -75,6 +112,33 @@ describe("Discord File Storage unit tests", function () {
 	// TODO: options
 	let client: WebDAVClient;
 
+	it("Prepares the test environment", async function () {
+		if(fs.existsSync(".local")) {
+			return true;
+		}
+		fs.mkdirSync(".local");
+		assert.isTrue(fs.existsSync(".local"));
+	});
+
+		
+
+	let localTestFolderName: string;
+	let localGeneratedFilePath: string;
+	it("Generate random file on a local filesystem", async function () {
+		let randomLocalFolderName = randomString();
+		localTestFolderName = randomLocalFolderName;
+		let randomLocalFileName = randomString();
+		fs.mkdirSync(path.join(".local", randomLocalFolderName), {recursive: true});
+		localGeneratedFilePath = path.join(".local", randomLocalFolderName, randomLocalFileName + ".txt");
+		
+		await fillWileWithData(1024 * 1024 * 10, fs.createWriteStream(localGeneratedFilePath, {
+			flags: "w"
+		}));
+
+		assert.isTrue(fs.existsSync(localGeneratedFilePath));
+	});
+
+	
 	it("Start the server and check for any directory contents after boot to ensure server is up", async function () {
 		this.timeout(10000);
 
@@ -82,55 +146,39 @@ describe("Discord File Storage unit tests", function () {
 		client = createClient(`http://${DOMAIN}:${PORT}`);
 
 		assert.isArray(await client.getDirectoryContents("/"))
-
 	});
 
-	let localRelativeFile: string;
-	it("Generate random file on a local filesystem", async function () {
-		let file = await generateTempFileInFs(1024 * 1024 * 10, "testfile.txt");
-		localRelativeFile = file;
-
-		console.log(process.cwd() + "/" + file);
-		console.log(fs.existsSync(process.cwd() + "/" + file));
-
-		assert.equal(fs.existsSync(process.cwd() + "/" + file), true);
-	});
 
 	let remoteFolderName = generateRandomString();
-	it("Create a test folder: " + remoteFolderName, async function () {
+	it("Create a remote temponary folder: " + remoteFolderName, async function () {
 		await client.createDirectory(remoteFolderName);
-		const content = await client.getDirectoryContents("/") as FileStat[];
+		const content = (await client.getDirectoryContents("/") as FileStat[]).filter((file) => file.type === "directory");
 
 		assert.equal(content.find((file) => file.basename === remoteFolderName) !== undefined, true);
 	});
 
-	it("Upload a file to the server", async function () {
+	it("Upload a local generated file to the remote", async function () {
 		this.timeout(5000);
+		return new Promise(async (resolve, reject) => {
+			const fsReadableStream = fs.createReadStream(localGeneratedFilePath);
 
-			return new Promise((resolve, reject) => {
-			
-			const writableStream = client.createWriteStream(`${remoteFolderName}/testfile.txt`);
-			const fsReadableStream = fs.createReadStream(localRelativeFile);
+			const fileUploaded = await client.putFileContents(`${remoteFolderName}/testfile.txt`, fsReadableStream);
 
-			fsReadableStream.pipe(writableStream);
-
-			writableStream.once("finish", async () => {
-				console.log("fsReadableStream end");
-
-				let content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
-			
-				assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+			if(fileUploaded) {
 				resolve();
-			});
+			} else {
+				reject();
+			}
 		});
 	});
 
-	
+
+	let localRecreatedUploadedFile = path.join(".local", "testfile-downloaded.txt");
 	it("Download a file from the server", async function () {
 		this.timeout(5000);
 
 		return new Promise((resolve, reject) => {
-			const writableStream = fs.createWriteStream("testfile-downloaded.txt");
+			const writableStream = fs.createWriteStream(localRecreatedUploadedFile);
 
 			const remoteReadableStream = client.createReadStream(`${remoteFolderName}/testfile.txt`);
 
@@ -139,20 +187,43 @@ describe("Discord File Storage unit tests", function () {
 			writableStream.once("finish", async () => {
 				console.log("writableStream end");
 
-				assert.equal(fs.existsSync("testfile-downloaded.txt"), true);
+				assert.equal(fs.existsSync(localRecreatedUploadedFile), true);
 				resolve();
 			});
 		});
 	});
 
+	it("Download uploaded file via http", async function () {
+		this.timeout(10000);
+		return new Promise(async (resolve, reject) => {
+			const content = (await client.getDirectoryContents(`/`) as FileStat[]).filter(e => e.type === "file").map(e => e.filename);
+			assert.isAbove(content.length, 0, "No files found in the root directory");
+
+
+			let stream = await axios.get(`http://${DOMAIN}:${PORT}/${remoteFolderName}/testfile.txt`, {
+				responseType: "stream"
+			});
+
+			stream.data.on("data", (data: any) => {
+				(stream.data as Readable).destroy();
+				resolve();
+			});
+
+			stream.data.on("error", (err: any) => {
+				reject(err);
+			});
+
+		});
+	});
+
 	it("checks md5 hash of the original and downloaded file", async function () {
-		const localFileMD5 = md5(fs.readFileSync(localRelativeFile));
-		const downloadedFileMD5 = md5(fs.readFileSync("testfile-downloaded.txt"));
+		const localFileMD5 = md5(fs.readFileSync(localGeneratedFilePath));
+		const downloadedFileMD5 = md5(fs.readFileSync(localRecreatedUploadedFile));
 
 		assert.equal(localFileMD5, downloadedFileMD5);
 	});
 
-	it("Delete a file from the server", async function () {
+	it("Delete a uploaded file from the server", async function () {
 		await client.deleteFile(`${remoteFolderName}/testfile.txt`);
 
 		let content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
@@ -165,6 +236,16 @@ describe("Discord File Storage unit tests", function () {
 
 		let content = await client.getDirectoryContents(`/`) as FileStat[];
 		assert.equal(content.find((file) => file.basename === remoteFolderName) == undefined, true);
+	});
+
+	it("Delete local created folder and files", async function () {
+
+		let folder = path.join(".local", localTestFolderName);
+		fs.rmSync(folder, { recursive: true });
+		fs.unlinkSync(localRecreatedUploadedFile);
+
+		assert.equal(fs.existsSync(localRecreatedUploadedFile), false, "local recreated file still exists");
+		assert.equal(fs.existsSync(folder), false, "local test folder still exists");
 	});
 
 
@@ -183,7 +264,8 @@ describe("Discord File Storage unit tests", function () {
 		});
 	});
 
-	it("Open stream to not existing folder", async function () {
+
+	it("Open stream to not existing file in not existing folder", async function () {
 		this.timeout(5000);
 		return new Promise((resolve, reject) => {
 			let stream = client.createReadStream("/not-existing-folder/test.txt");
@@ -198,30 +280,6 @@ describe("Discord File Storage unit tests", function () {
 		});
 	});
 
-	it("Tries to download some random file via http", async function () {
-		this.timeout(10000);
-		return new Promise(async (resolve, reject) => {
-			const content = (await client.getDirectoryContents(`/`) as FileStat[]).filter(e => e.type === "file").map(e => e.filename);
-			if(content.length === 0) {
-				return reject("No files found");
-			};
-
-
-			const random = Math.floor(Math.random() * content.length);
-			let stream = await axios.get(`http://${DOMAIN}:${PORT}${content[random]}`,{
-				responseType: "stream"
-			});
-
-			stream.data.on("data", (data: any) => {
-				(stream.data as Readable).destroy();
-				resolve();
-			});
-
-			stream.data.on("error", (err: any) => {
-				reject(err);
-			});
-
-		});
-	});
+	
 
 });

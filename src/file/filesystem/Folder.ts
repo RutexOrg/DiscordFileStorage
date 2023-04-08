@@ -207,7 +207,9 @@ export default class Folder {
             throw new Error("File is not in any folder, its already removed");
         }
         console.log("Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
+        console.log("File path: "+file.getAbsolutePath());
         file = Folder.root.getFileByPath(file.getAbsolutePath())!;
+        console.dir(file);
         if(!file){
             throw new Error("File not found");
         }
@@ -337,7 +339,7 @@ export default class Folder {
         }
         console.log(colors.blue("[D] ") +this.getAbsolutePath());
         this.files.forEach(file => {
-            console.log(colors.green("[F] ") +this.getAbsolutePath() + "/" + file.getFileName());
+            console.log(colors.green("[F] ") +this.getAbsolutePath() + file.getFileName());
         });
         this.folders.forEach(folder => {
             folder.printHierarchyWithFiles();
@@ -349,7 +351,7 @@ export default class Folder {
     
     public getFilesPaths(map: Map<string, ServerFile> = new Map()): Map<string, ServerFile> {
         this.files.forEach(file => {
-            map.set(this.getAbsolutePath() + "/" + file.getFileName(), file);
+            map.set(this.getAbsolutePath() + file.getFileName(), file);
         });
         this.folders.forEach(folder => {
             folder.getFilesPaths(map);
@@ -409,7 +411,11 @@ export default class Folder {
     }
 
 
-    // returns path in format /folder1/folder2/folder3
+
+    /**
+     * Returns absolute path of folder. If folder is root, returns "/". If folder is not root, returns path in format /folder1/folder2/folder3, with ending slash. 
+     * @returns current path, for example: "/folder1/folder2/folder3/ "or "/" 
+     */
     public getAbsolutePath(): string {
         let path = "";
         let currentFolder = this.parent;
@@ -417,8 +423,12 @@ export default class Folder {
             path = currentFolder.getName() + "/" + path;
             currentFolder = currentFolder.getParent();
         }
-        
-        return (path.charAt(0) == "/" ? path : "/" + path) + this.name;
+       
+        if(path == ""){
+            return "/";
+        }
+
+        return (path.charAt(0) == "/" ? path : "/" + path) + this.name + "/";
     }
 
     // returns array of folders in format ["folder1", "folder2", "folder3"]

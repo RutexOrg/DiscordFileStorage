@@ -6,3 +6,5 @@ runner.ts
 yarn-error.log
 tmp*
 testfile-downloaded.txt
+logs/
+.local

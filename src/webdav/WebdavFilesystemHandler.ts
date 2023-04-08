@@ -147,12 +147,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
-        //this.log(ctx.context, ".create", path + " | " + ctx.type);
+        this.log(ctx.context, ".create", path + ", " + (ctx.type.isFile ? "file" : "folder"));
         if (ctx.type.isDirectory) {
             this.fs.createHierarchy(path.toString());
             return callback();
         } else {
-            console.log("Creating file; ", path.toString());
             this.fs.createFileHierarchy(path.toString(), path.fileName());
             return callback();
         }
@@ -160,7 +159,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        //this.log(ctx.context, ".openReadStream", path);
+        this.log(ctx.context, ".openReadStream", path);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.ResourceNotFound);
@@ -169,13 +168,15 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const file = entryInfo.entry as ServerFile;
 
         if (!file.isUploaded() && file.getFileType() == "ram") {
-            //this.log(ctx.context, ".openReadStream", "File is not uploaded, returning empty dummy stream");
+            this.log(ctx.context, ".openReadStream", "Opening ram file: " + path.toString());
             return callback(undefined, (file as RamFile).getReadable(true));
         }
 
-        console.log("fetch: ", file);
+        console.log(".openReadStream, fetching: ", file);
         const pt = new PassThrough();
         const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
+        this.log(ctx.context, ".openReadStream", "Stream opened: " + path.toString());
+
 
         if (this.shouldEncrypt()) {
             readStream.pipe(this.createDecryptor()).pipe(pt);
@@ -188,20 +189,30 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
+        this.log(ctx.context, ".openWriteStream", path);
+
+        let { estimatedSize, mode, targetSource } = ctx
+        console.log({ estimatedSize, mode, targetSource });
+
+
         const existingFile = this.fs.getFileByPath(path.toString()); // being created in create() . 
-        console.log("createdFile", existingFile);
+        console.log(".openWriteStream into createdFile", existingFile);
 
         const folder = existingFile?.getFolder()!;
-        console.log("folder", folder);
+        console.log(".openWriteStream in folder", folder);
 
         // first creating file in the ram to be able to say system that file is created and ready to be written to.
+        console.log(".openWriteStream, check file attributes: ", existingFile?.getFileType(), existingFile?.isUploaded());
         if (existingFile?.getFileType() == "remote" && existingFile?.isUploaded()) {
             await this.app.getDiscordFileManager().deleteFile(existingFile);
         }
 
-        if (ctx.estimatedSize == -1) { // windows explorer does not provide estimated size if file is newly created. so we put in into ram to be able to say that file is created and give it back to open on client and modify it.
+
+        if (ctx.estimatedSize == -1) { // windows explorer does not provide estimated size if file is newly created. so we put in into ram to be able to say that file is created and give it back to open on client and modify it without have user to wait for initial upload.
+            console.log(".openWriteStream, estimatedSize == -1, creating ram file: ", path.toString());
             folder.removeFile(existingFile!);
-            const ramFile = new RamFile(path.fileName(), 0, folder);
+            const ramFile = new RamFile(path.fileName(), 0, folder, 1024 * 1024 * 20, new Date()); // 20 mb, test
+            console.log(".openWriteStream, ram file created: ", ramFile.getAbsolutePath());
             return callback(undefined, ramFile.getWritable());
         }
 
@@ -218,7 +229,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         const pt = new PassThrough();
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
-
         this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
 
 
@@ -241,7 +251,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
-        //this.log(ctx.context, ".delete", path);
+        this.log(ctx.context, ".delete", path);
         const entryCheck = this.fs.getElementTypeByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);

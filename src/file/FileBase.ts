@@ -1,5 +1,8 @@
 import mime from "mime-types";
 
+// remote = file is on the server
+// ram = file is in memory
+// ram defined in a RamFile.ts file
 export type FileType = "remote" | "ram";
 
 /**

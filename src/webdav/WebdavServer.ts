@@ -31,6 +31,7 @@ export default class WebdavServer extends webdav.WebDAVServer {
             privilegeManager: options.enableAuth ? privManager : undefined,
             httpAuthentication: options.enableAuth ? new webdav.HTTPDigestAuthentication(userManager, "Webdav Server") : undefined,
             ...options,
+            respondWithPaths: true,
         });
     }
 
