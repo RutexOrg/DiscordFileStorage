@@ -1,7 +1,7 @@
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, GuildBasedChannel, Message, TextBasedChannel, TextChannel } from 'discord.js';
 import color from 'colors/safe.js';
 import DiscordFileManager from './RemoteFileManager.js';
-import axios from 'axios';
+import axios from './helper/AxiosInstance.js';
 import ServerFile from './file/ServerFile.js';
 import { FolderTree } from './file/filesystem/Folder.js';
 
