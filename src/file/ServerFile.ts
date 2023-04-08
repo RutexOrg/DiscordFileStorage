@@ -149,9 +149,8 @@ export default class ServerFile extends FileBase {
     }
 
     public isUploaded(): boolean {
-        return this.attachmentInfos.length > 0 && !!this.metaIdInMetaChannel;
+        return this.getFileType() === "ram" || (this.attachmentInfos.length > 0 && !!this.metaIdInMetaChannel);
     }
  
-
 
 }

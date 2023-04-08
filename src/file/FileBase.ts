@@ -1,4 +1,5 @@
 import mime from "mime-types";
+import { INamingHelper } from "./filesystem/INamingHelper";
 
 // remote = file is on the server
 // ram = file is in memory
@@ -8,7 +9,7 @@ export type FileType = "remote" | "ram";
 /**
  * Basic shared FileBase class that represents a file.  
  */
-export default class FileBase {
+export default class FileBase implements INamingHelper {
     private filename: string;
     private totalSize: number;
     private uploadedDate: Date;
@@ -18,6 +19,9 @@ export default class FileBase {
         this.filename = filename;
         this.totalSize = totalSize;
         this.uploadedDate = uploadedDate;
+    }
+    getEntryName(): string {
+        return this.filename;
     }
 
     public setFileType(type: FileType) {
@@ -57,5 +61,7 @@ export default class FileBase {
     public getMimeType(): string {
         return mime.lookup(this.filename) || "application/octet-stream";
     }
+
+
     
 }

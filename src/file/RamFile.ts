@@ -58,6 +58,7 @@ export default class RamFile extends ServerFile {
         }
     }
 
+    // TODO: clean this up
     public cleanup(rm: boolean = false): void {
         this.buffer.clear();
         if(rm){

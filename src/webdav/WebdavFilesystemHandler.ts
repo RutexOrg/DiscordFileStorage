@@ -6,6 +6,7 @@ import ServerFile from "../file/ServerFile.js";
 import RamFile from "../file/RamFile.js";
 import Folder from "../file/filesystem/Folder.js";
 import crypto from "crypto";
+import { INamingHelper } from "../file/filesystem/INamingHelper.js";
 
 
 /**
@@ -104,10 +105,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        //this.log(ctx.context, ".readDir", path);
+        this.log(ctx.context, ".readDir", path);
         const folder = this.fs.getFolderByPath(path.toString())!;
         folder.printHierarchyWithFiles(true, ".readDir");
-        return callback(undefined, folder.getAllEntries());
+        
+        return callback(undefined, folder.getAllEntries().map(e => {
+            return (e.entry as INamingHelper).getEntryName();
+        }));
 
     }
 
@@ -115,7 +119,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         // console.log(ctx.context.user);
         const entryInfo = this.fs.getElementTypeByPath(path.toString());
 
-        let resType;
+        let resType: ResourceType;
         if (entryInfo.isFile) {
             resType = ResourceType.File;
         } else if (entryInfo.isFolder) {
@@ -133,21 +137,18 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.NoMimeTypeForAFolder)
         }
 
-        const file = entryInfo.entry as ServerFile;
-        return callback(undefined, file.getMimeType());
+        return callback(undefined, (entryInfo.entry as ServerFile).getMimeType());
 
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
         const existsCheckState = this.fs.getElementTypeByPath(path.toString());
-
         // //this.log(".fastExistCheck", exists + " | " + path.toString());
         if (existsCheckState.isUnknown) {
             return callback(false);
         }
-        const exists = (existsCheckState.isFile || existsCheckState.isFolder) ?? false;
 
-        return callback(exists);
+        return callback((existsCheckState.isFile || existsCheckState.isFolder) ?? false);
     }
 
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
@@ -170,6 +171,10 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         const file = entryInfo.entry as ServerFile;
+        if(!file.isUploaded()){
+            console.log("File is not uploaded yet. Waiting...");
+            return callback(Errors.Locked);
+        }
 
         if (!file.isUploaded() && file.getFileType() == "ram") {
             this.log(ctx.context, ".openReadStream", "Opening ram file: " + path.toString());
@@ -212,7 +217,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
 
-        if (ctx.estimatedSize == -1) { // windows explorer does not provide estimated size if file is newly created. so we put in into ram to be able to say that file is created and give it back to open on client and modify it without have user to wait for initial upload.
+        if (ctx.estimatedSize == -1) { // looks like most managers does not provide estimated size on  newly created file. so we put it into ram to be able to say that file is created and give it back to open on client to allow modify it without have user to wait for initial upload.
             console.log(".openWriteStream, estimatedSize == -1, creating ram file: ", path.toString());
             folder.removeFile(existingFile!);
             const ramFile = new RamFile(path.fileName(), 0, folder, 1024 * 1024 * 20, new Date()); // 20 mb, test
@@ -244,6 +249,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         
         writeStream.once("finish", async () => {
             await this.app.getDiscordFileManager().postMetaFile(file!);
+
             this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
 

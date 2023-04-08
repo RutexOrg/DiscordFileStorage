@@ -1,7 +1,8 @@
 import ServerFile from "../ServerFile.js";
 import colors from "colors/safe.js";
+import { INamingHelper } from "./INamingHelper.js";
 
-export interface ElementType {
+export interface ElementType{
     isFile?: boolean;
     isFolder?: boolean;
     isUnknown?: boolean;
@@ -12,7 +13,7 @@ export interface ElementType {
  * Very dirty implementation of a folder class.
  * Very early, unefficient and messy implementation, will be cleaned up later.
  */
-export default class Folder {
+export default class Folder  {
 
     private name: string;
     private files: ServerFile[] = [];
@@ -54,6 +55,10 @@ export default class Folder {
         return this.name;
     }
 
+    getEntryName(): string {
+        return this.name;
+    }
+
     public setName(name: string): void {
         this.name = name;
     }
@@ -82,10 +87,20 @@ export default class Folder {
         this.folders = folders;
     }
 
-    public getAllEntries(): string[] {
-        const entries: string[] = [];
-        this.folders.forEach(folder => entries.push(folder.getName()));
-        this.files.forEach(file => entries.push(file.getFileName()));
+    
+
+    public getAllEntries(): ElementType[] {
+        const entries: ElementType[] = [];
+
+        this.folders.forEach(folder => entries.push({
+            isFolder: true,
+            entry: folder
+        }));
+
+        this.files.forEach(file => entries.push({
+            isFile: true,
+            entry: file
+        }));
         return entries;
     }
 
