@@ -21,27 +21,14 @@ export default class RamFile extends ServerFile {
 
     // TODO: implement this properly
     public getReadable(confirmCloning: boolean): Readable {
-        let buffer = Buffer.alloc(this.buffer.size);
-        this.buffer.render(buffer);
-        return new Readable({
-            read(size: number){
-                let chunk = buffer.slice(0, size);
-                buffer = buffer.slice(size);
-                this.push(chunk);
-            },
-            destroy(error, callback) {
-                buffer = (null as any);
-                callback(error);
-            },
-            autoDestroy: true
-        });
+        return Readable.from(this.buffer.cloneNativeBuffer());
     }
 
     public getWritable(): Writable {
         return new Writable({
             write: (chunk: Buffer, encoding: string, callback: (error?: Error | null) => void) => {
                 this.totalWrittenFiles += chunk.length;
-                console.log("Writing " + chunk.length + " bytes to ramfile. Total: " + this.totalWrittenFiles + " bytes. Max: " + this.maxSize + " bytes.")
+                // console.log("Writing " + chunk.length + " bytes to ramfile. Total: " + this.totalWrittenFiles + " bytes. Max: " + this.maxSize + " bytes.")
                 this.buffer.write(chunk, encoding);
                 if (this.buffer.size > this.buffer.capacity()) {
                     return callback(new Error("Ramfile too large: " + this.buffer.size + " > " + this.maxSize + " bytes"));

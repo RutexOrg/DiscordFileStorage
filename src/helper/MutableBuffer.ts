@@ -60,6 +60,10 @@ export class BaseMutableBuffer {
     return this._buffer.length;
   }
 
+  cloneNativeBuffer() {
+    return this._buffer.subarray(0, this._size);
+  }
+
   clear() {
     this._size = 0;
   }

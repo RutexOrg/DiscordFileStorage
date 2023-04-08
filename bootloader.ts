@@ -19,12 +19,12 @@ export async function bootApp() {
     const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.");
     const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.");
 
-    const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number") as number;
+    const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number", 3000) as number;
 
-    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.") as boolean;
-    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean") as boolean;
+    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.", "boolean", true) as boolean;
+    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean", false) as boolean;
 
-    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean") as boolean;
+    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean", false) as boolean;
 
     
     const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false);
@@ -38,8 +38,8 @@ export async function bootApp() {
     }
 
     // regex: key:value,key:value,...
-    if(!(/^(?:\w+:\w+,)*\w+:\w+$/i).test(users)){
-        printAndExit("USERS env variable is not in correct format. Please use format username:password,username:password");
+    if(enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(users)){
+        printAndExit("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
     }
 
     const app = new DiscordFileStorageApp({

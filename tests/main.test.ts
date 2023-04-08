@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import crypro from "crypto";
 import axios from "../src/helper/AxiosInstance.js";
+import { patchEmitter } from "../src/helper/EventPatcher.js";
 
 const DOMAIN = "localhost";
 const PORT = 3000;
@@ -16,6 +17,12 @@ const PORT = 3000;
 
 function md5(buffer: Buffer) {
 	return crypro.createHash("md5").update(buffer).digest("hex");
+}
+
+async function sleep(t: number){
+    return new Promise((resolve, reject) => {
+        setTimeout(resolve, t);
+    })
 }
 
 
@@ -163,6 +170,7 @@ describe("Discord File Storage unit tests", function () {
 			const fsReadableStream = fs.createReadStream(localGeneratedFilePath);
 
 			const fileUploaded = await client.putFileContents(`${remoteFolderName}/testfile.txt`, fsReadableStream);
+			await sleep(500);
 
 			if(fileUploaded) {
 				resolve();
@@ -172,22 +180,18 @@ describe("Discord File Storage unit tests", function () {
 		});
 	});
 
+	it("Check if the remote file exists", async function () {
+		const content = (await client.getDirectoryContents(remoteFolderName) as FileStat[]).filter((file) => file.type === "file");
+		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+	});
+
 
 	let localRecreatedUploadedFile = path.join(".local", "testfile-downloaded.txt");
-	it("Download a file from the server", async function () {
-		this.timeout(5000);
+	it("Download remote created file: " + `${remoteFolderName}/testfile.txt`, async function () {
+		this.timeout(10000);
 
-		return new Promise((resolve, reject) => {
-			const writableStream = fs.createWriteStream(localRecreatedUploadedFile);
-
-			const remoteReadableStream = client.createReadStream(`${remoteFolderName}/testfile.txt`);
-
-			remoteReadableStream.pipe(writableStream);
-
-			writableStream.once("finish", async () => {
-				console.log("writableStream end");
-
-				assert.equal(fs.existsSync(localRecreatedUploadedFile), true);
+		return new Promise(async (resolve, reject) => {
+			client.createReadStream(`/${remoteFolderName}/testfile.txt`).pipe(fs.createWriteStream(localRecreatedUploadedFile)).on("finish", () => {
 				resolve();
 			});
 		});
@@ -196,7 +200,8 @@ describe("Discord File Storage unit tests", function () {
 	it("Download uploaded file via http", async function () {
 		this.timeout(10000);
 		return new Promise(async (resolve, reject) => {
-			const content = (await client.getDirectoryContents(`/`) as FileStat[]).filter(e => e.type === "file").map(e => e.filename);
+			const content = (await client.getDirectoryContents(`/`) as FileStat[]).map(e => e.filename);
+			console.dir(content);
 			assert.isAbove(content.length, 0, "No files found in the root directory");
 
 

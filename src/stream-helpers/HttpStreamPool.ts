@@ -3,26 +3,6 @@ import client from "../helper/AxiosInstance.js";
 import { IAttachShortInfo } from "../file/ServerFile.js";
 import { AxiosResponse } from "axios";
 
-
-
-export const patchEmitter = (emitter: any) => {
-	let oldEmit = emitter.emit;
-
-	emitter.emit = function () {
-		let emitArgs = arguments;
-		let eventName = emitArgs[0];
-
-		switch (eventName) {
-			default: {
-				console.log("event: " + eventName, "\n", Array.from(emitArgs).splice(0, 2));
-			}
-		}
-
-		oldEmit.apply(emitter, arguments as any);
-	} as any;
-}
-
-
 /**
  * Class that combines list of urls into a single Readable stream. 
  */
@@ -53,6 +33,9 @@ export default class HttpStreamPool {
 			if (self.currentUrlIndex >= self.urls.length) {
 				stream.once("unpipe", () => {
 					console.log("Downloading finished.");
+					setTimeout(() => {
+						stream.emit("end");
+					}, 5000);
 				});
 				return;
 			}
@@ -60,6 +43,7 @@ export default class HttpStreamPool {
 			let url = self.urls[self.currentUrlIndex];
 			let res: AxiosResponse;
 			try {
+				console.log("getting: " + url.url);
 				res = await client.get(url.url, {
 					responseType: "stream",
 					headers: {

@@ -171,10 +171,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         const file = entryInfo.entry as ServerFile;
-        if(!file.isUploaded()){
-            console.log("File is not uploaded yet. Waiting...");
-            return callback(Errors.Locked);
-        }
 
         if (!file.isUploaded() && file.getFileType() == "ram") {
             this.log(ctx.context, ".openReadStream", "Opening ram file: " + path.toString());
@@ -228,6 +224,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         if (existingFile?.getFileType() == "ram") {
             (existingFile as RamFile).cleanup(true);
+            console.log(".openWriteStream, ram file cleanup: ", existingFile.getAbsolutePath(), " with actual file...");
         } else {
             folder.removeFile(existingFile!);
         }
@@ -276,8 +273,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             this.fs.removeFile(file!);
             return callback();
         }
-        console.log(file);
-        console.log(file.getAbsolutePath());
+        // console.log(file);
+        // console.log(file.getAbsolutePath());
         this.fs.printHierarchyWithFiles();
 
         this.fs.removeFile(file!);
