@@ -22,7 +22,7 @@
   },
   "scripts": {
     "start": "tsc && node --no-warnings out/index.js",
-    "l": "--no-warnings out/index.js",
+    "l": "node --no-warnings out/index.js",
     "build": "tsc",
     "test": "yarn build && mocha out/tests/"
   },
