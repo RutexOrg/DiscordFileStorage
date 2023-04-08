@@ -35,7 +35,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             autoDestroy: false,
         });
         decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
-            console.log("decipher error", err);
+            console.log("Decipher", err);
         });
 
         return decipher;
@@ -46,7 +46,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             autoDestroy: false,
         });
         chiper.once("error", (err) => {
-            console.log("chiper error", err);
+            console.log("Chiper", err);
         });
 
         return chiper;
