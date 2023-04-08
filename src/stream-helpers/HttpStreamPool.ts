@@ -52,7 +52,6 @@ export default class HttpStreamPool {
 		let next = async () => {
 			if (self.currentUrlIndex >= self.urls.length) {
 				stream.once("unpipe", () => {
-					stream.destroy();
 					console.log("Downloading finished.");
 				});
 				return;
