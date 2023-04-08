@@ -179,7 +179,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
         if (this.shouldEncrypt()) {
-            readStream.pipe(this.createDecryptor()).pipe(pt);
+            readStream.pipe(this.createDecryptor()).pipe(pt).on("error", (err) => {
+                pt.destroy(err);
+            });
         }else{
             readStream.pipe(pt);
         }
