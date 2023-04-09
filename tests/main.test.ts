@@ -19,16 +19,16 @@ function md5(buffer: Buffer) {
 	return crypro.createHash("md5").update(buffer).digest("hex");
 }
 
-async function sleep(t: number){
-    return new Promise((resolve, reject) => {
-        setTimeout(resolve, t);
-    })
+async function sleep(t: number) {
+	return new Promise((resolve, reject) => {
+		setTimeout(resolve, t);
+	})
 }
 
 
 async function fillWileWithData(sizeInBytes: number, stream: Writable) {
 	return new Promise((resolve, reject) => {
-			
+
 		const buffer = Buffer.alloc(sizeInBytes);
 		for (let i = 0; i < sizeInBytes; i++) {
 			buffer[i] = Math.floor(Math.random() * 256);
@@ -65,10 +65,6 @@ function generateRandomString(n: number = 16) {
 	return result;
 }
 
-if(process.env["NODE_NO_WARNINGS"] == null) {
-	console.warn("NODE_NO_WARNINGS is not set. This will cause warnings to be printed to the console. Set NODE_NO_WARNINGS=1 to suppress these warnings.");
-}
-
 process.on("unhandledRejection", (reason, promise) => {
 	console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
@@ -88,16 +84,13 @@ describe("DICloud basic functions test", function () {
 	let warnStub: SinonStub;
 
 	before(() => {
+		// prints all console.log to a file. if its a string, removes the control escape characters. if type cannot be casted to string, like symbol, it will be ignored.
 		logStub = sinon.stub(console, "log").callsFake((...args) => {
-			// remove escape codes
-			args = args.map((arg) => {
-				if(typeof arg !== "string") {
-					return arg;
+			for (let i = 0; i < args.length; i++) {
+				if (typeof args[i] === "string") {
+					fileLogStream.write(args[i].replace(/\x1b\[[0-9;]*m/g, "") + "\n");
 				}
-				return arg.replace(/\x1b\[[0-9;]*m/g, "");
-			});
-
-			fileLogStream.write(args.join(" ") + "\n");
+			}
 		});
 
 		warnStub = sinon.stub(console, "warn");
@@ -109,9 +102,7 @@ describe("DICloud basic functions test", function () {
 	});
 
 	after(() => {
-		setTimeout(() => {
-			process.exit(0);
-		}, 15000)
+		process.exit(0);
 	})
 
 	let server: DiscordFileStorageApp;
@@ -120,24 +111,24 @@ describe("DICloud basic functions test", function () {
 	let client: WebDAVClient;
 
 	it("Prepares the test environment", async function () {
-		if(fs.existsSync(".local")) {
+		if (fs.existsSync(".local")) {
 			return true;
 		}
 		fs.mkdirSync(".local");
 		assert.isTrue(fs.existsSync(".local"));
 	});
 
-		
+
 
 	let localTestFolderName: string;
 	let localGeneratedFilePath: string;
-	it("Generate random file on a local filesystem", async function () {
+	it("Generate random 10MB file on a local filesystem", async function () {
 		let randomLocalFolderName = randomString();
 		localTestFolderName = randomLocalFolderName;
 		let randomLocalFileName = randomString();
-		fs.mkdirSync(path.join(".local", randomLocalFolderName), {recursive: true});
+		fs.mkdirSync(path.join(".local", randomLocalFolderName), { recursive: true });
 		localGeneratedFilePath = path.join(".local", randomLocalFolderName, randomLocalFileName + ".txt");
-		
+
 		await fillWileWithData(1024 * 1024 * 10, fs.createWriteStream(localGeneratedFilePath, {
 			flags: "w"
 		}));
@@ -145,8 +136,8 @@ describe("DICloud basic functions test", function () {
 		assert.isTrue(fs.existsSync(localGeneratedFilePath));
 	});
 
-	
-	it("Start the server and check for any directory contents after boot to ensure server is up", async function () {
+
+	it("Start the server and ensure server is up", async function () {
 		this.timeout(10000);
 
 		server = await bootApp();
@@ -164,7 +155,7 @@ describe("DICloud basic functions test", function () {
 		assert.equal(content.find((file) => file.basename === remoteFolderName) !== undefined, true);
 	});
 
-	it("Upload a local generated file to the remote", async function () {
+	it("Upload a local generated file to the remote created folder", async function () {
 		this.timeout(5000);
 		return new Promise(async (resolve, reject) => {
 			const fsReadableStream = fs.createReadStream(localGeneratedFilePath);
@@ -172,7 +163,7 @@ describe("DICloud basic functions test", function () {
 			const fileUploaded = await client.putFileContents(`${remoteFolderName}/testfile.txt`, fsReadableStream);
 			await sleep(500);
 
-			if(fileUploaded) {
+			if (fileUploaded) {
 				resolve();
 			} else {
 				reject();
@@ -180,14 +171,13 @@ describe("DICloud basic functions test", function () {
 		});
 	});
 
-	it("Check if the remote file exists", async function () {
+	it("Check if the remote file exists: " + remoteFolderName + "/testfile.txt", async function () {
 		const content = (await client.getDirectoryContents(remoteFolderName) as FileStat[]).filter((file) => file.type === "file");
 		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
 	});
 
-
 	let localRecreatedUploadedFile = path.join(".local", "testfile-downloaded.txt");
-	it("Download remote created file: " + `${remoteFolderName}/testfile.txt`, async function () {
+	it("Download remote created file: " + `${remoteFolderName}/testfile.txt -> ${localRecreatedUploadedFile}`, async function () {
 		this.timeout(10000);
 
 		return new Promise(async (resolve, reject) => {
@@ -197,15 +187,123 @@ describe("DICloud basic functions test", function () {
 		});
 	});
 
-	it("Download uploaded file via http", async function () {
+	it("checks md5 hash of the original and downloaded file", async function () {
+		const localFileMD5 = md5(fs.readFileSync(localGeneratedFilePath));
+		const downloadedFileMD5 = md5(fs.readFileSync(localRecreatedUploadedFile));
+
+
+		assert.equal(localFileMD5, downloadedFileMD5);
+	});
+
+
+	it("put new file contents to the remote file, transfers the file from RAM to being real uploaded file", async function () {
+		this.timeout(5000);
+		// logStub.restore();
+		console.log("put new file contents");
+
+		let success = await client.putFileContents(`${remoteFolderName}/testfile.txt`, "Hello World");
+		await sleep(1000);
+		assert.equal(success, true);
+	});
+
+	it("Checks if remote file content is actually changed", async function () {
+		this.timeout(5000);
+
+		const content = await client.getFileContents(`${remoteFolderName}/testfile.txt`);
+		console.log("file content", content);
+		assert.equal(content, "Hello World");
+	});
+
+	let randomNewName = randomString();
+	it("rename a remote file in " + randomNewName, async function () {
+		this.timeout(5000);
+
+		await client.moveFile(`${remoteFolderName}/testfile.txt`, `${remoteFolderName}/${randomNewName}.txt`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === randomNewName + ".txt") !== undefined, true);
+	});
+
+	it("rename a remote file back to testfile.txt", async function () {
+		this.timeout(5000);
+
+		await client.moveFile(`${remoteFolderName}/${randomNewName}.txt`, `${remoteFolderName}/testfile.txt`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+	});
+
+	let randomNewFolderName = randomString();
+	it("rename a remote folder " + remoteFolderName + " -> " + randomNewFolderName, async function () {
+		this.timeout(5000);
+
+		await client.moveFile(`${remoteFolderName}`, `${randomNewFolderName}`);
+
+		const content = await client.getDirectoryContents(`/`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === randomNewFolderName) !== undefined, true);
+	});
+
+	it("rename a remote folder back " + randomNewFolderName + " -> " + remoteFolderName, async function () {
+		this.timeout(5000);
+
+		await client.moveFile(`${randomNewFolderName}`, `${remoteFolderName}`);
+
+		const content = await client.getDirectoryContents(`/`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === remoteFolderName) !== undefined, true);
+	});
+
+
+	let localSubFolderName = "subfolder";
+	it("Create a new folder (" + localSubFolderName + ") on the server in created directory (" + remoteFolderName + ")", async function () {
+		await client.createDirectory(`${remoteFolderName}/${localSubFolderName}`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === localSubFolderName) !== undefined, true);
+	});
+
+	it("moves testfile.txt to the subfolder", async function () {
+		await client.moveFile(`${remoteFolderName}/testfile.txt`, `${remoteFolderName}/${localSubFolderName}/testfile.txt`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}/${localSubFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+	});
+
+	it("moves testfile.txt back to the temponary folder", async function () {
+		await client.moveFile(`${remoteFolderName}/${localSubFolderName}/testfile.txt`, `${remoteFolderName}/testfile.txt`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+	});
+
+	it("delete subfolder", async function () {
+		await client.deleteFile(`${remoteFolderName}/${localSubFolderName}`);
+
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === localSubFolderName) == undefined, true);
+	});
+
+	it("checks if the testfile is still there", async function () {
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		assert.equal(content.find((file) => file.basename === "testfile.txt") !== undefined, true);
+	});
+
+	it("Checks if md5 is still valid", async function () {
+		const fileContent = await client.getFileContents(`${remoteFolderName}/testfile.txt`) as string;
+		const fileMD5 = md5(Buffer.from(fileContent));
+
+		assert.equal(fileMD5, md5(Buffer.from("Hello World")));
+	});
+
+
+
+	it("Tries to download uploaded file via http", async function () {
 		this.timeout(10000);
 		return new Promise(async (resolve, reject) => {
-			const content = (await client.getDirectoryContents(`/`) as FileStat[]).map(e => e.filename);
-			console.dir(content);
+			const content = (await client.getDirectoryContents("/") as FileStat[]).filter((file) => file.type === "file");
 			assert.isAbove(content.length, 0, "No files found in the root directory");
 
-
-			let stream = await axios.get(`http://${DOMAIN}:${PORT}/${remoteFolderName}/testfile.txt`, {
+			let downloadUrl = client.getFileDownloadLink(`/${remoteFolderName}/testfile.txt`);
+			let stream = await axios.get(downloadUrl, {
 				responseType: "stream"
 			});
 
@@ -221,17 +319,12 @@ describe("DICloud basic functions test", function () {
 		});
 	});
 
-	it("checks md5 hash of the original and downloaded file", async function () {
-		const localFileMD5 = md5(fs.readFileSync(localGeneratedFilePath));
-		const downloadedFileMD5 = md5(fs.readFileSync(localRecreatedUploadedFile));
-
-		assert.equal(localFileMD5, downloadedFileMD5);
-	});
 
 	it("Delete a uploaded file from the server", async function () {
+		this.timeout(5000);
 		await client.deleteFile(`${remoteFolderName}/testfile.txt`);
 
-		let content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
+		const content = await client.getDirectoryContents(`/${remoteFolderName}`) as FileStat[];
 
 		assert.equal(content.find((file) => file.basename === "testfile.txt") == undefined, true);
 	});
@@ -239,7 +332,7 @@ describe("DICloud basic functions test", function () {
 	it("Delete a folder from the server", async function () {
 		await client.deleteFile(`${remoteFolderName}`);
 
-		let content = await client.getDirectoryContents(`/`) as FileStat[];
+		const content = await client.getDirectoryContents(`/`) as FileStat[];
 		assert.equal(content.find((file) => file.basename === remoteFolderName) == undefined, true);
 	});
 
@@ -263,12 +356,12 @@ describe("DICloud basic functions test", function () {
 			});
 
 			stream.on("data", (data) => {
+				stream.destroy();
 				reject();
 			});
 
 		});
 	});
-
 
 	it("Open stream to not existing file in not existing folder", async function () {
 		this.timeout(5000);
@@ -279,12 +372,11 @@ describe("DICloud basic functions test", function () {
 			});
 
 			stream.on("data", (data) => {
+				stream.destroy();
 				reject();
 			});
 
 		});
 	});
-
-	
 
 });

@@ -13,12 +13,14 @@ export default class FileBase implements INamingHelper {
     private filename: string;
     private totalSize: number;
     private uploadedDate: Date;
+    private lastChangedDate: Date;
     private type: FileType = "remote";
 
-    constructor(filename: string, totalSize: number, uploadedDate: Date = new Date()) {
+    constructor(filename: string, totalSize: number, uploadedDate: Date = new Date(), lastChangedDate: Date = new Date()) {
         this.filename = filename;
         this.totalSize = totalSize;
         this.uploadedDate = uploadedDate;
+        this.lastChangedDate = lastChangedDate;
     }
     getEntryName(): string {
         return this.filename;
@@ -41,7 +43,7 @@ export default class FileBase implements INamingHelper {
     }
 
 
-    public getTotalSize(): number {
+    public getSize(): number {
         return this.totalSize;
     }
 
@@ -49,10 +51,17 @@ export default class FileBase implements INamingHelper {
         return this.uploadedDate;
     }
 
-    public refreshUploadDate() {
-        this.uploadedDate = new Date();
+    public getModifiedDate(): Date {
+        return this.lastChangedDate;
     }
 
+    public setModifiedDate(date: Date) {
+        this.lastChangedDate = date;
+    }
+
+    public mofidyChangedDate() {
+        this.lastChangedDate = new Date();
+    }
 
     public setTotalSize(totalSize: number): void {
         this.totalSize = totalSize;

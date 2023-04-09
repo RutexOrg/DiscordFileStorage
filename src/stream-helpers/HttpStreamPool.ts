@@ -35,7 +35,7 @@ export default class HttpStreamPool {
 					console.log("Downloading finished.");
 					setTimeout(() => {
 						stream.emit("end");
-					}, 5000);
+					}, 10000);
 				});
 				return;
 			}

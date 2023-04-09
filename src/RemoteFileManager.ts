@@ -40,14 +40,11 @@ export default class DiscordFileManager implements IFIleManager {
 
         let msg = await metaChannel.send("Uploading file meta...");
 
-        file.refreshUploadDate();
         file.setMetaIdInMetaChannel(msg.id);
         msg.edit({
             content: ":white_check_mark: File meta posted successfully.",
             files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true, false)],
         });
-
-        console.log("return");
 
         return {
             message: "File meta posted successfully.",
@@ -61,7 +58,7 @@ export default class DiscordFileManager implements IFIleManager {
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
 
-        file.refreshUploadDate();
+        file.mofidyChangedDate();
 
         const metaChannel = await this.app.getMetadataChannel();
         const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
@@ -103,7 +100,7 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
-        return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getTotalSize())).getDownloadStream());
+        return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getSize())).getDownloadStream());
     }
 
 

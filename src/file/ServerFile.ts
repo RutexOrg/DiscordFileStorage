@@ -13,6 +13,7 @@ export interface IServerFile {
     totalSize: number;
     folder: string;
     uploadDate: Date;
+    modifiedDate: Date;
     attachmentInfos: IAttachShortInfo[];
     filesPostedInChannelId: string;
     metaIdInMetaChannel: string;
@@ -121,8 +122,9 @@ export default class ServerFile extends FileBase {
 
         return {
             filename: this.getFileName(),
-            totalSize: this.getTotalSize(),
+            totalSize: this.getSize(),
             uploadDate: this.getUploadedDate(),
+            modifiedDate: this.getModifiedDate(),
             filesPostedInChannelId: this.getFilesPostedInChannelId(),
             metaIdInMetaChannel: this.getMetaIdInMetaChannel(),
             metaVersion: this.metaVersion,
@@ -135,11 +137,13 @@ export default class ServerFile extends FileBase {
     public static fromObject(obj: IServerFile, root: FolderTree): ServerFile {
         let folder = root.getRoot().prepareFileHierarchy(obj.folder);
         const file = new ServerFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
+        file.setModifiedDate(new Date(obj.modifiedDate || new Date()));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
         file.setAttachmentInfos(obj.attachmentInfos);
 
         return file;
     }
+
 
     public getAbsolutePath(): string {
         if(this.folder == null) {
@@ -150,6 +154,10 @@ export default class ServerFile extends FileBase {
 
     public isUploaded(): boolean {
         return (this.attachmentInfos.length > 0 && !!this.metaIdInMetaChannel);
+    }
+
+    public toString(): string {
+        return "ServerFile: " + this.getAbsolutePath() + " (" + this.getSize() + " bytes)";
     }
  
 

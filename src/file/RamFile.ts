@@ -53,7 +53,7 @@ export default class RamFile extends ServerFile {
         }
     }
 
-    public getTotalSize(): number {
+    public getSize(): number {
         return this.buffer.size;
     }
 

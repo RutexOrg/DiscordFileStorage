@@ -94,7 +94,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.InvalidOperation); // TODO: some client (e.g. filezilla) tries to get size of folder. This is not supported yet.
         }
         const file = entryInfo.entry as ServerFile;
-        return callback(undefined, file.getTotalSize());
+        return callback(undefined, file.getSize());
     }
 
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
@@ -246,7 +246,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         
         writeStream.once("finish", async () => {
             await this.app.getDiscordFileManager().postMetaFile(file!);
-
+            pt.destroy();
             this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
 
@@ -268,6 +268,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         const file = entryCheck.entry as ServerFile;
+        console.log(".delete, Trying to delete file ")
+        console.log(file.toString());
 
         if (!file.isUploaded()) {
             this.fs.removeFile(file!);
@@ -284,8 +286,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
 
-    protected _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): void {
-        //this.log(ctx.context, ".copy", pathFrom + " | " + pathTo);
+    async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         return callback(Errors.InvalidOperation);
     }
 
@@ -366,6 +367,20 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
+        const entryCheck = this.fs.getElementTypeByPath(path.toString());
+        if (entryCheck.isUnknown) {
+            return callback(Errors.ResourceNotFound);
+        }
+
+        if (entryCheck.isFolder) {
+            return callback(undefined, 0);
+        }
+
+        const file = entryCheck.entry as ServerFile;
+        return callback(undefined, file.getModifiedDate().valueOf());
+    }
+
+    protected _creationDate(path: v2.Path, ctx: v2.CreationDateInfo, callback: v2.ReturnCallback<number>): void {
         const entryCheck = this.fs.getElementTypeByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);

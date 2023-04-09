@@ -224,7 +224,7 @@ export default class Folder  {
         console.log("Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
         console.log("File path: "+file.getAbsolutePath());
         file = Folder.root.getFileByPath(file.getAbsolutePath())!;
-        console.dir(file);
+        // console.dir(file);
         if(!file){
             throw new Error("File not found");
         }
@@ -487,7 +487,7 @@ export default class Folder  {
     public getTotalSize(): number {
         let size = 0;
         this.files.forEach(file => {
-            size += file.getTotalSize();
+            size += file.getSize();
         });
         this.folders.forEach(folder => {
             size += folder.getTotalSize();
