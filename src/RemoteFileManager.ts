@@ -3,7 +3,7 @@ import { AttachmentBuilder, TextBasedChannel } from "discord.js";
 import { Writable, Readable } from "stream";
 import DiscordFileStorageApp from "./DiscordFileStorageApp.js";
 import HttpStreamPool from './stream-helpers/HttpStreamPool.js';
-import ServerFile from './file/ServerFile.js';
+import RemoteFile from './file/RemoteFile.js';
 import IFIleManager, { IUploadResult } from "./file/IFileManager.js";
 import MutableBuffer from "./helper/MutableBuffer.js";
 
@@ -35,12 +35,13 @@ export default class DiscordFileManager implements IFIleManager {
         return this.getAttachmentBuilderFromBuffer(buff, path.parse(chunkName).name, chunkNummer, false, encrypt, extension);
     }
 
-    public async postMetaFile(file: ServerFile): Promise<IUploadResult> {
+    public async postMetaFile(file: RemoteFile): Promise<IUploadResult> {
         const metaChannel = await this.app.getMetadataChannel();
 
         let msg = await metaChannel.send("Uploading file meta...");
+        console.log(".postMetaFile() - msg.id: " + msg.id + " - file: " + file.getFileName());
+        file.setMessageMetaIdInMetaChannel(msg.id);
 
-        file.setMetaIdInMetaChannel(msg.id);
         msg.edit({
             content: ":white_check_mark: File meta posted successfully.",
             files: [this.getAttachmentBuilderFromBuffer(Buffer.from(file.toJson()), file.getFileName(), 0, true, false)],
@@ -53,7 +54,7 @@ export default class DiscordFileManager implements IFIleManager {
         }
     }
 
-    public async updateMetaFile(file: ServerFile): Promise<IUploadResult> {
+    public async updateMetaFile(file: RemoteFile): Promise<IUploadResult> {
         if (!file.isUploaded()) {
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
@@ -61,7 +62,7 @@ export default class DiscordFileManager implements IFIleManager {
         file.mofidyChangedDate();
 
         const metaChannel = await this.app.getMetadataChannel();
-        const msg = await metaChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        const msg = await metaChannel.messages.fetch(file.getMessageMetaIdInMetaChannel());
 
         await msg.edit({
             content: ":white_check_mark: :white_check_mark: File info updated successfully.",
@@ -83,7 +84,7 @@ export default class DiscordFileManager implements IFIleManager {
         return (str.length > n) ? str.substr(0, n - 1) : str;
     }
     
-    private async uploadFileChunkAndAttachToFile(buffer: typeof MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: ServerFile) {
+    private async uploadFileChunkAndAttachToFile(buffer: typeof MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: RemoteFile) {
         console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
@@ -99,12 +100,12 @@ export default class DiscordFileManager implements IFIleManager {
         });
     }
 
-    public async getDownloadableReadStream(file: ServerFile): Promise<Readable> {
+    public async getDownloadableReadStream(file: RemoteFile): Promise<Readable> {
         return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getSize())).getDownloadStream());
     }
 
 
-    public async getUploadWritableStream(file: ServerFile, size: number): Promise<Writable> {
+    public async getUploadWritableStream(file: RemoteFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
         let chunkNumber = 1;
         let totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
@@ -113,6 +114,7 @@ export default class DiscordFileManager implements IFIleManager {
         let buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
         return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
+                console.log("Writing chunk to buffer.")
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
                     await this.uploadFileChunkAndAttachToFile((buffer as any), chunkNumber, totalChunks, filesChannel, file);
                     chunkNumber++;
@@ -131,12 +133,12 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
 
-    public async deleteFile(file: ServerFile): Promise<IUploadResult> {
+    public async deleteFile(file: RemoteFile): Promise<IUploadResult> {
         const filesChannel = await this.app.getFileChannel();
         const metadataChannel = await this.app.getMetadataChannel();
         const messageIds = file.getAttachmentInfos();
 
-        const metadataMessage = await metadataChannel.messages.fetch(file.getMetaIdInMetaChannel());
+        const metadataMessage = await metadataChannel.messages.fetch(file.getMessageMetaIdInMetaChannel());
         await metadataMessage.edit(":x: File is deleted. " + messageIds.length + " chunks will be deleted....");
 
         for (let i = 0; i < messageIds.length; i++) {
@@ -155,7 +157,7 @@ export default class DiscordFileManager implements IFIleManager {
         }
     }
 
-    public async renameFile(file: ServerFile, newName: string): Promise<IUploadResult> {
+    public async renameFile(file: RemoteFile, newName: string): Promise<IUploadResult> {
         file.setFileName(newName);
         await this.updateMetaFile(file);
 

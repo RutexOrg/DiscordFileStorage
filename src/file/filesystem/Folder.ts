@@ -1,12 +1,13 @@
-import ServerFile from "../ServerFile.js";
+import FileBase from "../FileBase.js";
 import colors from "colors/safe.js";
 import { INamingHelper } from "./INamingHelper.js";
+import RamFile from "../RamFile.js";
 
 export interface ElementType{
     isFile?: boolean;
     isFolder?: boolean;
     isUnknown?: boolean;
-    entry?: Folder | ServerFile; // undefined on isUnknown
+    entry?: Folder | FileBase; // undefined on isUnknown
 }
 
 /**
@@ -16,7 +17,7 @@ export interface ElementType{
 export default class Folder  {
 
     private name: string;
-    private files: ServerFile[] = [];
+    private files: FileBase[] = [];
     private folders: Folder[] = [];
     private parent: Folder | null = null;
     private isRoot: boolean;
@@ -63,12 +64,12 @@ export default class Folder  {
         this.name = name;
     }
 
-    public getFiles(): ServerFile[] {
+    public getFiles(): FileBase[] {
         return this.files;
     }
 
 
-    public setFiles(files: ServerFile[], updateParents: boolean): void {
+    public setFiles(files: FileBase[], updateParents: boolean): void {
         for(let i = 0; i < files.length; i++) {
             files[i].getFolder()!.removeFile(files[i]);
             files[i].setFolder(this, updateParents);
@@ -107,6 +108,7 @@ export default class Folder  {
     public getallEntriesRecursiveThis(): ElementType[] {
         return this.getAllEntriesRecursive(this);
     }
+
     public getAllEntriesRecursive(folder: Folder = Folder.root): ElementType[] {
         let entries: ElementType[] = [];
         folder.getFolders().forEach(folder => {
@@ -165,7 +167,7 @@ export default class Folder  {
     }
 
 
-    public addFile(file: ServerFile): void {
+    public addFile(file: FileBase): void {
         if(!this.isSameNameExists(file.getFileName())) {
             file.setFolder(this, false);
             this.files.push(file);
@@ -187,7 +189,7 @@ export default class Folder  {
     }
 
 
-    public findFileByName(name: string, folder: Folder): ServerFile | undefined{
+    public findFileByName(name: string, folder: Folder): FileBase | undefined{
         const files = folder.getFiles();
         for(let i = 0; i < files.length; i++){
             if(files[i].getFileName() == name){
@@ -207,22 +209,23 @@ export default class Folder  {
         return undefined;
     }
 
-    private removeFileFromFolder(file: ServerFile, folder: Folder): void {
+    private removeFileFromFolder(file: FileBase, folder: Folder): void {
         const ff = folder.files.find(f => f.getFileName() == file.getFileName())!;
         ff.setNullFolder();
         folder.files = folder.files.filter(f => f.getFileName() != file.getFileName());
     }
 
-    public removeFileFromThisFolder(file: ServerFile): void {
+    public removeFileFromThisFolder(file: FileBase): void {
         this.removeFileFromFolder(file, this);
     }
     
-    public removeFile(file: ServerFile): void {
+    public removeFile(file: FileBase): void {
         if(file.getFolder() == null){
             throw new Error("File is not in any folder, its already removed");
         }
-        console.log("Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
-        console.log("File path: "+file.getAbsolutePath());
+        console.log("remove " , file instanceof FileBase ? "FileBase" : "ramFile")
+        console.log(".Folder, removeFile(file), File path: Removing file "+file.getFileName()+" from folder "+this.getName() + " with path "+file.getAbsolutePath());
+        console.log(".Folder, removeFile(file), File path: "+file.getAbsolutePath());
         file = Folder.root.getFileByPath(file.getAbsolutePath())!;
         // console.dir(file);
         if(!file){
@@ -293,13 +296,15 @@ export default class Folder  {
         return currentFolder;
     }
 
-    // same as createHierarchy but creates last element as file
-    public createFileHierarchy(path: string, filename: string): void {
+    // same as createHierarchy but creates last element as ramfile.
+    public createRAMFileHierarchy(path: string, filename: string): void {
         const folder = this.prepareFileHierarchy(path);
         if(folder.getFiles().find(file => file.getFileName() == filename)) {
             throw new Error("File with name "+filename+" already exists");
         }
-        new ServerFile(filename, 0, folder, new Date());
+        new RamFile(filename, 0, folder, undefined, new Date());
+        console.log(".createRAMFileHierarchy, File path: "+path+"/"+filename);
+
     }
 
     // creates folder hierarchy and returns last folder.
@@ -364,7 +369,7 @@ export default class Folder  {
         }
     }
     
-    public getFilesPaths(map: Map<string, ServerFile> = new Map()): Map<string, ServerFile> {
+    public getFilesPaths(map: Map<string, FileBase> = new Map()): Map<string, FileBase> {
         this.files.forEach(file => {
             map.set(this.getAbsolutePath() + file.getFileName(), file);
         });
@@ -399,7 +404,7 @@ export default class Folder  {
         return currentFolder;
     }
 
-    public getFileByPath(path: string): ServerFile | undefined {
+    public getFileByPath(path: string): FileBase | undefined {
         if(!path.startsWith("/")){
             throw new Error("Path should start with /");
         }
@@ -446,32 +451,8 @@ export default class Folder  {
         return (path.charAt(0) == "/" ? path : "/" + path) + this.name + "/";
     }
 
-    // returns array of folders in format ["folder1", "folder2", "folder3"]
-    public getAbsolutePathArray(): string[] {
-        const path: string[] = [];
-        let currentFolder = this.parent;
-        while (currentFolder != null) {
-            path.push(currentFolder.getName());
-            currentFolder = currentFolder.getParent();
-        }
-        return path.reverse();
-    }
 
-    public moveFolder(folder: Folder, toFolder: Folder): void {
-        if(folder.isRoot){
-            throw new Error("Cannot move root folder");
-        }
-
-        const prevFolderParent = folder.getParent();
-        if(prevFolderParent){
-            prevFolderParent.removeFolder(folder);
-        }
-
-        folder.parent = toFolder;
-        toFolder.addFolder(folder);
-    }
-
-    public moveFile(file: ServerFile, oldFolder: Folder, newPath: string): void {
+    public moveFile(file: FileBase, oldFolder: Folder, newPath: string): void {
         let newFolder = this.getFolderByPath(newPath);
         if(!newFolder){
             newFolder = this.prepareFileHierarchy(newPath);
@@ -499,7 +480,7 @@ export default class Folder  {
 }
 
 
-export class FolderTree {
+export class VirtualFS {
     private root: Folder;
 
     constructor() {

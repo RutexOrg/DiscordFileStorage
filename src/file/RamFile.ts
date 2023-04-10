@@ -1,13 +1,13 @@
 import { Writable } from 'stream';
 import { Readable } from 'stream';
 import Folder from "./filesystem/Folder.js";
-import ServerFile from "./ServerFile.js";
 import MutableBuffer from "../helper/MutableBuffer.js"
+import FileBase from './FileBase.js';
 
 /**
  * A file that is stored in ram.
  */
-export default class RamFile extends ServerFile {
+export default class RamFile extends FileBase {
     private maxSize: number;
     private totalWrittenFiles: number = 0;
     private buffer: MutableBuffer;
@@ -16,7 +16,6 @@ export default class RamFile extends ServerFile {
         super(filename, totalSize, folder, uploadedDate);
         this.buffer = new MutableBuffer(maxSize);
         this.maxSize = maxSize;
-        this.setFileType("ram");
     }
 
     // TODO: implement this properly
@@ -38,24 +37,17 @@ export default class RamFile extends ServerFile {
         });
     }
 
-    public rm(){
-        if(this.getFolder() !== null) {
-            this.getFolder()!.removeFile(this);
-            this.setFolder(null as any);
-        }
-    }
-
-    // TODO: clean this up
-    public cleanup(rm: boolean = false): void {
+    public rm(): Folder {
         this.buffer.clear();
-        if(rm){
-            this.rm();
-        }
+        return super.rm();
     }
 
     public getSize(): number {
         return this.buffer.size;
     }
 
+    public toString(): string {
+        return "RamFile: " + this.getEntryName() + " (" + this.getSize() + " bytes), (" + this.getAbsolutePath() + ")";
+    }
 
 }

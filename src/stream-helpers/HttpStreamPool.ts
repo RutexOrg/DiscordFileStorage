@@ -1,19 +1,19 @@
 import { Readable, PassThrough } from "stream";
 import client from "../helper/AxiosInstance.js";
-import { IAttachShortInfo } from "../file/ServerFile.js";
+import { IAttachmentInfo } from "../file/RemoteFile.js";
 import { AxiosResponse } from "axios";
 
 /**
  * Class that combines list of urls into a single Readable stream. 
  */
 export default class HttpStreamPool {
-	private urls: IAttachShortInfo[];
+	private urls: IAttachmentInfo[];
 	private totalSize: number;
 	private gotSize = 0;
 	private currentUrlIndex = 0;
 	private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
 
-	constructor(info: IAttachShortInfo[], totalSize: number) {
+	constructor(info: IAttachmentInfo[], totalSize: number) {
 		this.urls = info;
 		this.totalSize = totalSize;
 	}
@@ -33,9 +33,6 @@ export default class HttpStreamPool {
 			if (self.currentUrlIndex >= self.urls.length) {
 				stream.once("unpipe", () => {
 					console.log("Downloading finished.");
-					setTimeout(() => {
-						stream.emit("end");
-					}, 10000);
 				});
 				return;
 			}

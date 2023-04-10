@@ -83,8 +83,14 @@ describe("DICloud basic functions test", function () {
 	let logStub: SinonStub;
 	let warnStub: SinonStub;
 
+	
+	let server: DiscordFileStorageApp;
+	let client: WebDAVClient;
+
+
+
 	before(() => {
-		// prints all console.log to a file. if its a string, removes the control escape characters. if type cannot be casted to string, like symbol, it will be ignored.
+		// prints all console.log to a file. if its a string, removes the control escape characters (but not display characters, like \t \n and so on...). if type cannot be casted to string, like symbol, it will be ignored.
 		logStub = sinon.stub(console, "log").callsFake((...args) => {
 			for (let i = 0; i < args.length; i++) {
 				if (typeof args[i] === "string") {
@@ -94,6 +100,12 @@ describe("DICloud basic functions test", function () {
 		});
 
 		warnStub = sinon.stub(console, "warn");
+
+		if (fs.existsSync(".local")) {
+			return true;
+		}
+		fs.mkdirSync(".local");
+		assert.isTrue(fs.existsSync(".local"));
 	});
 
 	after(() => {
@@ -102,22 +114,10 @@ describe("DICloud basic functions test", function () {
 	});
 
 	after(() => {
-		process.exit(0);
+		setTimeout(() => {
+			process.exit(0);
+		}, process.env.WOTE ? 20000 : 0);
 	})
-
-	let server: DiscordFileStorageApp;
-
-	// TODO: options
-	let client: WebDAVClient;
-
-	it("Prepares the test environment", async function () {
-		if (fs.existsSync(".local")) {
-			return true;
-		}
-		fs.mkdirSync(".local");
-		assert.isTrue(fs.existsSync(".local"));
-	});
-
 
 
 	let localTestFolderName: string;
@@ -377,6 +377,51 @@ describe("DICloud basic functions test", function () {
 			});
 
 		});
+	});
+
+	it("Creates two remote uploaded files in a same folder (test_dir) with sleep(2000ms)", async function () {
+		this.timeout(15000);
+
+
+		await client.createDirectory("/tests_dir");
+		await client.putFileContents("/tests_dir/test1.txt", "test1");
+		await client.putFileContents("/tests_dir/test2.txt", "test1");
+		await sleep(2000);
+
+		let test1UploadedContent = await client.getFileContents("/tests_dir/test1.txt") as string;
+		let test2UploadedContent = await client.getFileContents("/tests_dir/test2.txt") as string;
+		console.log(test1UploadedContent)
+		console.log(test2UploadedContent)
+
+		assert.equal(test1UploadedContent, "test1");
+		assert.equal(test2UploadedContent, "test1");
+	});
+
+	it("Deletes the remote uploaded files in a same folder (test_dir)", async function () {
+		this.timeout(15000);
+
+		await client.deleteFile("/tests_dir/test1.txt");
+		await client.deleteFile("/tests_dir/test2.txt");
+		await client.deleteFile("/tests_dir");
+
+		let content = await client.getDirectoryContents("/") as FileStat[];
+		assert.equal(content.find((file) => file.basename === "tests_dir") == undefined, true);
+	});
+
+
+	it("creates subtree /a/b/c/d/e.txt", async function () {
+		this.timeout(15000);
+
+		await client.createDirectory("/a/");
+		await client.createDirectory("/a/b/");
+		await client.createDirectory("/a/b/c/");
+		await client.createDirectory("/a/b/c/d/");
+		await client.putFileContents("/a/b/c/d/e.txt", "test1");
+
+		let test1UploadedContent = await client.getFileContents("/a/b/c/d/e.txt") as string;
+		console.log(test1UploadedContent)
+
+		assert.equal(test1UploadedContent, "test1");
 	});
 
 });

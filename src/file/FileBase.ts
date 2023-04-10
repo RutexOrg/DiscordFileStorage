@@ -1,39 +1,67 @@
 import mime from "mime-types";
 import { INamingHelper } from "./filesystem/INamingHelper";
+import Folder from "./filesystem/Folder";
 
-// remote = file is on the server
-// ram = file is in memory
-// ram defined in a RamFile.ts file
-export type FileType = "remote" | "ram";
 
 /**
  * Basic shared FileBase class that represents a file.  
  */
-export default class FileBase implements INamingHelper {
+export default abstract class FileBase implements INamingHelper {
     private filename: string;
     private totalSize: number;
     private uploadedDate: Date;
     private lastChangedDate: Date;
-    private type: FileType = "remote";
+    private folder: Folder;
+    private markedDeleted: boolean = false;
 
-    constructor(filename: string, totalSize: number, uploadedDate: Date = new Date(), lastChangedDate: Date = new Date()) {
+    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date = new Date(), lastChangedDate: Date = new Date()) {
         this.filename = filename;
         this.totalSize = totalSize;
         this.uploadedDate = uploadedDate;
         this.lastChangedDate = lastChangedDate;
+        this.folder = folder;
+        folder.addFile(this);
     }
-    getEntryName(): string {
+
+    public isMarkedDeleted(): boolean {
+        return this.markedDeleted;
+    }
+
+    public markDeleted(): void {
+        this.markedDeleted = true;
+    }
+
+
+    public getFolder(): Folder {
+        return this.folder;
+    }
+
+    public setNullFolder(): void {
+        this.folder = null as any;
+    }
+
+    public setFolder(folder: Folder, updateParents: boolean = false): void {
+        if(updateParents && this.folder != null) {
+            this.folder.removeFile(this);
+            this.folder = folder;
+            folder.addFile(this);
+        }else{
+            this.folder = folder;
+        }
+    }
+
+    public getAbsolutePath(): string {
+        if(this.folder == null) {
+            throw new Error("Folder is null");
+        }
+        return this.folder.getAbsolutePath() + this.getFileName();
+    }
+    
+    public getEntryName(): string {
         return this.filename;
     }
 
-    public setFileType(type: FileType) {
-        this.type = type;
-    }
-
-    public getFileType(): FileType {
-        return this.type;
-    }
-
+    
     public getFileName(): string {
         return this.filename;
     }
@@ -69,6 +97,16 @@ export default class FileBase implements INamingHelper {
 
     public getMimeType(): string {
         return mime.lookup(this.filename) || "application/octet-stream";
+    }
+
+    /**
+     *  Removes this file from the folder and returns the folder.
+     * @returns the folder that this file was in.
+     */
+    public rm(): Folder {
+        const folder = this.folder;
+        this.folder.removeFile(this);
+        return folder;
     }
 
 

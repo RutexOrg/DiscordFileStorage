@@ -2,8 +2,8 @@ import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, GuildB
 import color from 'colors/safe.js';
 import DiscordFileManager from './RemoteFileManager.js';
 import axios from './helper/AxiosInstance.js';
-import ServerFile from './file/ServerFile.js';
-import { FolderTree } from './file/filesystem/Folder.js';
+import RemoteFile from './file/RemoteFile.js';
+import { VirtualFS } from './file/filesystem/Folder.js';
 
 export interface DiscordFileStorageAppOptions extends ClientOptions {
     metaChannelName: string;
@@ -23,7 +23,7 @@ export default class DiscordFileStorageApp extends Client {
     private filesChannelId: string;
     private channelsToCreate: Array<string>;
     private discordFileManager: DiscordFileManager;
-    private filesystem: FolderTree = new FolderTree();
+    private filesystem: VirtualFS = new VirtualFS();
 
     private shouldEncrypt: boolean = false;
     private encryptPassword;
@@ -134,7 +134,7 @@ export default class DiscordFileStorageApp extends Client {
         return allMessages;
     }
 
-    public getFileSystem(): FolderTree {
+    public getFileSystem(): VirtualFS {
         return this.filesystem;
     }
 
@@ -156,9 +156,9 @@ export default class DiscordFileStorageApp extends Client {
                 
                 console.log("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name);
 
-                if (ServerFile.isValidRemoteFile(file)) {
-                    const remoteFile = ServerFile.fromObject(file as any, this.filesystem);
-                    remoteFile.setMetaIdInMetaChannel(msg.id);
+                if (RemoteFile.isValidRemoteFile(file)) {
+                    const remoteFile = RemoteFile.fromObject(file as any, this.filesystem);
+                    remoteFile.setMessageMetaIdInMetaChannel(msg.id);
 
                     console.log("Loaded file " + remoteFile.getFileName() + " at " + remoteFile.getAbsolutePath());
                 } else {
