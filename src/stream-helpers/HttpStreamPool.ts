@@ -12,10 +12,11 @@ export default class HttpStreamPool {
 	private gotSize = 0;
 	private currentUrlIndex = 0;
 	private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
-
-	constructor(info: IAttachmentInfo[], totalSize: number) {
+	private downloadingFileName: string;
+	constructor(info: IAttachmentInfo[], totalSize: number, filename: string) {
 		this.urls = info;
 		this.totalSize = totalSize;
+		this.downloadingFileName = filename;
 	}
 
 	/**
@@ -32,7 +33,7 @@ export default class HttpStreamPool {
 		let next = async () => {
 			if (self.currentUrlIndex >= self.urls.length) {
 				stream.once("unpipe", () => {
-					console.log("Downloading finished.");
+					console.log("Downloading finished: " + self.downloadingFileName);
 				});
 				return;
 			}

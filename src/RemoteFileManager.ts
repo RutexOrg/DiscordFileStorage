@@ -101,7 +101,7 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     public async getDownloadableReadStream(file: RemoteFile): Promise<Readable> {
-        return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getSize())).getDownloadStream());
+        return (await (new HttpStreamPool(structuredClone(file.getAttachmentInfos()), file.getSize(), file.getEntryName())).getDownloadStream());
     }
 
 
