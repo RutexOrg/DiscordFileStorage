@@ -141,7 +141,7 @@ export default class DiscordFileStorageApp extends Client {
     /**
      * loadFiles
      */
-    public async loadFilesToCache() {
+    public async loadFiles() {
         console.log(color.yellow("Fetching files... This may take a while if there are a lot of files"))
 
         const metaDataChannelId = (await this.getMetadataChannel()).id;

@@ -80,6 +80,10 @@ export default abstract class FileBase implements INamingHelper {
         return this.creationDate;
     }
 
+    public setCreationDate(date: Date) {
+        this.creationDate = date;
+    }
+
     public getModifyDate(): Date {
         return this.modifyDate;
     }

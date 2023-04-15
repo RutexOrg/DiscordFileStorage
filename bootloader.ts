@@ -60,7 +60,7 @@ export async function bootApp() {
 
     if (!skipPreload) {
         console.log(color.yellow("Preloading files..."));
-        await app.loadFilesToCache();
+        await app.loadFiles();
     } else {
         console.log(color.yellow("Skipping preload..."));
     }

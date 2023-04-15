@@ -222,7 +222,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
 
         const pt = new PassThrough();
-        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
+        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize, {
+            onFinished: async () => {
+                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
+                await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
+            },
+        })
+
         this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
 
 
@@ -233,11 +239,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         callback(undefined, pt);
-        writeStream.once("finish", async () => {
-                await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
-                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
-        });
-
     }
 
 

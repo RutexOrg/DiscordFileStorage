@@ -4,8 +4,12 @@ import { Writable, Readable } from "stream";
 import DiscordFileStorageApp from "./DiscordFileStorageApp.js";
 import HttpStreamPool from './stream-helpers/HttpStreamPool.js';
 import RemoteFile from './file/RemoteFile.js';
-import IFIleManager, { IUploadResult } from "./file/IFileManager.js";
+import IFIleManager, { IUploadResult, IWriteStreamCallbacks } from "./file/IFileManager.js";
 import MutableBuffer from "./helper/MutableBuffer.js";
+
+
+
+
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of 8 old MB. 
 
@@ -107,7 +111,8 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
 
-    public async getUploadWritableStream(file: RemoteFile, size: number): Promise<Writable> {
+
+    public async getUploadWritableStream(file: RemoteFile, size: number, userCallbacks: IWriteStreamCallbacks): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
         const totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
         let chunkNumber = 1;
@@ -130,6 +135,7 @@ export default class DiscordFileManager implements IFIleManager {
                     await this.uploadFileChunkAndAttachToFile((buffer as any), chunkNumber, totalChunks, filesChannel, file);
                 }
                 buffer = null as any;
+                await userCallbacks.onFinished();
                 callback();
             }
         });

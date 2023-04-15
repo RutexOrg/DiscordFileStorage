@@ -8,11 +8,15 @@ export interface IUploadResult {
     file: RemoteFile;
 }
 
+export interface IWriteStreamCallbacks {
+    onFinished: () => Promise<void>;
+}
+
 export interface IDeleteResult extends IUploadResult {};
 
 export default interface IFIleManager {
     getDownloadableReadStream(file: RemoteFile, callback: (stream: Readable) => void): void;
-    getUploadWritableStream(file: RemoteFile, size: number): Promise<Writable>;
+    getUploadWritableStream(file: RemoteFile, size: number, callbacks: IWriteStreamCallbacks): Promise<Writable>;
     
     postMetaFile(file: RemoteFile): Promise<IUploadResult>;
     updateMetaFile(file: RemoteFile): Promise<IUploadResult>;
