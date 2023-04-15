@@ -9,16 +9,17 @@ import Folder from "./filesystem/Folder";
 export default abstract class FileBase implements INamingHelper {
     private filename: string;
     private totalSize: number;
-    private uploadedDate: Date;
-    private lastChangedDate: Date;
+    private creationDate: Date;
+    private modifyDate: Date;
     private folder: Folder;
     private markedDeleted: boolean = false;
+    private etag: string = "";
 
     constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date = new Date(), lastChangedDate: Date = new Date()) {
         this.filename = filename;
         this.totalSize = totalSize;
-        this.uploadedDate = uploadedDate;
-        this.lastChangedDate = lastChangedDate;
+        this.creationDate = uploadedDate;
+        this.modifyDate = lastChangedDate;
         this.folder = folder;
         folder.addFile(this);
     }
@@ -75,24 +76,32 @@ export default abstract class FileBase implements INamingHelper {
         return this.totalSize;
     }
 
-    public getUploadedDate(): Date {
-        return this.uploadedDate;
+    public getCreationDate(): Date {
+        return this.creationDate;
     }
 
-    public getModifiedDate(): Date {
-        return this.lastChangedDate;
+    public getModifyDate(): Date {
+        return this.modifyDate;
     }
 
-    public setModifiedDate(date: Date) {
-        this.lastChangedDate = date;
+    public setModifyDateDate(date: Date) {
+        this.modifyDate = date;
     }
 
-    public mofidyChangedDate() {
-        this.lastChangedDate = new Date();
+    public updateModifyDate() {
+        this.modifyDate = new Date();
     }
 
     public setTotalSize(totalSize: number): void {
         this.totalSize = totalSize;
+    }
+
+    public getEtag(): string {
+        return this.etag;
+    }
+
+    public setEtag(etag: string): void {
+        this.etag = etag;
     }
 
     public getMimeType(): string {

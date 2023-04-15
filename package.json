@@ -24,7 +24,9 @@
     "start": "tsc && node --no-warnings out/index.js",
     "l": "node --no-warnings out/index.js",
     "build": "tsc",
-    "test": "yarn build && mocha --no-warnings out/tests/"
+    "test": "yarn build && mocha --no-warnings out/tests/",
+    "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
+    "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",

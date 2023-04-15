@@ -83,7 +83,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        const entryInfo = this.fs.getEntryByPath(path.toString());
         if (path.isRoot()) {
             return callback(undefined, this.fs.getTotalSize());
         }
@@ -108,7 +108,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.log(ctx.context, ".readDir", path);
         const folder = this.fs.getFolderByPath(path.toString())!;
-        folder.printHierarchyWithFiles(true, ".readDir");
+        // folder.printHierarchyWithFiles(true, ".readDir");
 
         return callback(undefined, folder.getAllEntries().map(e => {
             return (e.entry as INamingHelper).getEntryName();
@@ -118,7 +118,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
         // console.log(ctx.context.user);
-        const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        const entryInfo = this.fs.getEntryByPath(path.toString());
 
         let resType: ResourceType;
         if (entryInfo.isFile) {
@@ -133,7 +133,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
         // this.log(ctx.context, ".mimeType", path);
-        const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        const entryInfo = this.fs.getEntryByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.NoMimeTypeForAFolder)
         }
@@ -143,7 +143,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
-        const existsCheckState = this.fs.getElementTypeByPath(path.toString());
+        const existsCheckState = this.fs.getEntryByPath(path.toString());
         // //this.log(".fastExistCheck", exists + " | " + path.toString());
         if (existsCheckState.isUnknown) {
             return callback(false);
@@ -155,7 +155,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
         this.log(ctx.context, ".openReadStream", path);
-        const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        console.log(".openReadStream!!!", ctx.estimatedSize);
+        console.log(".openReadStream!!!", ctx.targetSource);
+        const entryInfo = this.fs.getEntryByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.ResourceNotFound);
         }
@@ -187,10 +189,10 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         this.log(ctx.context, ".create", path + ", " + (ctx.type.isFile ? "file" : "folder"));
         if (ctx.type.isDirectory) {
-            this.fs.createHierarchy(path.toString());
+            this.fs.createFolderHierarchy(path.toString());
             return callback();
         } else {
-            this.fs.createRAMFileHierarchy(path.toString(), path.fileName());
+            this.fs.createRAMFileHierarchy(path.toString(), path.fileName(), new Date());
             return callback();
         }
     }
@@ -201,7 +203,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const { targetSource, estimatedSize, mode } = ctx;
         console.log(".openWriteStream", targetSource, estimatedSize, mode);
 
-        const entryInfo = this.fs.getElementTypeByPath(path.toString());
+        const entryInfo = this.fs.getEntryByPath(path.toString());
         let file = entryInfo.entry as (RemoteFile | RamFile);
 
         // looks like most managers does not provide estimated size on  newly created file. 
@@ -217,7 +219,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             await this.app.getDiscordFileManager().deleteFile(file);
         }
 
-        file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), new Date());
+        file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
 
         const pt = new PassThrough();
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file!, ctx.estimatedSize)
@@ -231,9 +233,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         callback(undefined, pt);
-        pt.once("close", async () => {
-            await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
-            this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
+        writeStream.once("finish", async () => {
+                await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
+                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
         });
 
     }
@@ -241,7 +243,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
         this.log(ctx.context, ".delete", path);
-        const entryCheck = this.fs.getElementTypeByPath(path.toString());
+        const entryCheck = this.fs.getEntryByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.Forbidden);
         }
@@ -276,8 +278,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.log(ctx.context, ".move", pathFrom + " | " + pathTo);
 
-        const sourceEntry = this.fs.getElementTypeByPath(pathFrom.toString());
-        const targetEntry = this.fs.getElementTypeByPath(pathTo.toString());
+        const sourceEntry = this.fs.getEntryByPath(pathFrom.toString());
+        const targetEntry = this.fs.getEntryByPath(pathTo.toString());
 
         if (sourceEntry.isUnknown || !targetEntry.isUnknown) {
             return callback(Errors.InvalidOperation);
@@ -329,7 +331,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
-        const entryCheck = this.fs.getElementTypeByPath(pathFrom.toString());
+        const entryCheck = this.fs.getEntryByPath(pathFrom.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
@@ -349,7 +351,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entryCheck = this.fs.getElementTypeByPath(path.toString());
+        const entryCheck = this.fs.getEntryByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
@@ -359,11 +361,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         const file = entryCheck.entry as (RemoteFile | RamFile);
-        return callback(undefined, file.getModifiedDate().valueOf());
+        return callback(undefined, file.getModifyDate().valueOf());
     }
 
     protected _creationDate(path: v2.Path, ctx: v2.CreationDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entryCheck = this.fs.getElementTypeByPath(path.toString());
+        const entryCheck = this.fs.getEntryByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
@@ -373,8 +375,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         const file = entryCheck.entry as (RemoteFile | RamFile);
-        return callback(undefined, file.getUploadedDate().valueOf());
+        return callback(undefined, file.getCreationDate().valueOf());
     }
+
+    // protected _etag(path: v2.Path, ctx: v2.ETagInfo, callback: v2.ReturnCallback<string>): void {
+        // console.log(".etag", path.toString());
+        // callback(undefined, "0");
+    // }
 
 
 

@@ -108,19 +108,13 @@ export async function bootApp() {
         console.log(color.green("WebDAV server started at port " + webdavPort + "."));
 
         // debug
-        // webdavServer.beforeRequest((arg, next) => {
-        //     let pathInfo = arg.requested.path;
-        //     if(pathInfo.paths[0] === "get"){
-        //         console.log("wtf");
-        //     }
-
-        //     next();
-        // });
+        webdavServer.beforeRequest((arg, next) => {
+            console.log(arg.request.method , arg.requested.path); 
+            next();
+        });
 
         webdavServer.afterRequest((arg, next) => {
-            // Display the method, the URI, the returned status code and the returned message
             console.log('>>', arg.request.method, arg.requested.uri, '>', arg.response.statusCode, arg.response.statusMessage);
-            // If available, display the body of the response
             console.log(arg.responseBody);
             next();
         });

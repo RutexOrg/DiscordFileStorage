@@ -59,7 +59,7 @@ export default class DiscordFileManager implements IFIleManager {
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
 
-        file.mofidyChangedDate();
+        file.updateModifyDate();
 
         const metaChannel = await this.app.getMetadataChannel();
         const msg = await metaChannel.messages.fetch(file.getMessageMetaIdInMetaChannel());
@@ -84,7 +84,7 @@ export default class DiscordFileManager implements IFIleManager {
         return (str.length > n) ? str.substr(0, n - 1) : str;
     }
     
-    private async uploadFileChunkAndAttachToFile(buffer: typeof MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: RemoteFile) {
+    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: RemoteFile) {
         console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
@@ -92,12 +92,14 @@ export default class DiscordFileManager implements IFIleManager {
             ],
         });
 
+        
         file.addAttachmentInfo({
             id: message.id,
             url: message.attachments.first()!.url,
             proxyUrl: message.attachments.first()!.proxyURL,
-            length: buffer.length,
+            length: buffer.size,
         });
+        console.dir(file.getAttachmentInfos())
     }
 
     public async getDownloadableReadStream(file: RemoteFile): Promise<Readable> {
@@ -107,8 +109,8 @@ export default class DiscordFileManager implements IFIleManager {
 
     public async getUploadWritableStream(file: RemoteFile, size: number): Promise<Writable> {
         const filesChannel = await this.app.getFileChannel();
+        const totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
         let chunkNumber = 1;
-        let totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
         file.setFilesPostedInChannelId(filesChannel.id);
 
         let buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
@@ -123,6 +125,7 @@ export default class DiscordFileManager implements IFIleManager {
                 callback();
             },
             final: async (callback) => {
+                console.log("Finalizing upload.")
                 if (buffer.size > 0) {
                     await this.uploadFileChunkAndAttachToFile((buffer as any), chunkNumber, totalChunks, filesChannel, file);
                 }

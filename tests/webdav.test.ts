@@ -10,20 +10,12 @@ import path from "path";
 import crypro from "crypto";
 import axios from "../src/helper/AxiosInstance.js";
 import { patchEmitter } from "../src/helper/EventPatcher.js";
+import safeSetup, { randomString, sleep, md5 } from "./helper.js";
 
 const DOMAIN = "localhost";
 const PORT = 3000;
 
-
-function md5(buffer: Buffer) {
-	return crypro.createHash("md5").update(buffer).digest("hex");
-}
-
-async function sleep(t: number) {
-	return new Promise((resolve, reject) => {
-		setTimeout(resolve, t);
-	})
-}
+safeSetup();
 
 
 async function fillWileWithData(sizeInBytes: number, stream: Writable) {
@@ -44,34 +36,6 @@ async function fillWileWithData(sizeInBytes: number, stream: Writable) {
 	});
 }
 
-function randomString(n: number = 16) {
-	let result = "";
-	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	const charactersLength = characters.length;
-	for (let i = 0; i < n; i++) {
-		result += characters.charAt(Math.floor(Math.random() * charactersLength));
-	}
-	return result;
-}
-
-
-function generateRandomString(n: number = 16) {
-	let result = "";
-	const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-	const charactersLength = characters.length;
-	for (let i = 0; i < n; i++) {
-		result += characters.charAt(Math.floor(Math.random() * charactersLength));
-	}
-	return result;
-}
-
-process.on("unhandledRejection", (reason, promise) => {
-	console.error("Unhandled Rejection at:", promise, "reason:", reason);
-});
-
-process.on("uncaughtException", (err) => {
-	console.error("Uncaught Exception at:", err);
-});
 
 
 
@@ -147,7 +111,7 @@ describe("DICloud basic functions test", function () {
 	});
 
 
-	let remoteFolderName = generateRandomString();
+	let remoteFolderName = randomString();
 	it("Create a remote temponary folder: " + remoteFolderName, async function () {
 		await client.createDirectory(remoteFolderName);
 		const content = (await client.getDirectoryContents("/") as FileStat[]).filter((file) => file.type === "directory");

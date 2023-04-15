@@ -148,7 +148,7 @@ export default class Folder  {
         this.folders = [];
     }
 
-    public getElementTypeByPath(path: string): ElementType {
+    public getEntryByPath(path: string): ElementType {
         if (this.getFolderByPath(path)) {
             return {
                 isFolder: true,
@@ -270,7 +270,7 @@ export default class Folder  {
     }
     
 
-    public createHierarchy(path: string): Folder {
+    public createFolderHierarchy(path: string): Folder {
         if(!path.startsWith("/")){
             throw new Error("Path should start with /");
         }
@@ -297,14 +297,13 @@ export default class Folder  {
     }
 
     // same as createHierarchy but creates last element as ramfile.
-    public createRAMFileHierarchy(path: string, filename: string): void {
+    public createRAMFileHierarchy(path: string, filename: string, creationDate: Date): RamFile {
         const folder = this.prepareFileHierarchy(path);
         if(folder.getFiles().find(file => file.getFileName() == filename)) {
             throw new Error("File with name "+filename+" already exists");
         }
-        new RamFile(filename, 0, folder, undefined, new Date());
         console.log(".createRAMFileHierarchy, File path: "+path+"/"+filename);
-
+        return new RamFile(filename, 0, folder, undefined, creationDate);
     }
 
     // creates folder hierarchy and returns last folder.
