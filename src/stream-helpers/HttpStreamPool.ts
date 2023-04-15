@@ -38,6 +38,11 @@ export default class HttpStreamPool {
 				return;
 			}
 
+			if(stream.closed || stream.destroyed) {
+				console.log("stream closed; aborting");
+				return;
+			}
+
 			let url = self.urls[self.currentUrlIndex];
 			let res: AxiosResponse;
 			try {

@@ -109,13 +109,13 @@ export async function bootApp() {
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            console.log("["+arg.request.socket.remoteAddress+"] > "+arg.request.method , arg.requested.path); 
+            console.log(">> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method , arg.requested.path); 
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            console.log('>>', arg.response.statusMessage);
-            console.log(arg.responseBody);
+            // console.log('<<', arg.response.statusMessage);
+            console.log("<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
             next();
         });
     }
@@ -146,7 +146,7 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
             print("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
             return defaultValue;
         }
-        printAndExit("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
+        printAndExit("Required env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     };
 
     const valueLower = value.toLowerCase();

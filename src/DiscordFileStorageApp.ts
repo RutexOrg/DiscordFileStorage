@@ -27,7 +27,7 @@ export default class DiscordFileStorageApp extends Client {
 
     private shouldEncrypt: boolean = false;
     private encryptPassword;
-    
+
     public static instance: DiscordFileStorageApp;
 
 
@@ -39,13 +39,13 @@ export default class DiscordFileStorageApp extends Client {
         DiscordFileStorageApp.instance = this;
 
         this.channelsToCreate = [
-            options.metaChannelName, 
+            options.metaChannelName,
             options.filesChannelName
         ];
 
         this.metaChannelName = options.metaChannelName;
         this.filesChannelId = options.filesChannelName;
-        
+
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
 
@@ -150,10 +150,10 @@ export default class DiscordFileStorageApp extends Client {
         console.log();
         for (let i = 0; i < messages.length; i++) {
             const msg = messages[i];
-            
+
             if (msg.attachments.size > 0) {
                 let file = (await axios.get(msg.attachments.first()!.url)).data as object;
-                
+
                 console.log("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name);
 
                 if (RemoteFile.isValidRemoteFile(file)) {
@@ -165,7 +165,7 @@ export default class DiscordFileStorageApp extends Client {
                     console.log("Failed to extract valid message data");
                     console.log(file);
                 }
-            }else{
+            } else {
                 console.log("Message has no attachments");
             }
         }
@@ -178,6 +178,8 @@ export default class DiscordFileStorageApp extends Client {
     public getDiscordFileManager(): DiscordFileManager {
         return this.discordFileManager;
     }
+
+    
 
 }
 
