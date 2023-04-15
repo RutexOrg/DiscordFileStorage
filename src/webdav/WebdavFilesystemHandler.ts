@@ -379,6 +379,8 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, file.getCreationDate().valueOf());
     }
 
+    
+
     // protected _etag(path: v2.Path, ctx: v2.ETagInfo, callback: v2.ReturnCallback<string>): void {
         // console.log(".etag", path.toString());
         // callback(undefined, "0");
