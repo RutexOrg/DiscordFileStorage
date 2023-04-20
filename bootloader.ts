@@ -102,20 +102,19 @@ export async function bootApp() {
         }
 
         console.log("Starting webdav server...");
-        const webdavServer = WebdavServer.createServer(serverLaunchOptions);
+        const webdavServer = WebdavServer.createServer(serverLaunchOptions, app);
 
         await webdavServer.startAsync();
         console.log(color.green("WebDAV server started at port " + webdavPort + "."));
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            console.log(">> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method , arg.requested.path); 
+            app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            // console.log('<<', arg.response.statusMessage);
-            console.log("<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
+            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
             next();
         });
     }

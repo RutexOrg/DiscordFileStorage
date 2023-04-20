@@ -14,7 +14,8 @@
     "dotenv": "^16.0.3",
     "mime-types": "^2.1.35",
     "typed-emitter": "^2.1.0",
-    "webdav-server": "^2.6.2"
+    "webdav-server": "^2.6.2",
+    "winston": "^3.8.2"
   },
   "engines": {
     "node": ">=18",

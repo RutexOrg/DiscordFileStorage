@@ -4,6 +4,7 @@ import DiscordFileManager from './RemoteFileManager.js';
 import axios from './helper/AxiosInstance.js';
 import RemoteFile from './file/RemoteFile.js';
 import { VirtualFS } from './file/filesystem/Folder.js';
+import { make } from './Log.js';
 
 export interface DiscordFileStorageAppOptions extends ClientOptions {
     metaChannelName: string;
@@ -29,7 +30,7 @@ export default class DiscordFileStorageApp extends Client {
     private encryptPassword;
 
     public static instance: DiscordFileStorageApp;
-
+    private logger = make("DiscordFileStorageApp", true);
 
     constructor(options: DiscordFileStorageAppOptions, guildId: string) {
         super(options);
@@ -178,6 +179,12 @@ export default class DiscordFileStorageApp extends Client {
     public getDiscordFileManager(): DiscordFileManager {
         return this.discordFileManager;
     }
+
+
+    public getLogger() {
+        return this.logger;
+    }
+
 
     
 

@@ -10,6 +10,7 @@ export interface IUploadResult {
 
 export interface IWriteStreamCallbacks {
     onFinished: () => Promise<void>;
+    onCunkUploaded?: (chunkNumber: number, totalChunks: number) => Promise<void>;
 }
 
 export interface IDeleteResult extends IUploadResult {};

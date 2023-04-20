@@ -34,7 +34,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     private createDecryptor() {
         const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy: false
         });
         decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
             console.log("Decipher", err);
@@ -45,7 +44,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     private createEncryptor() {
         const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy: false
         });
         chiper.once("error", (err) => {
             console.log("Chiper", err);
@@ -70,11 +68,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _propertyManager(path: v2.Path, ctx: v2.PropertyManagerInfo, callback: v2.ReturnCallback<v2.IPropertyManager>): void {
         return callback(undefined, this.cPropertyManager);
-    }
-
-
-    private log(ctx: v2.RequestContext, from: string, data: any) {
-        console.log(new Date().toTimeString().split(' ')[0] + ` [${from}] ${data}`);
     }
 
     private shouldEncrypt(): boolean {
@@ -106,11 +99,21 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        this.log(ctx.context, ".readDir", path);
+        this.app.getLogger().info(".readDir", path.toString(), ctx);
+        
         const folder = this.fs.getFolderByPath(path.toString())!;
-        // folder.printHierarchyWithFiles(true, ".readDir");
 
-        return callback(undefined, folder.getAllEntries().map(e => {
+        const entires = folder.getAllEntries().filter(e => {
+            if (e.isFolder) {
+                return true;
+            }
+            if(e.isFile) {
+                const file = e.entry as (RemoteFile | RamFile);
+                return file.isMarkedDeleted() === false;
+            }
+        });
+        
+        return callback(undefined, entires.map(e => {
             return (e.entry as INamingHelper).getEntryName();
         }));
 
@@ -154,7 +157,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        this.log(ctx.context, ".openReadStream", path);
+        this.app.getLogger().info(".openReadStream", path.toString(), ctx);
         console.log(".openReadStream!!!", ctx.estimatedSize);
         console.log(".openReadStream!!!", ctx.targetSource);
         const entryInfo = this.fs.getEntryByPath(path.toString());
@@ -166,14 +169,14 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         console.log("read: ", file);
 
         if (file instanceof RamFile) {
-            this.log(ctx.context, ".openReadStream", "Opening ram file: " + path.toString());
+            this.app.getLogger().info(".openReadStream", "Opening ram file: " + path.toString());
             return callback(undefined, (file as RamFile).getReadable(true));
         }
 
         console.log(".openReadStream, fetching: ", file.toString());
         const pt = new PassThrough();
         const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
-        this.log(ctx.context, ".openReadStream", "Stream opened: " + path.toString());
+        this.app.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
 
 
         if (this.shouldEncrypt()) {
@@ -187,7 +190,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
-        this.log(ctx.context, ".create", path + ", " + (ctx.type.isFile ? "file" : "folder"));
+        this.app.getLogger().info(".create", path.toString(), ctx);
         if (ctx.type.isDirectory) {
             this.fs.createFolderHierarchy(path.toString());
             return callback();
@@ -224,11 +227,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         const pt = new PassThrough();        
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize, {
             onFinished: async () => {
-                this.log(ctx.context, ".openWriteStream", "File uploaded: " + path.toString());
+                this.app.getLogger().info(".openWriteStream", "File uploaded: " + path.toString());
                 await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
             },
         })
-        this.log(ctx.context, ".openWriteStream", "Stream opened: " + path.toString());
+        this.app.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
 
 
         if (this.shouldEncrypt()) {
@@ -242,7 +245,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
-        this.log(ctx.context, ".delete", path);
+        this.app.getLogger().info(".delete", path.toString(), ctx);
         const entryCheck = this.fs.getEntryByPath(path.toString());
         if (entryCheck.isUnknown) {
             return callback(Errors.Forbidden);
@@ -253,7 +256,9 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
                 this.fs.removeFolderHierarchy(entryCheck.entry as Folder);
                 return callback();
             } else {
-                return callback(Errors.Forbidden); // forcing the clients to delete files first
+                const entires = (entryCheck.entry as Folder).getallEntriesRecursiveThis();
+
+                // return callback(Errors.Forbidden); // forcing the clients to delete files first
             }
         }
 
@@ -276,7 +281,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // very, VERY dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        this.log(ctx.context, ".move", pathFrom + " | " + pathTo);
+        this.app.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), ctx);
 
         const sourceEntry = this.fs.getEntryByPath(pathFrom.toString());
         const targetEntry = this.fs.getEntryByPath(pathTo.toString());

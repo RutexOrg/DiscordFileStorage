@@ -25,11 +25,7 @@ export default class DiscordFileManager implements IFIleManager {
 
     private getAttachmentBuilderFromBuffer(buff: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt",) {
         const builder = new AttachmentBuilder(buff);
-        let name = (chunkNummer ? chunkNummer + "-" : "") + chunkName + (addExtension ? "." + extension : "");
-        if (encrypt) {
-            console.log("encrypting")
-            name += ".enc";
-        }
+        const name = (chunkNummer ? chunkNummer + "-" : "") + chunkName + (addExtension ? "." + extension : "") + (encrypt ? ".enc" : "");
 
         builder.setName(name);
         return builder;
@@ -92,7 +88,7 @@ export default class DiscordFileManager implements IFIleManager {
         console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
-                this.getAttachmentBuilderFromBufferWithoutExt((buffer as any).flush(), this.truncate(file.getFileName(), 15), chunkNumber, this.app.shouldEncryptFiles())
+                this.getAttachmentBuilderFromBufferWithoutExt(buffer.flush(), this.truncate(file.getFileName(), 15), chunkNumber, this.app.shouldEncryptFiles())
             ],
         });
 
@@ -123,8 +119,11 @@ export default class DiscordFileManager implements IFIleManager {
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
                 console.log("Writing chunk to buffer.")
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
-                    await this.uploadFileChunkAndAttachToFile((buffer as any), chunkNumber, totalChunks, filesChannel, file);
                     chunkNumber++;
+                    await this.uploadFileChunkAndAttachToFile(buffer, chunkNumber, totalChunks, filesChannel, file);
+                    if(userCallbacks.onCunkUploaded){
+                        await userCallbacks.onCunkUploaded(chunkNumber, totalChunks);
+                    }
                 }
                 buffer.write(chunk, encoding);
                 callback();
@@ -132,7 +131,7 @@ export default class DiscordFileManager implements IFIleManager {
             final: async (callback) => {
                 console.log("Finalizing upload.")
                 if (buffer.size > 0) {
-                    await this.uploadFileChunkAndAttachToFile((buffer as any), chunkNumber, totalChunks, filesChannel, file);
+                    await this.uploadFileChunkAndAttachToFile(buffer, chunkNumber, totalChunks, filesChannel, file);
                 }
                 buffer = null as any;
                 await userCallbacks.onFinished();
