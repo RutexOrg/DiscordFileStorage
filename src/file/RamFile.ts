@@ -13,7 +13,7 @@ export default class RamFile extends FileBase {
     private buffer: MutableBuffer;
 
     constructor(filename: string, totalSize: number, folder: Folder, maxSize: number = 128000 * 8, uploadedDate: Date = new Date()) {
-        super(filename, totalSize, folder, uploadedDate);
+        super(filename, totalSize, folder, uploadedDate, new Date());
         this.buffer = new MutableBuffer(maxSize);
         this.maxSize = maxSize;
     }
@@ -44,6 +44,10 @@ export default class RamFile extends FileBase {
 
     public getSize(): number {
         return this.buffer.size;
+    }
+
+    public getETag(): string {
+        return Math.random().toString().replace(".", "");
     }
 
     public toString(): string {

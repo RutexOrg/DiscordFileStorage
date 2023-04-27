@@ -109,12 +109,12 @@ export async function bootApp() {
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            // app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
+            // app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
             next();
         });
     }

@@ -3,7 +3,7 @@
  * Debugging helper to log all events emitted by the given emitter without having to manually add a listener for each event.
  * @param emitter The emitter to patch.
  */
-export const patchEmitter = (emitter: any) => {
+export const patchEmitter = (emitter: any, label: string = "default") => {
 	let oldEmit = emitter.emit;
 
 	emitter.emit = function () {
@@ -12,7 +12,7 @@ export const patchEmitter = (emitter: any) => {
 
 		switch (eventName) {
 			default: {
-				console.log("event: " + eventName, "\n", Array.from(emitArgs).splice(0, 2));
+				console.log("["+label+"] event: " + eventName, "\n", Array.from(emitArgs).splice(0, 2));
 			}
 		}
 

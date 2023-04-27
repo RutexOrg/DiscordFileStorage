@@ -13,9 +13,8 @@ export default abstract class FileBase implements INamingHelper {
     private modifyDate: Date;
     private folder: Folder;
     private markedDeleted: boolean = false;
-    private etag: string = "";
 
-    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date = new Date(), lastChangedDate: Date = new Date()) {
+    constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date, lastChangedDate: Date) {
         this.filename = filename;
         this.totalSize = totalSize;
         this.creationDate = uploadedDate;
@@ -42,27 +41,27 @@ export default abstract class FileBase implements INamingHelper {
     }
 
     public setFolder(folder: Folder, updateParents: boolean = false): void {
-        if(updateParents && this.folder != null) {
+        if (updateParents && this.folder != null) {
             this.folder.removeFile(this);
             this.folder = folder;
             folder.addFile(this);
-        }else{
+        } else {
             this.folder = folder;
         }
     }
 
     public getAbsolutePath(): string {
-        if(this.folder == null) {
+        if (this.folder == null) {
             throw new Error("Folder is null");
         }
         return this.folder.getAbsolutePath() + this.getFileName();
     }
-    
+
     public getEntryName(): string {
         return this.filename;
     }
 
-    
+
     public getFileName(): string {
         return this.filename;
     }
@@ -100,17 +99,14 @@ export default abstract class FileBase implements INamingHelper {
         this.totalSize = totalSize;
     }
 
-    public getEtag(): string {
-        return this.etag;
-    }
-
-    public setEtag(etag: string): void {
-        this.etag = etag;
+    public getETag(): string {
+        return this.modifyDate.getTime() + "-" + this.getSize();
     }
 
     public getMimeType(): string {
         return mime.lookup(this.filename) || "application/octet-stream";
     }
+
 
     /**
      *  Removes this file from the folder and returns the folder.
@@ -123,5 +119,5 @@ export default abstract class FileBase implements INamingHelper {
     }
 
 
-    
+
 }

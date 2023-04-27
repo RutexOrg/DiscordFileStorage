@@ -1,7 +1,7 @@
 import FileBase from "./FileBase.js";
 import Folder, { VirtualFS } from "./filesystem/Folder.js";
 
-export interface IAttachmentInfo {
+export interface IChunkInfo {
     id: string;
     url: string;
     proxyUrl: string;
@@ -14,7 +14,7 @@ export interface IRemoteFile {
     folder: string;
     uploadDate: Date;
     modifiedDate: Date;
-    attachmentInfos: IAttachmentInfo[];
+    attachmentInfos: IChunkInfo[];
     filesPostedInChannelId: string;
     metaIdInMetaChannel: string;
     metaVersion: number;
@@ -25,26 +25,26 @@ export interface IRemoteFile {
  */
 export default class RemoteFile extends FileBase {
 
-    private attachmentInfos: IAttachmentInfo[] = [];
+    private chunks: IChunkInfo[] = [];
     private filesPostedInChannelId: string = "";
     private messageMetaIdInMetaChannel: string = "";
     private metaVersion: number = 0;
 
 
     constructor(filename: string, totalSize: number, folder: Folder, uploadedDate: Date) {
-        super(filename, totalSize, folder, uploadedDate);
+        super(filename, totalSize, folder, uploadedDate, new Date());
     }
 
-    public getAttachmentInfos(): IAttachmentInfo[] {
-        return this.attachmentInfos;
+    public getChunks(): IChunkInfo[] {
+        return this.chunks;
     }
 
-    public addAttachmentInfo(discordMessageId: IAttachmentInfo): void {
-        this.attachmentInfos.push(discordMessageId);
+    public addChunk(discordMessageId: IChunkInfo): void {
+        this.chunks.push(discordMessageId);
     }
 
-    public setAttachmentInfos(attachmentInfos: IAttachmentInfo[]): void {
-        this.attachmentInfos = attachmentInfos;
+    public setChunks(attachmentInfos: IChunkInfo[]): void {
+        this.chunks = attachmentInfos;
     }
 
     public getFilesPostedInChannelId(): string {
@@ -65,7 +65,7 @@ export default class RemoteFile extends FileBase {
 
 
     public cleanAttachmentInfos(): void {
-        this.attachmentInfos = [];
+        this.chunks = [];
     }
 
 
@@ -100,27 +100,34 @@ export default class RemoteFile extends FileBase {
             metaIdInMetaChannel: this.getMessageMetaIdInMetaChannel(),
             metaVersion: this.metaVersion,
             folder: this.getAbsolutePath(),
-            attachmentInfos: this.getAttachmentInfos(),
+            attachmentInfos: this.getChunks(),
         };
     }
     
     public static fromObject(obj: IRemoteFile, root: VirtualFS): RemoteFile {
         let folder = root.getRoot().prepareFileHierarchy(obj.folder);
         const file = new RemoteFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
+        console.dir(obj);
         file.setModifyDateDate(new Date(obj.modifiedDate ?? obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
-        file.setAttachmentInfos(obj.attachmentInfos);
+        file.setChunks(obj.attachmentInfos);
+
+        console.log("setup file", file);
 
         return file;
     }
 
 
+    public isPosted(): boolean {
+        return !!this.messageMetaIdInMetaChannel
+    }
+    
     public isUploaded(): boolean {
-        return (this.attachmentInfos.length > 0 && !!this.messageMetaIdInMetaChannel);
+        return (this.chunks.length > 0 && !!this.messageMetaIdInMetaChannel);
     }
 
     public toString(): string {
-        return "RemoteFile: " + this.getEntryName() + " (" + this.getSize() + " bytes), ("+this.getAbsolutePath()+"), with " + this.attachmentInfos.length + " attachment(s)";
+        return "RemoteFile: " + this.getEntryName() + " (" + this.getSize() + " bytes), ("+this.getAbsolutePath()+"), with " + this.chunks.length + " attachment(s)";
     }
 
     

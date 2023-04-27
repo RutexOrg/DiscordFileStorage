@@ -1,16 +1,16 @@
-import RemoteFile from "./RemoteFile";
+import RemoteFile from "./file/RemoteFile";
 import { Readable, Writable } from "stream";
 
 
 export interface IUploadResult {
     success: boolean;
     message: string;
-    file: RemoteFile;
+    file: RemoteFile | null;
 }
 
 export interface IWriteStreamCallbacks {
-    onFinished: () => Promise<void>;
-    onCunkUploaded?: (chunkNumber: number, totalChunks: number) => Promise<void>;
+    onFinished?: () => Promise<void>;
+    onChunkUploaded?: (chunkNumber: number, totalChunks: number) => Promise<void>;
 }
 
 export interface IDeleteResult extends IUploadResult {};
@@ -22,6 +22,6 @@ export default interface IFIleManager {
     postMetaFile(file: RemoteFile): Promise<IUploadResult>;
     updateMetaFile(file: RemoteFile): Promise<IUploadResult>;
 
-    deleteFile(file: RemoteFile): Promise<IDeleteResult>;
+    deleteFile(file: RemoteFile, headerOnly: boolean): Promise<IDeleteResult>;
     renameFile(file: RemoteFile, newName: string): Promise<IUploadResult>;
 }

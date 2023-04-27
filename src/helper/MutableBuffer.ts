@@ -89,6 +89,7 @@ export class BaseMutableBuffer {
     this.clear();
     return result;
   }
+  
 
   write(source: WriteData, encoding?: BufferEncoding): number;
   write(source: WriteData, ...args: any[]): number;

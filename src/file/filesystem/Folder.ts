@@ -52,6 +52,10 @@ export default class Folder {
         this.parent = parent;
     }
 
+    public static createRoot(): Folder {
+        return new Folder("");
+    }
+
     public getName(): string {
         return this.name;
     }
@@ -270,6 +274,7 @@ export default class Folder {
     }
 
 
+
     public createFolderHierarchy(path: string): Folder {
         if (!path.startsWith("/")) {
             throw new Error("Path should start with /");
@@ -483,7 +488,7 @@ export class VirtualFS {
     private root: Folder;
 
     constructor() {
-        this.root = new Folder("", null);
+        this.root = Folder.createRoot();
     }
 
     public getRoot(): Folder {
