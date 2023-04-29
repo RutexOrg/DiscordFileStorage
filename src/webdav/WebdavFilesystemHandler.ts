@@ -231,10 +231,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
 
-        // do not close stream on end. we need to wait for upload to finish.
         const pt = new PassThrough();
-
-
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize, {
             onFinished: async () => {
                 this.app.getLogger().info(".openWriteStream", "File uploaded: " + path.toString());
@@ -242,19 +239,14 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             },
         });
 
-        // patchEmitter(pt, "pt");
-        // patchEmitter(writeStream, "writeStream");
-
         this.app.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
 
 
         if (this.shouldEncrypt()) {
-            pt.pipe(this.createEncryptor(), { end: false }).pipe(writeStream);
+            callback(undefined, pt.pipe(this.createEncryptor()).pipe(writeStream));
         } else {
-            pt.pipe(writeStream);
+            callback(undefined, pt.pipe(writeStream));
         }
-
-        callback(undefined, pt);
     }
 
 

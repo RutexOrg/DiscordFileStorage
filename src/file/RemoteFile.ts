@@ -107,12 +107,12 @@ export default class RemoteFile extends FileBase {
     public static fromObject(obj: IRemoteFile, root: VirtualFS): RemoteFile {
         let folder = root.getRoot().prepareFileHierarchy(obj.folder);
         const file = new RemoteFile(obj.filename, obj.totalSize, folder, new Date(obj.uploadDate));
-        console.dir(obj);
         file.setModifyDateDate(new Date(obj.modifiedDate ?? obj.uploadDate));
         file.setFilesPostedInChannelId(obj.filesPostedInChannelId);
         file.setChunks(obj.attachmentInfos);
-
-        console.log("setup file", file);
+        
+        // console.dir(obj);
+        // console.log("setup file", file);
 
         return file;
     }

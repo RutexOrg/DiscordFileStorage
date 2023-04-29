@@ -131,15 +131,17 @@ export default class DiscordFileManager implements IFIleManager {
                 callback();
             },
             final: async (callback) => {
-                console.log("Finalizing upload.")
+                console.log("final() Finalizing upload.")
                 if (buffer.size > 0) {
                     await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
                 }
-                
+
+                console.log("final() uploaded .")                
                 if(callbacks.onFinished){
                     await callbacks.onFinished();
                 }
-                console.log("final() write stream finished.")
+
+                console.log("final() write stream finished, onFinished() called.")
                 callback();
             }
         });
