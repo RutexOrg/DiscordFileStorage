@@ -199,12 +199,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
         if (this.shouldEncrypt()) {
-            readStream.pipe(this.createDecryptor()).pipe(pt);
+            callback(undefined, readStream.pipe(this.createDecryptor()).pipe(pt));
+            // readStream.pipe(this.createDecryptor()).pipe(pt);
         } else {
-            readStream.pipe(pt);
+            callback(undefined, readStream.pipe(pt));
+            // readStream.pipe(pt);
         }
-
-        callback(undefined, pt);
+        // callback(undefined, pt);
     }
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
