@@ -121,11 +121,11 @@ export default class DiscordFileManager implements IFIleManager {
         return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
-                    currentChunkNumber++;
                     await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
                     if (callbacks.onChunkUploaded) {
                         await callbacks.onChunkUploaded(currentChunkNumber, totalChunks);
                     }
+                    currentChunkNumber++;
                 }
                 buffer.write(chunk, encoding);
                 callback();

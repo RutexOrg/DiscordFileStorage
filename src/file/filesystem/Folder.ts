@@ -273,7 +273,16 @@ export default class Folder {
         }
     }
 
+    public preparePath(path: string): string[] {
+        const paths = path.split("/");
+        paths.shift();
 
+        if (paths.length == 0) {
+            throw new Error("Path cannot be empty");
+        }
+        return paths;
+    }
+        
 
     public createFolderHierarchy(path: string): Folder {
         if (!path.startsWith("/")) {
@@ -282,9 +291,7 @@ export default class Folder {
         const paths = path.split("/");
         paths.shift();
 
-        if (paths.length == 0) {
-            throw new Error("Path cannot be empty");
-        }
+
 
         let currentFolder: Folder = this;
         for (let i = 0; i < paths.length; i++) {
@@ -307,7 +314,7 @@ export default class Folder {
         if (folder.getFiles().find(file => file.getFileName() == filename)) {
             throw new Error("File with name " + filename + " already exists");
         }
-        console.log(".createRAMFileHierarchy, File path: " + path + "/" + filename);
+        // console.log(".createRAMFileHierarchy, File path: " + path + "/" + filename);
         return new RamFile(filename, 0, folder, undefined, creationDate);
     }
 

@@ -10,7 +10,7 @@ import path from "path";
 import crypro from "crypto";
 import axios from "../src/helper/AxiosInstance.js";
 import { patchEmitter } from "../src/helper/EventPatcher.js";
-import safeSetup, { randomString, sleep, md5 } from "./helper.js";
+import safeSetup, { randomString, md5 } from "./helper.js";
 
 const DOMAIN = "localhost";
 const PORT = 3000;
@@ -125,7 +125,7 @@ describe("DICloud basic functions test", function () {
 			const fsReadableStream = fs.createReadStream(localGeneratedFilePath);
 
 			const fileUploaded = await client.putFileContents(`${remoteFolderName}/testfile.txt`, fsReadableStream);
-			await sleep(500);
+			// await sleep(500);
 
 			if (fileUploaded) {
 				resolve();
@@ -166,7 +166,7 @@ describe("DICloud basic functions test", function () {
 		console.log("put new file contents");
 
 		let success = await client.putFileContents(`${remoteFolderName}/testfile.txt`, "Hello World");
-		await sleep(1000);
+		// await sleep(1000);
 		assert.equal(success, true);
 	});
 
@@ -350,7 +350,7 @@ describe("DICloud basic functions test", function () {
 		await client.createDirectory("/tests_dir");
 		await client.putFileContents("/tests_dir/test1.txt", "test1");
 		await client.putFileContents("/tests_dir/test2.txt", "test1");
-		await sleep(2000);
+		// await sleep(2000);
 
 		let test1UploadedContent = await client.getFileContents("/tests_dir/test1.txt") as string;
 		let test2UploadedContent = await client.getFileContents("/tests_dir/test2.txt") as string;

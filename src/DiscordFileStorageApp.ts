@@ -156,7 +156,7 @@ export default class DiscordFileStorageApp extends Client {
                 let file = (await axios.get(msg.attachments.first()!.url)).data as object;
 
                 console.log("Loading file " + i + "/" + messages.length + " " + msg.attachments.first()!.name);
-
+                console.log(file);
                 if (RemoteFile.isValidRemoteFile(file)) {
                     const remoteFile = RemoteFile.fromObject(file as any, this.filesystem);
                     remoteFile.setMessageMetaIdInMetaChannel(msg.id);

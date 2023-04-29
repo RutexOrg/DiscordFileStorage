@@ -93,16 +93,15 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
         if (entryInfo.isFolder) {
-            return callback(Errors.InvalidOperation); // TODO: some client (e.g. filezilla) tries to get size of folder. This is not supported yet.
+            return callback(undefined, (entryInfo.entry as Folder).getTotalSize());
         }
+
         const file = entryInfo.entry as (RemoteFile | RamFile);
         return callback(undefined, file.getSize());
     }
 
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
-        return callback(undefined, [
-            new v2.LockKind(v2.LockScope.Exclusive, v2.LockType.Write),
-        ]);
+        return callback(undefined, []);
     }
 
 
