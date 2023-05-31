@@ -1,6 +1,9 @@
 out/
 node_modules/
 .env
+.env-local
+.env-prod
+log.txt
 certs/
 runner.ts
 yarn-error.log

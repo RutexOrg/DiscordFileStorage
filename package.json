@@ -9,7 +9,6 @@
     "axios": "^1.3.6",
     "axios-retry": "^3.4.0",
     "colors": "^1.4.0",
-    "debug": "^4.3.4",
     "discord.js": "^14.9.0",
     "dotenv": "^16.0.3",
     "mime-types": "^2.1.35",
@@ -27,7 +26,8 @@
     "build": "tsc",
     "test": "yarn build && mocha --no-warnings out/tests/",
     "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
-    "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test"
+    "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test",
+    "clear": "del /s /q out"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",

@@ -26,7 +26,7 @@ export default class DiscordFileStorageApp extends Client {
     private discordFileManager: DiscordFileManager;
     private filesystem: VirtualFS = new VirtualFS();
 
-    private shouldEncrypt: boolean = false;
+    private shouldEncrypt;
     private encryptPassword;
 
     public static instance: DiscordFileStorageApp;
@@ -47,11 +47,12 @@ export default class DiscordFileStorageApp extends Client {
         this.metaChannelName = options.metaChannelName;
         this.filesChannelId = options.filesChannelName;
 
+        this.shouldEncrypt = options.shouldEncrypt;
+        this.encryptPassword = options.encryptPassword ?? "";
+
         this.guildId = guildId;
         this.discordFileManager = new DiscordFileManager(this);
 
-        this.shouldEncrypt = options.shouldEncrypt;
-        this.encryptPassword = options.encryptPassword ?? "";
     }
 
     public shouldEncryptFiles(): boolean {
@@ -144,6 +145,8 @@ export default class DiscordFileStorageApp extends Client {
      */
     public async loadFiles() {
         console.log(color.yellow("Fetching files... This may take a while if there are a lot of files"))
+        let totalLoadedFiles = 0;
+        let failedFiles = 0;
 
         const metaDataChannelId = (await this.getMetadataChannel()).id;
         let messages = (await this.getAllMessages(metaDataChannelId));
@@ -165,11 +168,19 @@ export default class DiscordFileStorageApp extends Client {
                 } else {
                     console.log("Failed to extract valid message data");
                     console.log(file);
+                    failedFiles++;
                 }
+                totalLoadedFiles++;
             } else {
                 console.log("Message has no attachments");
             }
         }
+
+        console.log(); // little bit debug
+        console.log("Readen " + totalLoadedFiles + " files");
+        console.log("Success loadeded " + (totalLoadedFiles - failedFiles) + " / " + totalLoadedFiles + " files. " + "(" +( totalLoadedFiles - failedFiles) / totalLoadedFiles * 100 + "%)")
+        console.log();
+
     }
 
     public async sleep(ms: number) {

@@ -30,7 +30,9 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 		transports: [] as any[]
 	}
 
-	logger.transports.push(new transports.File({filename: path.join(process.cwd(), "logs", loggerName + ".log")}))
+	if(process.env.FILE_LOGGING_ENABLED) {
+		logger.transports.push(new transports.File({filename: path.join(process.cwd(), "logs", loggerName + ".log")}))
+	}
 
 	if (logToConsole) {
 		logger.transports.push(new transports.Console())

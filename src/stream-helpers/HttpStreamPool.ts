@@ -68,10 +68,6 @@ export default class HttpStreamPool {
 			// print download progress in percentage each 10%. at 0, 10, 20, 30, ... 100%
 			res.data.on("data", (chunk: Buffer) => {
 				self.gotSize += chunk.length;
-				if (self.gotSize / self.totalSize * 100 % 30 < 0.1) {
-					console.log("got: " + self.gotSize + " of " + self.totalSize + " bytes from url: [" + url.url + "]");
-				}
-
 				stream.emit("progress", self.gotSize, self.totalSize);
 			});
 
