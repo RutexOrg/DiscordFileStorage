@@ -40,7 +40,7 @@ export default class DiscordFileManager implements IFIleManager {
         const metaChannel = await this.app.getMetadataChannel();
 
         let msg = await metaChannel.send("Uploading file meta...");
-        console.log(".postMetaFile() - msg.id: " + msg.id + " - file: " + file.getFileName());
+        this.app.getLogger().info(".postMetaFile() - msg.id: " + msg.id + " - file: " + file.getFileName());
         file.setMessageMetaIdInMetaChannel(msg.id);
 
         await msg.edit({
@@ -56,7 +56,7 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     public async updateMetaFile(file: RemoteFile): Promise<IUploadResult> {
-        console.log(".updateMetaFile() - file: " + file.getFileName(), file.toString());
+        this.app.getLogger().info(".updateMetaFile() - file: " + file.getFileName(), file.toString());
         if (!file.isUploaded()) {
             throw new Error("File is not valid: seems like it was not uploaded to discord yet.");
         }
@@ -87,21 +87,21 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: RemoteFile) {
-        console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
+        this.app.getLogger().info(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
                 this.getAttachmentBuilderFromBufferWithoutExt(buffer.flush(), this.truncate(file.getFileName(), 15), chunkNumber, this.app.shouldEncryptFiles())
             ],
         });
 
-        console.log(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
+        this.app.getLogger().info(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
         file.addChunk({
             id: message.id,
             url: message.attachments.first()!.url,
             proxyUrl: message.attachments.first()!.proxyURL,
             length: buffer.size,
         });
-        console.dir(file.getChunks())
+        this.app.getLogger().info(file.getChunks())
     }
 
     private createDecryptor(autoDestroy = true) {
@@ -129,20 +129,29 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     public async getDownloadableReadStream(file: RemoteFile): Promise<Readable> {
-        console.log(".getDownloadableReadStream() - file: " + file.getFileName());
+        this.app.getLogger().info(".getDownloadableReadStream() - file: " + file.getFileName());
+        const stream = (await (new HttpStreamPool(structuredClone(file.getChunks()), file.getSize(), file.getEntryName())).getDownloadStream());
 
-        return (await (new HttpStreamPool(structuredClone(file.getChunks()), file.getSize(), file.getEntryName())).getDownloadStream()).pipe(this.createDecryptor());
+        if (!this.app.shouldEncryptFiles()) {
+            return stream;
+        }
+
+        return stream.pipe(this.createDecryptor());
     }
 
 
     public async getUploadWritableStream(file: RemoteFile, size: number, callbacks: IWriteStreamCallbacks): Promise<Writable> {
-        console.log(".getUploadWritableStream() - file: " + file.getFileName());
+        this.app.getLogger().info(".getUploadWritableStream() - file: " + file.getFileName());
+
         const filesChannel = await this.app.getFileChannel();
         const totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
+        const buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
+
+
         let currentChunkNumber = 1;
+
         file.setFilesPostedInChannelId(filesChannel.id);
 
-        const buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
 
         const write = new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
@@ -157,17 +166,17 @@ export default class DiscordFileManager implements IFIleManager {
                 callback();
             },
             final: async (callback) => {
-                console.log("final() Finalizing upload.")
+                this.app.getLogger().info("final() Finalizing upload.")
                 if (buffer.size > 0) {
                     await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
                 }
 
-                console.log("final() uploaded .")
+                this.app.getLogger().info("final() uploaded .")
                 if (callbacks.onFinished) {
                     await callbacks.onFinished();
                 }
 
-                console.log("final() write stream finished, onFinished() called.")
+                this.app.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
             }
         });
@@ -197,12 +206,14 @@ export default class DiscordFileManager implements IFIleManager {
         });
 
         write.on("error", (err) => {
-            console.log("write.on('error')", err);
+            this.app.getLogger().info("write.on('error')", err);
+            pt.destroy();
             enc.destroy();
         });
 
         write.on("finish", () => {
             pt.end();
+            enc.destroy();
         });
 
         return pt;

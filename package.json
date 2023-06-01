@@ -27,7 +27,7 @@
     "test": "yarn build && mocha --no-warnings out/tests/",
     "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
     "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test",
-    "clear": "del /s /q out"
+    "del": "del /s /q out"
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",

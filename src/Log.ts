@@ -9,6 +9,7 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 	}
 
 	// thx to https://github.com/winstonjs/winston/issues/1427#issuecomment-540417212
+	
 	const logger = {
 		levels: config.syslog.levels,
 		format: format.combine(
@@ -16,7 +17,7 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 			format.printf((info: any) => {
 				const timestamp = info.timestamp.trim();
 				const level = info.level;
-				const message = (info.message || '').trim();
+				const message = (info && info.message ? info.message : "")
 				const args = info[Symbol.for('splat')];
 				const strArgs = (args || []).map((arg: any) => {
 					return util.inspect(arg, {

@@ -36,31 +36,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
     private fs: Folder;
 
-    private createDecryptor(autoDestroy = true) {
-        const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy,
-        });
-
-        decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
-            this.app.getLogger().info("Decipher", err);
-        });
-
-        return decipher;
-    }
-
-    private createEncryptor(autoDestroy = true) {
-        const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy,
-
-        });
-
-        chiper.once("error", (err) => {
-            this.app.getLogger().info("Chiper", err);
-        });
-
-        return chiper;
-    }
-
     constructor(client: DiscordFileStorageApp) {
         super(new VirtualDiscordFileSystemSerializer());
         this.app = client;
@@ -174,7 +149,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
         this.app.getLogger().info(".openReadStream", path.toString(), ctx);
         this.app.getLogger().info(".openReadStream!!!", ctx.estimatedSize);
-        this.app.getLogger().info(".openReadStream!!!", ctx.targetSource);
         const entryInfo = this.fs.getEntryByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
             return callback(Errors.ResourceNotFound);
