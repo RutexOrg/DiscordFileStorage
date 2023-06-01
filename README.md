@@ -16,7 +16,7 @@
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
-Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 7 GB in multifile mode.
+Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 7 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
