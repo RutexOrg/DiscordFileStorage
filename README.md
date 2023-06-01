@@ -16,20 +16,20 @@
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
-Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 1 GB in multifile mode.
+Yes, even ***above 8MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 7 GB in multifile mode.
 
 Supported functions: 
-- Manage files (Upload, Download, Delete, Rename, Move, Modify) \
+- Manage files (Upload, Download, Delete, Rename, Move, Modify)
 - Manage folders (Create, Delete, Rename, Move)
 
-Please look at the [Known issues](#known-issues) section for more information.
-
 # State and details
-Not even alpha. **Created for fun**. Dont use it in production, since it *active development* and *contains bugs*.  Use it only for testing and playing around.
-
-Has been tested __MAINLY on Windows 10__ and on __dolphin UNIX explorer__.
+Not even alpha. **Created for fun and ONLY for fun**. Dont use it in production, since it *active development* and *contains bugs, LOT of _bugs_*.  Use it only for testing and playing around.
 
 Please look at the [Known issues](#known-issues) section for more information.
+
+
+Has been tested __MAINLY__ on Windows 10 and on some third party webdav clients, like OwlFiles, WinSCP, dolphin. 
+
 
 # How to setup and play with this
 
@@ -52,7 +52,7 @@ Copy the link and visit it. Follow the instructions to invite the bot to your se
 1. Install [NodeJS (Tested on 18)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
-4. Create a file named ``.env`` in the root of the project. There example of the file named as ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
+4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
 5. To run the bot, run ``yarn start``. This will compile the project and start the bot.
 
 ## SSL
@@ -61,7 +61,7 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 
 
 1. Generate a certificate.
-2. Rename your certificate to ``cert.pem`` and your private key to ``privKey.pem``) and if you have chain certificate, rename it to ``chain.pem``.
+2. Rename your certificate to ``cert.pem`` and your private key to ``privKey.pem`` and if you have chain certificate, rename it to ``chain.pem``.
 3. Put your certificate and private key to ``certs`` folder. (You have to create manually, its included in ``.gitignore``).
 4. Enable HTTPS in ``.env`` file. Set ``ENABLE_HTTPS`` to ``true``.
 
@@ -69,7 +69,8 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
-2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. **Warning**. If you lose this password, you will not be able to decrypt your files.
+2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. \
+**WARNING**. If you lose this password, you will not be able to decrypt your files.
 
 
 
@@ -99,10 +100,13 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 3. Empty folders and newly created files without content will be deleted between restarts, since they cached only in memory.  **WILL BE FIXED IN FUTURE**, not a priority for now.
 
 
-3. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
+4. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
 This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit. Script may be found in: ***scripts/webdav.reg*** \
 If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
 **You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
 
 
-4. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+5. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+
+6. Uploading and downloading big files (~1GB+) is working unstable, so if you really need it, split big file into smaller chunks (lets say 100MB, with any archiver like [7zip](https://www.7-zip.org/) or [WinRAR](https://www.rarlab.com/)) and upload them one by one. After downloading, you can merge them back.  \
+For now no other solution for this, sorry. 
