@@ -122,6 +122,7 @@ export async function bootApp() {
     return app;
 }
 
+
 export function checkIfFileExists(path: string, soft: boolean, assertString: string = ""): boolean {
     try {
         if (!fs.statSync(path).isFile()) {

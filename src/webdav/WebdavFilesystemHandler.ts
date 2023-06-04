@@ -5,7 +5,7 @@ import DiscordFileStorageApp from "../DiscordFileStorageApp.js";
 import RemoteFile, { IChunkInfo } from "../file/RemoteFile.js";
 import RamFile from "../file/RamFile.js";
 import Folder from "../file/filesystem/Folder.js";
-import { INamingHelper } from "../file/filesystem/INamingHelper.js";
+import { IResourceHelper } from "../file/filesystem/IResourceHelper.js";
 import { patchEmitter } from "../helper/EventPatcher.js";
 import FileBase from "../file/FileBase.js";
 
@@ -14,7 +14,7 @@ function getContext(ctx: v2.IContextInfo) {
     return {
         host: ctx.context.headers.host,
         contentLength: ctx.context.headers.contentLength,
-        useragent : ctx.context.headers.find("user-agent", "unkown useragent"),
+        useragent: ctx.context.headers.find("user-agent", "unkown useragent"),
         uri: ctx.context.requested.uri,
     }
 }
@@ -47,9 +47,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.fs = this.app.getFileSystem().getRoot();
     }
 
-    public getFs(): Folder {
-        return this.fs;
-    }
 
     protected _lockManager(path: v2.Path, ctx: v2.LockManagerInfo, callback: v2.ReturnCallback<v2.ILockManager>): void {
         return callback(undefined, this.cLockManager);
@@ -59,112 +56,98 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, this.cPropertyManager);
     }
 
-    protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        const entryInfo = this.fs.getEntryByPath(path.toString());
-        if (path.isRoot()) {
-            return callback(undefined, this.fs.getTotalSize());
-        }
-
-        if (entryInfo.isUnknown) {
-            return callback(Errors.ResourceNotFound);
-        }
-        if (entryInfo.isFolder) {
-            return callback(undefined, (entryInfo.entry as Folder).getTotalSize());
-        }
-
-        const file = entryInfo.entry as FileBase;
-        return callback(undefined, file.getSize());
-    }
-
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
         return callback(undefined, []);
     }
 
+    public getFs(): Folder {
+        return this.fs;
+    }
+
+    protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
+        const entry = this.fs.getEntryByPath(path.toString());
+
+        if (entry.isFolder) {
+            return callback(undefined, this.fs.getallEntriesRecursiveThis().filter(e => e.isFile).map(e => e.entry as FileBase).reduce((prev, cur) => prev + cur.getSize(), 0))
+        }
+
+        if (entry.isFile) {
+            return callback(undefined, (entry.entry as FileBase).getSize())
+        }
+
+        return callback(Errors.ResourceNotFound)
+    }
+
+
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.app.getLogger().info(".readDir", path.toString(), getContext(ctx));
+        const entry = this.fs.getEntryByPath(path.toString());
 
-        const folder = this.fs.getFolderByPath(path.toString())!;
+        if (entry.isFolder) {
+            return callback(undefined, (entry.entry as Folder).getAllEntries().map(e => (e.entry as IResourceHelper).getEntryName()));
+        }
 
-        const entires = folder.getAllEntries().filter(e => {
-            if (e.isFolder) {
-                return true;
-            }
-            if (e.isFile) {
-                const file = e.entry as FileBase;
-                return file.isMarkedDeleted() === false;
-            }
-        });
-
-        return callback(undefined, entires.map(e => {
-            return (e.entry as INamingHelper).getEntryName();
-        }));
-
+        return callback(Errors.ResourceNotFound);
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
-        // this.app.getLogger().info(ctx.context.user);
-        const entryInfo = this.fs.getEntryByPath(path.toString());
+        // this.app.getLogger().info(".type", path.toString(), getContext(ctx));
+        const entry = this.fs.getEntryByPath(path.toString());
 
-        let resType: ResourceType;
-        if (entryInfo.isFile) {
+        let resType = ResourceType.NoResource;
+        if (entry.isFile) {
             resType = ResourceType.File;
-        } else if (entryInfo.isFolder) {
+        } else if (entry.isFolder) {
             resType = ResourceType.Directory;
-        } else {
-            resType = ResourceType.NoResource
         };
+
         return callback(undefined, resType);
     }
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
-        // this.log(ctx.context, ".mimeType", path);
-        const entryInfo = this.fs.getEntryByPath(path.toString());
-        if (entryInfo.isUnknown || entryInfo.isFolder) {
+        // this.app.getLogger().info(".mimeType", path.toString(), getContext(ctx));
+        const entry = this.fs.getEntryByPath(path.toString());
+        if (entry.isUnknown || entry.isFolder) {
             return callback(Errors.NoMimeTypeForAFolder)
         }
 
-        return callback(undefined, (entryInfo.entry as FileBase).getMimeType());
+        return callback(undefined, (entry.entry as FileBase).getMimeType());
 
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
-        const existsCheckState = this.fs.getEntryByPath(path.toString());
-        // //this.log(".fastExistCheck", exists + " | " + path.toString());
-        if (existsCheckState.isUnknown) {
-            return callback(false);
-        }
+        // this.app.getLogger().info(".fastExistCheck", path.toString(), getContext(ctx));
 
-        return callback((existsCheckState.isFile || existsCheckState.isFolder) ?? false);
+        return callback(!this.fs.getEntryByPath(path.toString()).isUnknown);
     }
 
     _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         this.app.getLogger().info(".create", path.toString(), getContext(ctx));
         if (ctx.type.isDirectory) {
             this.fs.createFolderHierarchy(path.toString());
-            return callback();
         } else {
             this.fs.createRAMFileHierarchy(path.toString(), path.fileName(), new Date());
-            return callback();
         }
+        return callback();
     }
 
 
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        this.app.getLogger().info(".openReadStream", path.toString(), getContext(ctx));
-        this.app.getLogger().info(".openReadStream!!!", ctx.estimatedSize);
-        const entryInfo = this.fs.getEntryByPath(path.toString());
-        if (entryInfo.isUnknown || entryInfo.isFolder) {
+        this.app.getLogger().info(".openReadStream (path, estimatedSize, ctx)", path.toString(), ctx.estimatedSize, getContext(ctx));
+        const entry = this.fs.getEntryByPath(path.toString());
+
+        if (entry.isUnknown || entry.isFolder) {
             return callback(Errors.ResourceNotFound);
         }
 
-        const file = entryInfo.entry as FileBase;
+        const file = entry.entry as FileBase;
         this.app.getLogger().info("read: ", file);
 
         if (file instanceof RamFile) {
             this.app.getLogger().info(".openReadStream", "Opening ram file: " + path.toString());
-            return callback(undefined, (file as RamFile).getReadable(true));
+            return callback(undefined, (file as RamFile).getReadable());
         }
 
         this.app.getLogger().info(".openReadStream, fetching: ", file.toString());
@@ -174,22 +157,24 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, readStream);
     }
 
-
-
-
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         const { targetSource, estimatedSize, mode } = ctx;
         this.app.getLogger().info(".openWriteStream", targetSource, estimatedSize, mode, "shouldEncrypt: ", this.app.shouldEncryptFiles());
 
-        const entryInfo = this.fs.getEntryByPath(path.toString());
-        let file = entryInfo.entry as FileBase;
+        const entry = this.fs.getEntryByPath(path.toString());
 
+        if(entry.isUnknown || entry.isFolder) {
+            return callback(Errors.InvalidOperation);
+        }
+
+        let file = entry.entry as FileBase;
 
         // looks like most managers does not provide estimated size on  newly created file. 
         // So we put it into ram to be able to say that file is created and give it back to open on client to allow modify it without have user to wait for initial upload.
-        if (ctx.estimatedSize == -1 && entryInfo.entry instanceof RamFile) {
+        // TODO: debug for big sizes.
+        if (ctx.estimatedSize == -1 && entry.entry instanceof RamFile) {
             this.app.getLogger().info(".openWriteStream, ram file created: ", file.getAbsolutePath());
-            return callback(undefined, entryInfo.entry.getWritable());
+            return callback(undefined, entry.entry.getWritable());
         }
 
         // at this point we need to update file with new attachments. since discord does not allow to update attachments, we need to delete old one and upload new one.
@@ -199,7 +184,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
-
 
         const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file as RemoteFile, ctx.estimatedSize, {
             onFinished: async () => {
@@ -219,7 +203,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.app.getLogger().info(".delete", path.toString(), getContext(ctx));
         const entry = this.fs.getEntryByPath(path.toString());
         if (entry.isUnknown) {
-            return callback(Errors.Forbidden);
+            return callback(Errors.InvalidOperation);
         }
 
         if (entry.isFolder) {
@@ -245,12 +229,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             await this.app.getDiscordFileManager().deleteFile(file, false);
         }
         file.rm();
-
         callback();
     }
 
 
-
+    // serverside copy
     async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         const source = this.fs.getEntryByPath(pathFrom.toString());
         const target = this.fs.getEntryByPath(pathTo.toString());
@@ -274,7 +257,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             });
 
             if (sourceTyped instanceof RamFile) {
-                sourceTyped.getReadable(true).pipe(writeStream);
+                sourceTyped.getReadable().pipe(writeStream);
             } else {
                 const readStream = (await this.app.getDiscordFileManager().getDownloadableReadStream(sourceTyped as RemoteFile));
                 patchEmitter(readStream, "readStream", [/data/]);
@@ -297,8 +280,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         if (source.isFolder) {
             return callback(Errors.InvalidOperation); // TODO: implement
         }
-
-
     }
 
     // very, VERY dirty, TODO: clean up
@@ -425,7 +406,5 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.app.getLogger().info("etag: " + path.toString() + " " + tag);
         callback(undefined, tag);
     }
-
-
 
 }

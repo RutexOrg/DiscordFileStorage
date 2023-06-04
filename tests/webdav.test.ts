@@ -388,4 +388,12 @@ describe("DICloud basic functions test", function () {
 		assert.equal(test1UploadedContent, "test1");
 	});
 
+	it("deletes subtree /a/b/c/d/e.txt with one call", async function () {
+		this.timeout(15000);
+		await client.deleteFile("/a/");
+		let content = await client.getDirectoryContents("/") as FileStat[];
+		assert.equal(content.find((file) => file.basename === "a") == undefined, true);
+	});
+
+
 });

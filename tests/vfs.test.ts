@@ -3,7 +3,7 @@ import { before, after, describe, it } from "mocha";
 import sinon, { SinonStub } from "sinon";
 import { Readable, Writable } from "stream";
 import fs from "fs";
-import safeSetup, { sleep } from "./helper.js";
+import safeSetup from "./helper.js";
 import Folder, { VirtualFS } from "../src/file/filesystem/Folder.js";
 import RamFile from "../src/file/RamFile.js";
 
@@ -73,7 +73,7 @@ describe("DICloud VFS basic functions test", function () {
 
 			let file = enry.entry as RamFile;
 
-			let readStream = file.getReadable(true);
+			let readStream = file.getReadable();
 			let data = "";
 			readStream.on("data", (chunk) => {
 				data += chunk;
@@ -92,13 +92,6 @@ describe("DICloud VFS basic functions test", function () {
 			file.setFileName("hello2.txt");
 			assert.equal(file.getAbsolutePath(), "/c/d/e/hello2.txt");
 		});
-
-		
-
-
-
-
-
 
 	})
 

@@ -1,6 +1,6 @@
 import FileBase from "../FileBase.js";
 import colors from "colors/safe.js";
-import { INamingHelper } from "./INamingHelper.js";
+import { IResourceHelper } from "./IResourceHelper.js";
 import RamFile from "../RamFile.js";
 
 export interface ElementType {
@@ -14,7 +14,7 @@ export interface ElementType {
  * Very dirty implementation of a folder class.
  * Very early, unefficient and messy implementation, will be cleaned up later.
  */
-export default class Folder {
+export default class Folder implements IResourceHelper {
 
     private name: string;
     private files: FileBase[] = [];
@@ -60,7 +60,7 @@ export default class Folder {
         return this.name;
     }
 
-    getEntryName(): string {
+    public getEntryName(): string {
         return this.name;
     }
 

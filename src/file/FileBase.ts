@@ -1,12 +1,12 @@
 import mime from "mime-types";
-import { INamingHelper } from "./filesystem/INamingHelper";
+import { IResourceHelper } from "./filesystem/IResourceHelper";
 import Folder from "./filesystem/Folder";
 
 
 /**
  * Basic shared FileBase class that represents a file.  
  */
-export default abstract class FileBase implements INamingHelper {
+export default abstract class FileBase implements IResourceHelper {
     private filename: string;
     private totalSize: number;
     private creationDate: Date;

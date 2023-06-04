@@ -9,7 +9,6 @@ import FileBase from './FileBase.js';
  */
 export default class RamFile extends FileBase {
     private maxSize: number;
-    private totalWrittenFiles: number = 0;
     private buffer: MutableBuffer;
 
     constructor(filename: string, totalSize: number, folder: Folder, maxSize: number = 128000 * 8, uploadedDate: Date = new Date()) {
@@ -18,16 +17,13 @@ export default class RamFile extends FileBase {
         this.maxSize = maxSize;
     }
 
-    // TODO: implement this properly
-    public getReadable(confirmCloning: boolean): Readable {
+    public getReadable(): Readable {
         return Readable.from(this.buffer.cloneNativeBuffer());
     }
 
     public getWritable(): Writable {
         return new Writable({
             write: (chunk: Buffer, encoding: string, callback: (error?: Error | null) => void) => {
-                this.totalWrittenFiles += chunk.length;
-                // console.log("Writing " + chunk.length + " bytes to ramfile. Total: " + this.totalWrittenFiles + " bytes. Max: " + this.maxSize + " bytes.")
                 this.buffer.write(chunk, encoding);
                 if (this.buffer.size > this.buffer.capacity()) {
                     return callback(new Error("Ramfile too large: " + this.buffer.size + " > " + this.maxSize + " bytes"));
