@@ -5,13 +5,18 @@ import DiscordFileStorageApp from "../DiscordFileStorageApp.js";
 import RemoteFile, { IChunkInfo } from "../file/RemoteFile.js";
 import RamFile from "../file/RamFile.js";
 import Folder from "../file/filesystem/Folder.js";
-import crypto from "crypto";
 import { INamingHelper } from "../file/filesystem/INamingHelper.js";
 import { patchEmitter } from "../helper/EventPatcher.js";
 import FileBase from "../file/FileBase.js";
 
-function getUnixTimeStamp(offsetMinutes = 0) {
-    return Math.floor(Date.now() / 1000) + offsetMinutes * 60;
+
+function getContext(ctx: v2.IContextInfo) {
+    return {
+        host: ctx.context.headers.host,
+        contentLength: ctx.context.headers.contentLength,
+        useragent : ctx.context.headers.find("user-agent", "unkown useragent"),
+        uri: ctx.context.requested.uri,
+    }
 }
 
 /**
@@ -77,7 +82,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        this.app.getLogger().info(".readDir", path.toString(), ctx);
+        this.app.getLogger().info(".readDir", path.toString(), getContext(ctx));
 
         const folder = this.fs.getFolderByPath(path.toString())!;
 
@@ -134,7 +139,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
-        this.app.getLogger().info(".create", path.toString(), ctx);
+        this.app.getLogger().info(".create", path.toString(), getContext(ctx));
         if (ctx.type.isDirectory) {
             this.fs.createFolderHierarchy(path.toString());
             return callback();
@@ -147,7 +152,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        this.app.getLogger().info(".openReadStream", path.toString(), ctx);
+        this.app.getLogger().info(".openReadStream", path.toString(), getContext(ctx));
         this.app.getLogger().info(".openReadStream!!!", ctx.estimatedSize);
         const entryInfo = this.fs.getEntryByPath(path.toString());
         if (entryInfo.isUnknown || entryInfo.isFolder) {
@@ -211,21 +216,21 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
-        this.app.getLogger().info(".delete", path.toString(), ctx);
+        this.app.getLogger().info(".delete", path.toString(), getContext(ctx));
         const entry = this.fs.getEntryByPath(path.toString());
         if (entry.isUnknown) {
             return callback(Errors.Forbidden);
         }
 
         if (entry.isFolder) {
-            if ((entry.entry as Folder).getFiles().length !== 0) {
-                const entires = (entry.entry as Folder).getallEntriesRecursiveThis().filter(e => e.isFile);
-                for (const e of entires) {
-                    const file = e.entry as FileBase;
-                    if (file instanceof RemoteFile) {
-                        await this.app.getDiscordFileManager().deleteFile(file, false);
+            const entires = (entry.entry as Folder).getallEntriesRecursiveThis();
+
+            for (const e of entires) {
+                if (e.entry instanceof FileBase) {
+                    if (e.entry instanceof RemoteFile) {
+                        await this.app.getDiscordFileManager().deleteFile(e.entry, false);
                     }
-                    file.rm();
+                    e.entry.rm();
                 }
             }
 
@@ -298,7 +303,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     // very, VERY dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        this.app.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), ctx);
+        this.app.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), getContext(ctx));
 
         const sourceEntry = this.fs.getEntryByPath(pathFrom.toString());
         const targetEntry = this.fs.getEntryByPath(pathTo.toString());
