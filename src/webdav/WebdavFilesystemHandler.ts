@@ -67,7 +67,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, (entryInfo.entry as Folder).getTotalSize());
         }
 
-        const file = entryInfo.entry as (RemoteFile | RamFile);
+        const file = entryInfo.entry as FileBase;
         return callback(undefined, file.getSize());
     }
 
@@ -86,7 +86,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
                 return true;
             }
             if (e.isFile) {
-                const file = e.entry as (RemoteFile | RamFile);
+                const file = e.entry as FileBase;
                 return file.isMarkedDeleted() === false;
             }
         });
@@ -119,7 +119,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.NoMimeTypeForAFolder)
         }
 
-        return callback(undefined, (entryInfo.entry as (RemoteFile | RamFile)).getMimeType());
+        return callback(undefined, (entryInfo.entry as FileBase).getMimeType());
 
     }
 
@@ -154,7 +154,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
 
-        const file = entryInfo.entry as (RemoteFile | RamFile);
+        const file = entryInfo.entry as FileBase;
         this.app.getLogger().info("read: ", file);
 
         if (file instanceof RamFile) {
@@ -163,13 +163,13 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         this.app.getLogger().info(".openReadStream, fetching: ", file.toString());
-        const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file)
+        const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file as RemoteFile)
         this.app.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
 
         return callback(undefined, readStream);
     }
 
-    
+
 
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
@@ -177,7 +177,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         this.app.getLogger().info(".openWriteStream", targetSource, estimatedSize, mode, "shouldEncrypt: ", this.app.shouldEncryptFiles());
 
         const entryInfo = this.fs.getEntryByPath(path.toString());
-        let file = entryInfo.entry as (RemoteFile | RamFile);
+        let file = entryInfo.entry as FileBase;
 
 
         // looks like most managers does not provide estimated size on  newly created file. 
@@ -196,7 +196,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
 
 
-        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file, ctx.estimatedSize, {
+        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file as RemoteFile, ctx.estimatedSize, {
             onFinished: async () => {
                 this.app.getLogger().info(".openWriteStream", "File uploaded: " + path.toString());
                 await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
@@ -204,7 +204,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         });
 
         this.app.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
-    
+
 
         return callback(undefined, writeStream);
     }
@@ -212,22 +212,28 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
         this.app.getLogger().info(".delete", path.toString(), ctx);
-        const entryCheck = this.fs.getEntryByPath(path.toString());
-        if (entryCheck.isUnknown) {
+        const entry = this.fs.getEntryByPath(path.toString());
+        if (entry.isUnknown) {
             return callback(Errors.Forbidden);
         }
 
-        if (entryCheck.isFolder) {
-            if ((entryCheck.entry as Folder).getFiles().length == 0) {
-                this.fs.removeFolderHierarchy(entryCheck.entry as Folder);
-                return callback();
-            } else {
-                // const entires = (entryCheck.entry as Folder).getallEntriesRecursiveThis();
-                return callback(Errors.InvalidOperation); // forcing the clients to delete files first, TODO: make it recursive
+        if (entry.isFolder) {
+            if ((entry.entry as Folder).getFiles().length !== 0) {
+                const entires = (entry.entry as Folder).getallEntriesRecursiveThis().filter(e => e.isFile);
+                for (const e of entires) {
+                    const file = e.entry as FileBase;
+                    if (file instanceof RemoteFile) {
+                        await this.app.getDiscordFileManager().deleteFile(file, false);
+                    }
+                    file.rm();
+                }
             }
+
+            this.fs.removeFolderHierarchy(entry.entry as Folder);
+            return callback(undefined);
         }
 
-        const file = entryCheck.entry as (RemoteFile | RamFile);
+        const file = entry.entry as FileBase;
         this.app.getLogger().info(".delete, Trying to delete file", file)
 
         if (file instanceof RemoteFile) {
@@ -241,7 +247,53 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        return callback(Errors.Forbidden);
+        const source = this.fs.getEntryByPath(pathFrom.toString());
+        const target = this.fs.getEntryByPath(pathTo.toString());
+
+        if (source.isUnknown || !target.isUnknown) {
+            return callback(Errors.InvalidOperation);
+        }
+
+        if (source.isFile) {
+            const sourceTyped = source.entry as FileBase;
+            const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
+
+            const newFile = new RemoteFile(pathTo.fileName(), sourceTyped.getSize(), newFolder, sourceTyped.getCreationDate());
+            newFile.updateModifyDate();
+
+            const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(newFile as RemoteFile, sourceTyped.getSize(), {
+                onFinished: async () => {
+                    this.app.getLogger().info(".copy", "File uploaded: " + pathTo.toString());
+                    await this.app.getDiscordFileManager().postMetaFile(newFile as RemoteFile);
+                }
+            });
+
+            if (sourceTyped instanceof RamFile) {
+                sourceTyped.getReadable(true).pipe(writeStream);
+            } else {
+                const readStream = (await this.app.getDiscordFileManager().getDownloadableReadStream(sourceTyped as RemoteFile));
+                patchEmitter(readStream, "readStream", [/data/]);
+                readStream.pipe(writeStream);
+
+            }
+
+            writeStream.on("finish", () => {
+                this.app.getLogger().info(".copy", "File copied: " + pathTo.toString());
+                callback(undefined, true);
+            });
+
+            writeStream.on("error", (err) => {
+                this.app.getLogger().error(".copy", "Error while copying file: " + pathTo.toString(), err);
+                callback(err);
+            });
+
+        }
+
+        if (source.isFolder) {
+            return callback(Errors.InvalidOperation); // TODO: implement
+        }
+
+
     }
 
     // very, VERY dirty, TODO: clean up
@@ -256,7 +308,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         if (sourceEntry.isFile) {
-            const file = sourceEntry.entry as (RemoteFile | RamFile);
+            const file = sourceEntry.entry as FileBase;
 
             const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
             const oldFolder = file.getFolder()!;
@@ -301,17 +353,17 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
-        const entryCheck = this.fs.getEntryByPath(pathFrom.toString());
-        if (entryCheck.isUnknown) {
+        const entry = this.fs.getEntryByPath(pathFrom.toString());
+        if (entry.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if (entryCheck.isFolder) {
-            (entryCheck.entry as Folder).setName(newName);
+        if (entry.isFolder) {
+            (entry.entry as Folder).setName(newName);
             return callback(undefined, true);
         }
 
-        const file = entryCheck.entry as (RemoteFile | RamFile);
+        const file = entry.entry as FileBase;
         file.setFileName(newName);
         if (file instanceof RemoteFile) {
             await this.app.getDiscordFileManager().updateMetaFile(file);
@@ -320,32 +372,32 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entryCheck = this.fs.getEntryByPath(path.toString());
-        if (entryCheck.isUnknown) {
+        const entry = this.fs.getEntryByPath(path.toString());
+        if (entry.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if (entryCheck.isFolder) {
+        if (entry.isFolder) {
             return callback(undefined, 0);
         }
 
-        const file = entryCheck.entry as (RemoteFile | RamFile);
+        const file = entry.entry as FileBase;
         this.app.getLogger().info("getModDate: " + path.toString() + " " + file.getModifyDate());
 
         return callback(undefined, file.getModifyDate().valueOf());
     }
 
     protected _creationDate(path: v2.Path, ctx: v2.CreationDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entryCheck = this.fs.getEntryByPath(path.toString());
-        if (entryCheck.isUnknown) {
+        const entry = this.fs.getEntryByPath(path.toString());
+        if (entry.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if (entryCheck.isFolder) {
+        if (entry.isFolder) {
             return callback(undefined, 0);
         }
 
-        const file = entryCheck.entry as (RemoteFile | RamFile);
+        const file = entry.entry as FileBase;
         this.app.getLogger().info("getCreationDate: " + path.toString() + " " + file.getModifyDate());
 
         return callback(undefined, file.getCreationDate().valueOf());
@@ -355,16 +407,16 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
     protected _etag(path: v2.Path, ctx: v2.ETagInfo, callback: v2.ReturnCallback<string>): void {
         this.app.getLogger().info(".etag", path.toString());
-        const entryCheck = this.fs.getEntryByPath(path.toString());
-        if (entryCheck.isUnknown) {
+        const entry = this.fs.getEntryByPath(path.toString());
+        if (entry.isUnknown) {
             return callback(Errors.ResourceNotFound);
         }
 
-        if (entryCheck.isFolder) {
+        if (entry.isFolder) {
             return callback(undefined, "0");
         }
 
-        const tag = entryCheck.entry instanceof FileBase ? (entryCheck.entry as FileBase).getETag() : Math.random().toString();
+        const tag = entry.entry instanceof FileBase ? (entry.entry as FileBase).getETag() : Math.random().toString();
         this.app.getLogger().info("etag: " + path.toString() + " " + tag);
         callback(undefined, tag);
     }

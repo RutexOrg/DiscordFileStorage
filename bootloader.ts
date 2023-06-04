@@ -16,8 +16,8 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 export async function bootApp() {
     const token = checkEnvVariableIsSet("TOKEN", "Please set the TOKEN to your bot token.");
     const guildId = checkEnvVariableIsSet("GUILD_ID", "Please set the GUILD_ID to your guild id.");
-    const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.");
-    const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.");
+    const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.", "string", "files");
+    const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.", "string", "meta");
 
     const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number", 3000) as number;
 
@@ -95,8 +95,8 @@ export async function bootApp() {
                 const [username, password] = user.split(":");
                 console.log(color.yellow("Adding user: " + username));
                 return {
-                    username: username,
-                    password: password,
+                    username,
+                    password,
                 }
             });
         }
@@ -109,12 +109,12 @@ export async function bootApp() {
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            // app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            // app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
+            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
             next();
         });
     }

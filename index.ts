@@ -1,7 +1,7 @@
-import { bootApp, bootApp as launch } from "./bootloader.js";
+import { bootApp } from "./bootloader.js";
 
 try {
-    launch();
+    bootApp();
 }catch(err){
     console.dir(err);
 }

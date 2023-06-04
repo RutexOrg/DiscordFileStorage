@@ -87,14 +87,14 @@ export default class DiscordFileManager implements IFIleManager {
     }
 
     private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: RemoteFile) {
-        this.app.getLogger().info(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
+        this.app.getLogger().info(`[${file.getFileName()}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
                 this.getAttachmentBuilderFromBufferWithoutExt(buffer.flush(), this.truncate(file.getFileName(), 15), chunkNumber, this.app.shouldEncryptFiles())
             ],
         });
 
-        this.app.getLogger().info(new Date().toTimeString().split(' ')[0] + ` [${file.getFileName()}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
+        this.app.getLogger().info(`[${file.getFileName()}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
         file.addChunk({
             id: message.id,
             url: message.attachments.first()!.url,
@@ -130,13 +130,21 @@ export default class DiscordFileManager implements IFIleManager {
 
     public async getDownloadableReadStream(file: RemoteFile): Promise<Readable> {
         this.app.getLogger().info(".getDownloadableReadStream() - file: " + file.getFileName());
-        const stream = (await (new HttpStreamPool(structuredClone(file.getChunks()), file.getSize(), file.getEntryName())).getDownloadStream());
+        const readStream = (await (new HttpStreamPool(structuredClone(file.getChunks()), file.getSize(), file.getEntryName())).getDownloadStream());
 
         if (!this.app.shouldEncryptFiles()) {
-            return stream;
+            return readStream;
         }
 
-        return stream.pipe(this.createDecryptor());
+        const decipher = this.createDecryptor();
+
+        // calling .end on decipher stream will throw an error and not emit end event. so we need to do this manually. 
+        decipher.once("unpipe", () => {
+            decipher.emit("end");
+            decipher.destroy();
+        });
+
+        return readStream.pipe(decipher, { end: false });
     }
 
 
@@ -155,6 +163,7 @@ export default class DiscordFileManager implements IFIleManager {
 
         const write = new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
+                console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
                     await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
                     if (callbacks.onChunkUploaded) {
@@ -190,15 +199,15 @@ export default class DiscordFileManager implements IFIleManager {
         // Since we give the encryption stream back and it closes too early, the write stream stream is not flushed all its data in discord, what results in a corrupted file or telling client at wrong time that the file is uploaded, when it is not. 
         // this is why we need to wait for the write stream to finish before we close the encryption stream.
 
-        const enc = this.createEncryptor(false);
-        enc.pipe(write);
+        const cipher = this.createEncryptor(false);
+        cipher.pipe(write);
 
         const pt = new Writable({
             write: (chunk, encoding, callback) => {
-                enc.write(chunk, encoding, callback);
+                cipher.write(chunk, encoding, callback);
             },
             final: (callback) => {
-                enc.end();
+                cipher.end();
                 write.once("finish", () => {
                     callback();
                 });
@@ -207,13 +216,15 @@ export default class DiscordFileManager implements IFIleManager {
 
         write.on("error", (err) => {
             this.app.getLogger().info("write.on('error')", err);
-            pt.destroy();
-            enc.destroy();
+            pt.destroy(err);
+            cipher.emit("end");
+            cipher.destroy();
         });
 
         write.on("finish", () => {
             pt.end();
-            enc.destroy();
+            cipher.emit("end");
+            cipher.destroy();
         });
 
         return pt;
@@ -228,6 +239,7 @@ export default class DiscordFileManager implements IFIleManager {
         const metadataMessage = await metadataChannel.messages.fetch(file.getMessageMetaIdInMetaChannel());
         await metadataMessage.edit(":x: File is deleted. " + chunks.length + " chunks will be deleted....");
 
+     
         for (let i = 0; i < chunks.length; i++) {
             const attachmentInfo = chunks[i];
             const message = await filesChannel.messages.fetch(attachmentInfo.id); // TODO: delete without fetching?
@@ -236,6 +248,8 @@ export default class DiscordFileManager implements IFIleManager {
 
         await metadataMessage.delete();
         file.markDeleted();
+
+
 
         return {
             success: true,

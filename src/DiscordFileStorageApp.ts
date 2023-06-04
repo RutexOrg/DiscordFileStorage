@@ -98,15 +98,15 @@ export default class DiscordFileStorageApp extends Client {
         console.log(color.yellow("Fetching channels..."));
         await guild.channels.fetch();
         let guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
-        for (let chan of this.channelsToCreate) {
-            if (!guildChannels.some(channel => channel.name == chan)) {
-                console.log("creating channel: " + chan);
+        for (const channelToCreate of this.channelsToCreate) {
+            if (!guildChannels.some(channel => channel.name == channelToCreate)) {
+                console.log("creating channel: " + channelToCreate);
                 await guild.channels.create({
-                    name: chan,
+                    name: channelToCreate,
                     type: ChannelType.GuildText,
                 });
             } else {
-                console.log(color.green("channel already exists: " + chan));
+                console.log(color.green("channel already exists: " + channelToCreate));
             }
         }
     }

@@ -318,8 +318,10 @@ export default class Folder {
         return new RamFile(filename, 0, folder, undefined, creationDate);
     }
 
-    // creates folder hierarchy and returns last folder.
-    // example: /folder1/folder2/folder3/file.txt -> returns folder3
+    /**
+    creates folder hierarchy and returns last folder.
+    example: /folder1/folder2/folder3/file.txt -> returns folder3
+     */
     public prepareFileHierarchy(path: string): Folder {
         const paths = path.split("/");
         paths.shift();

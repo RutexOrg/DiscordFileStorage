@@ -9,7 +9,6 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 	}
 
 	// thx to https://github.com/winstonjs/winston/issues/1427#issuecomment-540417212
-	
 	const logger = {
 		levels: config.syslog.levels,
 		format: format.combine(
@@ -45,4 +44,3 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 export function make(loggerName: string, logToConsole: boolean = true) {
 	return createLogger(setup(loggerName, logToConsole))
 }
-

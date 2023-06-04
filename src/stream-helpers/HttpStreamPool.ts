@@ -34,11 +34,11 @@ export default class HttpStreamPool {
 		const stream = new PassThrough();
 		const self = this;
 
-
 		let next = async () => {
 			if (self.currentUrlIndex >= self.urls.length) {
 				stream.once("unpipe", () => {
 					console.log("Downloading finished: " + self.downloadingFileName);
+					stream.end(null);
 				});
 				return;
 			}
