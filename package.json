@@ -21,8 +21,8 @@
     "yarn": ">=1.22.0"
   },
   "scripts": {
-    "start": "tsc && node --no-warnings out/index.js",
-    "l": "node --no-warnings out/index.js",
+    "start": "tsc && node --no-warnings out/indexBoot.js",
+    "l": "node --no-warnings out/indexBoot.js",
     "build": "tsc",
     "test": "yarn build && mocha --no-warnings out/tests/",
     "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",

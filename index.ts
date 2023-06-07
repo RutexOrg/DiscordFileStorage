@@ -1,7 +1,3 @@
-import { bootApp } from "./bootloader.js";
+import { boot } from "./bootloader.js";
+export default boot;
 
-try {
-    bootApp();
-}catch(err){
-    console.dir(err);
-}
