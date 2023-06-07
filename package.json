@@ -1,7 +1,7 @@
 {
   "name": "dicloud",
   "version": "2.1.0",
-  "main": "index.js",
+  "main": "out/indexBoot.js",
   "license": "MIT",
   "type": "module",
   "dependencies": {
