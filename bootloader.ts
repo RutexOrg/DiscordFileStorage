@@ -196,6 +196,10 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
         } else if (valueLower === "false") {
             return false;
         } else {
+            if (defaultValue !== undefined) {
+                print("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
+                return defaultValue;
+            }
             printAndExit("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
         }
     }
@@ -203,12 +207,20 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
     if (type == "number") {
         const number = parseInt(value!);
         if (isNaN(number)) {
+            if (defaultValue !== undefined) {
+                print("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
+                return defaultValue;
+            }
             printAndExit("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
         }
         return number;
     }
 
     if(type == "string" && value.length == 0){
+        if (defaultValue !== undefined) {
+            print("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
+            return defaultValue;
+        }
         printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     }
 
