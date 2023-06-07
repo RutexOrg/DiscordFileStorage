@@ -34,6 +34,8 @@ export default class WebdavServer extends webdav.WebDAVServer {
             });
         }
 
+        options.respondWithPaths = true;
+
         return new WebdavServer({
             privilegeManager: options.enableAuth ? privManager : undefined,
             httpAuthentication: options.enableAuth ? new webdav.HTTPDigestAuthentication(userManager, "DICloud Server") : undefined,
