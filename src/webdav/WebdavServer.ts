@@ -34,8 +34,7 @@ export default class WebdavServer extends webdav.WebDAVServer {
             });
         }
 
-        options.hostname = "0.0.0.0";
-        
+        options.hostname = options.hostname || "0.0.0.0";
 
         return new WebdavServer({
             privilegeManager: options.enableAuth ? privManager : undefined,

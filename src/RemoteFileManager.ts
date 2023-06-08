@@ -7,9 +7,7 @@ import RemoteFile, { IChunkInfo } from './file/RemoteFile.js';
 import IFIleManager, { IUploadResult, IWriteStreamCallbacks } from "./IFileManager.js";
 import MutableBuffer from "./helper/MutableBuffer.js";
 import crypto from "crypto";
-import util from "util";
-import { patchEmitter } from "./helper/EventPatcher.js";
-
+import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
 
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of 8 old MB. 

@@ -123,7 +123,7 @@ export async function bootDefault() {
 
     
     const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false);
-    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string")
+    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "")
 
 
     const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption.", "boolean", false);
