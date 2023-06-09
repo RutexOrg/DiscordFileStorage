@@ -102,10 +102,17 @@ export default class DiscordFileManager implements IFIleManager {
         this.app.getLogger().info(file.getChunks())
     }
 
+    // reason: TypeError: authTagLength required for chacha20-poly1305
     private createDecryptor(autoDestroy = true) {
         const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword(), {
             autoDestroy,
-        });
+            authTagLength: 16
+        } as any);
+
+        // backport to nodejs 16.14.2
+        if(decipher.setAuthTag){
+            decipher.setAuthTag(Buffer.alloc(16, 0));
+        }
 
         decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
             this.app.getLogger().info("Decipher", err);
@@ -117,7 +124,9 @@ export default class DiscordFileManager implements IFIleManager {
     private createEncryptor(autoDestroy = true) {
         const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword(), {
             autoDestroy,
-        });
+            authTagLength: 16
+        } as any);
+
 
         chiper.once("error", (err) => {
             this.app.getLogger().info("Chiper", err);

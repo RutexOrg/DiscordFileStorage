@@ -35,6 +35,9 @@ export interface IBootParams {
 }
 
 export async function boot (params: IBootParams){
+    console.log(`NodeJS version: ${process.version}`);
+    console.log(color.yellow("Starting DiscordFileStorage..."));
+
     const app = new DiscordFileStorageApp({
         intents: [
             GatewayIntentBits.MessageContent,
@@ -82,6 +85,10 @@ export async function boot (params: IBootParams){
    
 
         if (params.enableAuth) {
+            if(params.users.length === 0) {
+                printAndExit("Please set the USERS to your users in format username:password,username:password or add at least one user.");
+            }
+
             console.log("Detected AUTH env variable. Starting webdav server with auth enabled.");
             serverLaunchOptions.enableAuth = true;
             serverLaunchOptions.users = params.users;
@@ -114,20 +121,20 @@ export async function bootDefault() {
     const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.", "string", "files");
     const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name.", "string", "meta");
 
+    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.", "boolean", true) as boolean;
     const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number", 3000) as number;
 
-    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.", "boolean", true) as boolean;
-    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean", false) as boolean;
-
-    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean", false) as boolean;
 
     
+
+    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean", false) as boolean;
+    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean", false) as boolean;
+
     const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false);
     const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "")
-
-
+    
     const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption.", "boolean", false);
-    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password.", "string");    
+    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password.", "string", "");    
 
     if (enableEncrypt && !encryptPassword) {
         printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password.");
