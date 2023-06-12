@@ -78,9 +78,7 @@ export default class DiscordFileStorageApp extends Client {
 
     public async waitForReady(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.once("ready", () => {
-                resolve();
-            });
+            this.once("ready", resolve as any);
         });
     }
 
@@ -92,9 +90,10 @@ export default class DiscordFileStorageApp extends Client {
 
         const guild = await guilds.get(this.guildId)?.fetch()!;
         if (!guild) {
-            printAndExit("Failed to fetch guild");
+            printAndExit("Failed to fetch guild: " + this.guildId);
         }
-
+        
+        this.logger.info("Guild found: " + guild.name);
         console.log(color.yellow("Fetching channels..."));
         await guild.channels.fetch();
         let guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);

@@ -1,7 +1,7 @@
-import { bootDefault } from "./bootloader.js";
+import { envBoot } from "./bootloader.js";
 
 try {
-    bootDefault();
+    envBoot();
 }catch(err){
     console.dir(err);
 }

@@ -11,3 +11,5 @@ tmp*
 testfile-downloaded.txt
 logs/
 .local
+.space
+Spacefile

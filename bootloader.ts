@@ -14,7 +14,7 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 // Idk how to fix it now, so let it be just disabled.
 
 
-export interface UIserRecord  {
+export interface IUserRecord {
     username: string;
     password: string;
 }
@@ -29,15 +29,45 @@ export interface IBootParams {
     enableHttps: boolean;
     skipPreload: boolean;
     enableAuth: boolean;
-    users: UIserRecord[];
+    users: string;
     enableEncrypt: boolean;
     encryptPassword: string;
 }
 
-export async function boot (params: IBootParams){
+export interface IBootParamsParsed extends IBootParams {
+    usersParsed: IUserRecord[];
+}
+
+function bootPrecheck(params: IBootParams): IBootParamsParsed {
+    if (params.enableEncrypt && !params.encryptPassword) {
+        printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password.");
+    }
+
+    // regex: key:value,key:value,...
+    if(params.enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(params.users)){
+        printAndExit("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
+    }
+
+    const usersParsed: IUserRecord[] = params.users.split(",").map((user) => {
+        const [username, password] = user.split(":");
+        return { username, password };
+    });
+
+    if (params.enableAuth && usersParsed.length == 0) {
+        printAndExit("USERS env variable is empty. Please set at least one user.");
+    }
+
+    return {
+        ...params,
+        usersParsed,
+    };
+}
+
+
+export async function boot(data: IBootParams){
     console.log(`NodeJS version: ${process.version}`);
     console.log(color.yellow("Starting DiscordFileStorage..."));
-
+    const params = bootPrecheck(data);
     const app = new DiscordFileStorageApp({
         intents: [
             GatewayIntentBits.MessageContent,
@@ -91,7 +121,7 @@ export async function boot (params: IBootParams){
 
             console.log("Detected AUTH env variable. Starting webdav server with auth enabled.");
             serverLaunchOptions.enableAuth = true;
-            serverLaunchOptions.users = params.users;
+            serverLaunchOptions.users = params.usersParsed;
         }
 
         console.log("Starting webdav server...");
@@ -115,7 +145,7 @@ export async function boot (params: IBootParams){
     return app;
 }
 
-export async function bootDefault() {
+export async function envBoot() {
     const token = checkEnvVariableIsSet("TOKEN", "Please set the TOKEN to your bot token.");
     const guildId = checkEnvVariableIsSet("GUILD_ID", "Please set the GUILD_ID to your guild id.");
     const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name.", "string", "files");
@@ -124,28 +154,16 @@ export async function bootDefault() {
     const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server.", "boolean", true) as boolean;
     const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port.", "number", 3000) as number;
 
-
-    
-
     const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https.", "boolean", false) as boolean;
     const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload.", "boolean", false) as boolean;
 
-    const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false);
-    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "")
+    const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth.", "boolean", false) as boolean;
+    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
     
-    const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption.", "boolean", false);
-    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password.", "string", "");    
+    const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption.", "boolean", false) as boolean;
+    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password.", "string", "") as string;
 
-    if (enableEncrypt && !encryptPassword) {
-        printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password.");
-    }
-
-    // regex: key:value,key:value,...
-    if(enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(users)){
-        printAndExit("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
-    }
-
-    return boot({
+    return await boot({
         token,
         guildId,
         filesChannelName,
@@ -155,12 +173,7 @@ export async function bootDefault() {
         enableHttps,
         skipPreload,
         enableAuth,
-        users: users.split(",").map((user: string) => {
-            return {
-                username: user.split(":")[0], // username
-                password: user.split(":")[1], // password
-            }
-        }),
+        users: users,
         enableEncrypt,
         encryptPassword,
     })
@@ -203,10 +216,6 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
         } else if (valueLower === "false") {
             return false;
         } else {
-            if (defaultValue !== undefined) {
-                print("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
-                return defaultValue;
-            }
             printAndExit("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
         }
     }
@@ -214,25 +223,16 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
     if (type == "number") {
         const number = parseInt(value!);
         if (isNaN(number)) {
-            if (defaultValue !== undefined) {
-                print("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
-                return defaultValue;
-            }
             printAndExit("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
         }
         return number;
     }
 
     if(type == "string" && value.length == 0){
-        if (defaultValue !== undefined) {
-            print("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + defaultValue);
-            return defaultValue;
-        }
         printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     }
 
     return value;
-
 }
 
 export function readFileSyncOrUndefined(path: string): string | undefined {

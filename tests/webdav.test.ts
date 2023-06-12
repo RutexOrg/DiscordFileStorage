@@ -2,7 +2,7 @@ import { FileStat, WebDAVClient, createClient } from "webdav"
 import { assert } from "chai";
 import { before, after, describe, it } from "mocha";
 import DiscordFileStorageApp from "../src/DiscordFileStorageApp.js";
-import { bootDefault } from "../bootloader.js";
+import { envBoot } from "../bootloader.js";
 import sinon, { SinonStub } from "sinon";
 import { Readable, Writable } from "stream";
 import fs from "fs";
@@ -104,7 +104,7 @@ describe("DICloud basic functions test", function () {
 	it("Start the server and ensure server is up", async function () {
 		this.timeout(10000);
 
-		server = await bootDefault();
+		server = await envBoot();
 		client = createClient(`http://${DOMAIN}:${PORT}`);
 
 		assert.isArray(await client.getDirectoryContents("/"))
