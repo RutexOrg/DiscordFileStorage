@@ -8,6 +8,7 @@ import IFIleManager, { IUploadResult, IWriteStreamCallbacks } from "./IFileManag
 import MutableBuffer from "./helper/MutableBuffer.js";
 import crypto from "crypto";
 import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
+import { patchEmitter } from "./helper/EventPatcher.js";
 
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of 8 old MB. 
@@ -147,8 +148,12 @@ export default class DiscordFileManager implements IFIleManager {
 
         // calling .end on decipher stream will throw an error and not emit end event. so we need to do this manually. 
         decipher.once("unpipe", () => {
-            decipher.emit("end");
-            decipher.destroy();
+            patchEmitter(decipher, "decipher");
+            patchEmitter(readStream, "read");
+            setImmediate(() => { // idk if this work as it should... but looks like it does.
+                decipher.emit("end");
+                decipher.destroy();
+            });
         });
 
         return readStream.pipe(decipher, { end: false });
@@ -170,7 +175,7 @@ export default class DiscordFileManager implements IFIleManager {
 
         const write = new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
-                console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
+                // console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
                     await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
                     if (callbacks.onChunkUploaded) {
