@@ -262,7 +262,11 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         if(stat.isDirectory()){
             // TODO: delete all files in directory
-            return callback(Errors.Forbidden);
+            // if empty, delete directory, else error
+
+            if(this.fs.readdirSync(path.toString()).length > 0){
+                return callback(Errors.Forbidden);
+            }
         }
 
 
