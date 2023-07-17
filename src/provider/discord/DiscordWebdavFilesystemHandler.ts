@@ -6,6 +6,7 @@ import mime from "mime-types";
 import path from "path";
 import FileStorageApp from "../../DICloudApp.js";
 import { IFile } from "../../file/IFile.js";
+import getFilesRecursive from "../../memfs/MemfsHelper.js";
 
 
 function getContext(ctx: v2.IContextInfo) {
@@ -261,11 +262,17 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         if(stat.isDirectory()){
-            // TODO: delete all files in directory
-            // if empty, delete directory, else error
-
-            if(this.fs.readdirSync(path.toString()).length > 0){
-                return callback(Errors.Forbidden);
+            const pathFiles = getFilesRecursive(this.fs, path.toString());
+            for(const pathFile of pathFiles){
+                const file = this.getFile(new v2.Path(pathFile));
+                if(file.uploaded){
+                    for(const chunk of file.chunks){
+                        this.client.addToDeletionQueue({
+                            channel: (await this.client.getFileChannel()).id,
+                            message: chunk.id
+                        });
+                    }
+                }
             }
         }
 
