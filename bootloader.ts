@@ -6,8 +6,8 @@ import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
 import color from "colors/safe.js";
 import FileStorageApp, { print, printAndExit } from "./src/DICloudApp.js";
-import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
+import WebdavFilesystemHandler from "./src/provider/discord/DiscordWebdavFilesystemHandler.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -27,7 +27,6 @@ export interface IBootParams {
     webdavPort: number;
     startWebdavServer: boolean;
     enableHttps: boolean;
-    skipPreload: boolean;
     enableAuth: boolean;
     users: string;
     enableEncrypt: boolean;
@@ -84,12 +83,8 @@ export async function boot(data: IBootParams){
     await app.waitForReady();
     await app.preload();
 
-    if (!params.skipPreload) {
-        console.log(color.yellow("Preloading files..."));
-        await app.loadFiles();
-    } else {
-        console.log(color.yellow("Skipping preload..."));
-    }
+    console.log(color.yellow("Loading files..."));
+    await app.loadFiles();
 
     if (params.startWebdavServer) {
         const serverLaunchOptions: ServerOptions = {
@@ -112,7 +107,6 @@ export async function boot(data: IBootParams){
             }
         }
 
-   
 
         if (params.enableAuth) {
             if(params.users.length === 0) {
@@ -155,7 +149,6 @@ export async function envBoot() {
     const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
 
     const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
-    const skipPreload = checkEnvVariableIsSet("SKIP_PRELOAD", "Please set the SKIP_PRELOAD to true or false to skip preload", "boolean", false) as boolean;
 
     const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth", "boolean", false) as boolean;
     const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
@@ -171,7 +164,6 @@ export async function envBoot() {
         webdavPort,
         startWebdavServer,
         enableHttps,
-        skipPreload,
         enableAuth,
         users: users,
         enableEncrypt,

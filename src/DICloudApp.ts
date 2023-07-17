@@ -1,7 +1,7 @@
 import color from 'colors/safe.js';
 import nodeFS from 'fs';
 import os from 'os';
-import DiscordFileManager from './RemoteFileManager.js';
+import DiscordFileManager from './provider/discord/DiscordFileManager.js';
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
 import { Volume } from 'memfs/lib/volume.js';
@@ -104,7 +104,6 @@ export default class FileStorageApp extends Client {
     }
 
     public async preload() {
-
         if (!this.guilds.cache.has(this.guildId)) {
             printAndExit("Guild not found");
         }
@@ -117,19 +116,19 @@ export default class FileStorageApp extends Client {
         this.logger.info("Guild found: " + guild.name);
         console.log(color.yellow("Fetching channels..."));
         await guild.channels.fetch();
-        let guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
+        const guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
+        
         for (const channelToCreate of this.channelsToCreate) {
             if (!guildChannels.some(channel => channel.name == channelToCreate)) {
-                console.log("creating channel: " + channelToCreate);
+                console.log("Creating channel: " + channelToCreate);
                 await guild.channels.create({
                     name: channelToCreate,
                     type: ChannelType.GuildText,
                 });
             } else {
-                console.log(color.green("channel already exists: " + channelToCreate));
+                console.log(color.green("Channel already exists: " + channelToCreate + ", skipping"));
             }
         }
-
 
         this.tickInterval = setInterval(() => {
             this.tick();
@@ -141,12 +140,12 @@ export default class FileStorageApp extends Client {
     async getAllMessages(channelId: string): Promise<Message[]> {
         const channel = await this.channels.fetch(channelId) as TextChannel;
         let allMessages: Message[] = [];
-        let lastId: string | undefined;
+        let last: string | undefined;
 
         while (true) {
             const options: FetchMessagesOptions = { limit: 100 };
-            if (lastId) {
-                options.before = lastId;
+            if (last) {
+                options.before = last;
             }
 
             const messages = [... (await channel.messages.fetch(options)).values()];
@@ -157,7 +156,7 @@ export default class FileStorageApp extends Client {
                 break;
             }
 
-            lastId = messages.pop()!.id;
+            last = messages.pop()!.id;
         }
 
         return allMessages;
@@ -196,9 +195,6 @@ export default class FileStorageApp extends Client {
 
         const file = await axios.get(attachment.url, { responseType: "arraybuffer" });
         const data = JSON.parse(file.data.toString()) as IFiles;
-
-        console.log("data: ")
-        console.dir(data);
 
         this.fs = Volume.fromJSON(data as any);
     }
