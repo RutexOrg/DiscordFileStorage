@@ -15,10 +15,6 @@ export default class HttpStreamPool {
 	private downloadingFileName: string;
 	
 	constructor(info: IChunkInfo[], totalSize: number, filename: string) {
-		if (info.length == 0) {
-			throw new Error("IChunkInfo[] is empty, wtf?");
-		}
-
 		this.urls = info;
 		this.totalSize = totalSize;
 		this.downloadingFileName = filename;
@@ -31,6 +27,11 @@ export default class HttpStreamPool {
 	 * @returns Readable stream that emits data from all urls sequentially. 
 	 */
 	public async getDownloadStream(): Promise<Readable> {
+		if(this.urls.length == 0) {
+			console.warn("No urls to download, returning empty stream");
+			return Readable.from([]);
+		}
+
 		const stream = new PassThrough();
 		const self = this;
 
