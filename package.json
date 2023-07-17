@@ -12,6 +12,7 @@
     "colors": "^1.4.0",
     "discord.js": "^14.9.0",
     "dotenv": "^16.0.3",
+    "memfs": "^4.2.0",
     "mime-types": "^2.1.35",
     "typed-emitter": "^2.1.0",
     "webdav-server": "^2.6.2",

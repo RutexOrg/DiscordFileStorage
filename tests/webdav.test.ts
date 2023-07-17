@@ -1,7 +1,7 @@
 import { FileStat, WebDAVClient, createClient } from "webdav"
 import { assert } from "chai";
 import { before, after, describe, it } from "mocha";
-import DiscordFileStorageApp from "../src/DiscordFileStorageApp.js";
+import FileStorageApp from "../src/DICloudApp.js";
 import { envBoot } from "../bootloader.js";
 import sinon, { SinonStub } from "sinon";
 import { Readable, Writable } from "stream";
@@ -48,7 +48,7 @@ describe("DICloud basic functions test", function () {
 	let warnStub: SinonStub;
 
 	
-	let server: DiscordFileStorageApp;
+	let server: FileStorageApp;
 	let client: WebDAVClient;
 
 

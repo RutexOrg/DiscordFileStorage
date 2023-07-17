@@ -1,7 +1,7 @@
+import { AxiosResponse } from "axios";
 import { Readable, PassThrough } from "stream";
 import client from "../helper/AxiosInstance.js";
-import { IChunkInfo } from "../file/RemoteFile.js";
-import { AxiosResponse } from "axios";
+import { IChunkInfo } from "../file/IFile.js";
 
 /**
  * Class that combines list of urls into a single Readable stream. 
