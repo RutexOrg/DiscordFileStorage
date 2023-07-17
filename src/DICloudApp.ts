@@ -1,7 +1,7 @@
 import color from 'colors/safe.js';
 import nodeFS from 'fs';
 import os from 'os';
-import DiscordFileManager from './provider/discord/DiscordFileManager.js';
+import DiscordFileManager from './provider/discord/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
 import { Volume } from 'memfs/lib/volume.js';
@@ -32,7 +32,7 @@ export default class FileStorageApp extends Client {
     private metaChannelName: string;
     private filesChannelId: string;
     private channelsToCreate: Array<string>;
-    private discordFileManager: DiscordFileManager;
+    private currentProvider: DiscordFileManager;
 
     private shouldEncrypt;
     private encryptPassword;
@@ -72,7 +72,7 @@ export default class FileStorageApp extends Client {
         this.encryptPassword = options.encryptPassword ?? "";
 
         this.guildId = guildId;
-        this.discordFileManager = new DiscordFileManager(this);
+        this.currentProvider = new DiscordFileManager(this);
 
 
     }
@@ -272,8 +272,8 @@ export default class FileStorageApp extends Client {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    public getDiscordFileManager(): DiscordFileManager {
-        return this.discordFileManager;
+    public getCurrentProvider(): DiscordFileManager {
+        return this.currentProvider;
     }
 
 

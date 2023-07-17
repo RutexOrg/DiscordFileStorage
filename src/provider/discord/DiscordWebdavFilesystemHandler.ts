@@ -195,7 +195,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
         this.client.getLogger().info(".openReadStream, fetching: ", file.toString());
-        const readStream = await this.client.getDiscordFileManager().getDownloadableReadStream(file)
+        const readStream = await this.client.getCurrentProvider().getDownloadableReadStream(file)
         this.client.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
 
         return callback(undefined, readStream);
@@ -228,7 +228,7 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         }
 
 
-        const writeStream = await this.client.getDiscordFileManager().getUploadWritableStream(file, {
+        const writeStream = await this.client.getCurrentProvider().getUploadWritableStream(file, {
             onFinished: async () => {
                 this.client.getLogger().info(".openWriteStream", "Stream finished: " + path.toString());
                 file.uploaded = true;
@@ -284,53 +284,38 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
 
     // serverside copy
-    // async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-    //     const source = this.fs.getEntryByPath(pathFrom.toString());
-    //     const target = this.fs.getEntryByPath(pathTo.toString());
+    async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
+        this.client.getLogger().info(".copy", pathFrom + " | " + pathTo);
 
-    //     if (source.isUnknown || !target.isUnknown) {
-    //         return callback(Errors.InvalidOperation);
-    //     }
+        const sourceExists = this.fs.existsSync(pathFrom.toString());
+        const targetExists = this.fs.existsSync(pathTo.toString());
 
-    //     if (source.isFile) {
-    //         const sourceTyped = source.entry as FileBase;
-    //         const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
+        if (!sourceExists || targetExists) {
+            return callback(Errors.ResourceAlreadyExists);
+        }
 
-    //         const newFile = new RemoteFile(pathTo.fileName(), sourceTyped.getSize(), newFolder, sourceTyped.getCreationDate());
-    //         newFile.updateModifyDate();
+        const oldFile = this.getFile(pathFrom);
+        const newFile: IFile = {
+            name: pathTo.fileName(),
+            created: new Date(),
+            modified: new Date(),
+            size: oldFile.size,
+            uploaded: false,
+            chunks: []
+        }
 
-    //         const writeStream = await this.client.getDiscordFileManager().getUploadWritableStream(newFile as RemoteFile, sourceTyped.getSize(), {
-    //             onFinished: async () => {
-    //                 this.client.getLogger().info(".copy", "File uploaded: " + pathTo.toString());
-    //                 await this.client.getDiscordFileManager().postMetaFile(newFile as RemoteFile);
-    //             }
-    //         });
+        const readStream = await this.client.getCurrentProvider().getDownloadableReadStream(oldFile);
+        const writeStream = await this.client.getCurrentProvider().getUploadWritableStream(newFile, {
+            onFinished: async () => {
+                this.client.getLogger().info(".copy", "Stream finished: " + pathTo.toString());
+                newFile.uploaded = true;
+                this.setFile(pathTo, newFile, true);
+                return callback(undefined, true);
+            }
+        });
 
-    //         if (sourceTyped instanceof RamFile) {
-    //             sourceTyped.getReadable().pipe(writeStream);
-    //         } else {
-    //             const readStream = (await this.client.getDiscordFileManager().getDownloadableReadStream(sourceTyped as RemoteFile));
-    //             patchEmitter(readStream, "readStream", [/data/]);
-    //             readStream.pipe(writeStream);
-
-    //         }
-
-    //         writeStream.on("finish", () => {
-    //             this.client.getLogger().info(".copy", "File copied: " + pathTo.toString());
-    //             callback(undefined, true);
-    //         });
-
-    //         writeStream.on("error", (err) => {
-    //             this.client.getLogger().error(".copy", "Error while copying file: " + pathTo.toString(), err);
-    //             callback(err);
-    //         });
-
-    //     }
-
-    //     if (source.isFolder) {
-    //         return callback(Errors.InvalidOperation); // TODO: implement
-    //     }
-    // }
+        readStream.pipe(writeStream);
+    }
 
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.client.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), getContext(ctx));
