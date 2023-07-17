@@ -44,11 +44,12 @@ export default class FileStorageApp extends Client {
     private metadataMessageId: string | undefined;
     private fs!: Volume;
     private debounceTimeout: NodeJS.Timeout | undefined;
-    private debounceTimeoutTime: number = 2000;
+    private debounceTimeoutTime: number = 4000;
 
     private fileDeletionQueue: Array<IDelayedDeletionEntry> = [];
 
     private tickInterval: NodeJS.Timeout | undefined;
+    private tickIntervalTime: number = 1000;
 
     private medataInfoMessage: string = "DiscordFS Metadata ✔";
 
@@ -132,7 +133,7 @@ export default class FileStorageApp extends Client {
 
         this.tickInterval = setInterval(() => {
             this.tick();
-        }, 2500);
+        }, this.tickIntervalTime);
 
         this.preloadComplete = true;
     }
