@@ -5,7 +5,7 @@ import fs from "node:fs";
 import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
 import color from "colors/safe.js";
-import DiscordFileStorageApp, { print, printAndExit } from "./src/DiscordFileStorageApp.js";
+import FileStorageApp, { print, printAndExit } from "./src/DICloudApp.js";
 import WebdavFilesystemHandler from "./src/webdav/WebdavFilesystemHandler.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
 
@@ -68,7 +68,7 @@ export async function boot(data: IBootParams){
     console.log(`NodeJS version: ${process.version}`);
     console.log(color.yellow("Starting DiscordFileStorage..."));
     const params = bootPrecheck(data);
-    const app = new DiscordFileStorageApp({
+    const app = new FileStorageApp({
         intents: [
             GatewayIntentBits.MessageContent,
         ],
@@ -82,7 +82,7 @@ export async function boot(data: IBootParams){
     console.log(color.yellow("Logging in..."));
     await app.login(params.token);
     await app.waitForReady();
-    await app.prepare();
+    await app.preload();
 
     if (!params.skipPreload) {
         console.log(color.yellow("Preloading files..."));

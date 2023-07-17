@@ -1,8 +1,6 @@
-out/
 node_modules/
-.env
-.env-local
-.env-prod
+out/
+.*env*
 log.txt
 certs/
 runner.ts
@@ -13,3 +11,7 @@ logs/
 .local
 .space
 Spacefile
+
+
+dataloader.js
+data.json

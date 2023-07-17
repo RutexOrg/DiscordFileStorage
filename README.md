@@ -81,7 +81,6 @@ You can set authorization for the server. To do this, set ``AUTH`` to ``true`` i
 
 Then add your username and password to ``.env`` file. Set ``USERS`` to ``username:password``. You can add multiple users, just separate them with ``,``. For example: ``USERS=username1:password1,username2:password2``. At the moment, only basic authorization is supported. 
 
-
 ___
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
@@ -92,21 +91,14 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 
 # Known issues
 
-
-1. Renaming of folders with lot of files is very slow, since it requieres to change metadata of each file in the subfolders to display new path correctly after restart.  **WILL BE FIXED.**
-
-2. Boot taking a lot of time with a lot of files. This is because of the fact that the server is caching all files in memory and doing a lot http requests to discord to load files into memory. **WILL BE FIXED.**
-
-3. Empty folders and newly created files without content will be deleted between restarts, since they cached only in memory.  **WILL BE FIXED IN FUTURE**, not a priority for now.
-
-
-4. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
+1. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
 This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit. Script may be found in: ***scripts/webdav.reg*** \
 If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
 **You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
 
-
-5. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
-
-6. Uploading and downloading big files (~1GB+) is working unstable, so if you really need it, split big file into smaller chunks (lets say 100MB, with any archiver like [7zip](https://www.7-zip.org/) or [WinRAR](https://www.rarlab.com/)) and upload them one by one. After downloading, you can merge them back.  \
+2. Uploading and downloading big files (~1GB+) is working unstable, so if you really need it, split big file into smaller chunks (lets say 100MB, with any archiver like [7zip](https://www.7-zip.org/) or [WinRAR](https://www.rarlab.com/)) and upload them one by one. After downloading, you can merge them back.  \
 For now no other solution for this, sorry. 
+
+3. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+
+4. Not all webdav clients are working as expected. Will do some work in the future to fix this.

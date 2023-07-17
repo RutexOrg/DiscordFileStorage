@@ -1,14 +1,13 @@
 import { Readable, Writable, Transform, PassThrough } from "stream";
-import { Lock, ResourceType, v2 } from "webdav-server";
-import { Errors, IUser, LockKind } from "webdav-server/lib/index.v2.js";
-import DiscordFileStorageApp from "../DiscordFileStorageApp.js";
-import RemoteFile, { IChunkInfo } from "../file/RemoteFile.js";
-import RamFile from "../file/RamFile.js";
-import Folder from "../file/filesystem/Folder.js";
-import { IResourceHelper } from "../file/filesystem/IResourceHelper.js";
+import { ResourceType, v2 } from "webdav-server";
+import { Errors } from "webdav-server/lib/index.v2.js";
+import FileStorageApp from "../DICloudApp.js";
 import { patchEmitter } from "../helper/EventPatcher.js";
-import FileBase from "../file/FileBase.js";
-
+import { Volume } from "memfs/lib/volume.js";
+import { IFile } from "../file/IFile.js";
+import mime from "mime-types";
+import path from "path";
+import getFilesRecursive from "../memfs/MemfsHelper.js";
 
 function getContext(ctx: v2.IContextInfo) {
     return {
@@ -36,15 +35,20 @@ export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializ
 }
 
 export default class WebdavFilesystemHandler extends v2.FileSystem {
-    private app: DiscordFileStorageApp;
+    private client: FileStorageApp;
     private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
-    private fs: Folder;
+    private fs: Volume;
 
-    constructor(client: DiscordFileStorageApp) {
+    constructor(client: FileStorageApp) {
         super(new VirtualDiscordFileSystemSerializer());
-        this.app = client;
-        this.fs = this.app.getFileSystem().getRoot();
+        this.client = client;
+        this.fs = client.getFs();
+        
+
+        // this.fs.watch("/", {recursive: true}, (event, filename) => {
+            // console.log("delete!!!!" , event, filename);
+        // });
     }
 
 
@@ -60,351 +64,343 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, []);
     }
 
-    public getFs(): Folder {
-        return this.fs;
+    private fixPath(path: v2.Path) {
+        if(!path.toString().startsWith("/")){
+            return new v2.Path("/" + path.toString());
+        }
+        return path;
     }
+
+    /**
+     * Returns the mime type of the file according to the file extension. (Not by the file content)
+     * @param filename 
+     * @returns 
+     */
+    private getMimeType(rPath: string): string {
+        return mime.lookup(path.parse(rPath).base) || "application/octet-stream";
+    }
+
+
+    private getFile(path: v2.Path): IFile {
+        return JSON.parse(this.fs.readFileSync(path.toString()).toString()) as IFile;
+    }
+
+    private setFile(path: v2.Path, file: IFile, notifyAboutChanges: boolean = false) {
+        this.fs.writeFileSync(path.toString(), JSON.stringify(file));
+        if(notifyAboutChanges){
+            this.client.markDirty();
+        }
+    }
+
 
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        const entry = this.fs.getEntryByPath(path.toString());
-
-        if (entry.isFolder) {
-            return callback(undefined, this.fs.getallEntriesRecursiveThis().filter(e => e.isFile).map(e => e.entry as FileBase).reduce((prev, cur) => prev + cur.getSize(), 0))
+        this.client.getLogger().info(".size", path.toString(), getContext(ctx));
+        
+        const stat = this.fs.statSync(path.toString());
+        
+        if(stat.isFile()){
+            return callback(undefined, this.getFile(path).size);
         }
 
-        if (entry.isFile) {
-            return callback(undefined, (entry.entry as FileBase).getSize())
-        }
-
-        return callback(Errors.ResourceNotFound)
+        return callback(Errors.NoSizeForAFolder);
     }
 
-
-
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        this.app.getLogger().info(".readDir", path.toString(), getContext(ctx));
-        const entry = this.fs.getEntryByPath(path.toString());
+        this.client.getLogger().info(".readDir", path.toString(), getContext(ctx));
 
-        if (entry.isFolder) {
-            return callback(undefined, (entry.entry as Folder).getAllEntries().map(e => (e.entry as IResourceHelper).getEntryName()));
+        
+        const stat = this.fs.statSync(path.toString());
+
+        if(stat.isDirectory()){
+            return callback(undefined, this.fs.readdirSync(path.toString()) as string[]);
         }
 
         return callback(Errors.ResourceNotFound);
     }
 
     protected _type(path: v2.Path, ctx: v2.TypeInfo, callback: v2.ReturnCallback<v2.ResourceType>): void {
-        // this.app.getLogger().info(".type", path.toString(), getContext(ctx));
-        const entry = this.fs.getEntryByPath(path.toString());
+        this.client.getLogger().info(".type", path.toString(), getContext(ctx));
 
-        let resType = ResourceType.NoResource;
-        if (entry.isFile) {
-            resType = ResourceType.File;
-        } else if (entry.isFolder) {
-            resType = ResourceType.Directory;
-        };
+        const stat = this.fs.statSync(path.toString());
 
-        return callback(undefined, resType);
+        if(stat.isFile()){
+            return callback(undefined, ResourceType.File);
+        } else if(stat.isDirectory()){
+            return callback(undefined, ResourceType.Directory);
+        }
+
+        return callback(Errors.ResourceNotFound);
     }
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
-        // this.app.getLogger().info(".mimeType", path.toString(), getContext(ctx));
-        const entry = this.fs.getEntryByPath(path.toString());
-        if (entry.isUnknown || entry.isFolder) {
-            return callback(Errors.NoMimeTypeForAFolder)
+        this.client.getLogger().info(".mimeType", path.toString(), getContext(ctx));
+
+        const stat = this.fs.statSync(path.toString());
+
+        if(stat.isFile()){
+            return callback(undefined, this.getMimeType(path.toString()));
         }
 
-        return callback(undefined, (entry.entry as FileBase).getMimeType());
-
+        return callback(Errors.NoMimeTypeForAFolder);
     }
 
     protected _fastExistCheck(ctx: v2.RequestContext, path: v2.Path, callback: (exists: boolean) => void): void {
-        // this.app.getLogger().info(".fastExistCheck", path.toString(), getContext(ctx));
+        // this.client.getLogger().info(".fastExistCheck", path.toString(), getContext(ctx));
+        this.client.getLogger().info(".fastExistCheck", path.toString());
 
-        return callback(!this.fs.getEntryByPath(path.toString()).isUnknown);
+        return callback(this.fs.existsSync(path.toString()));
     }
 
     _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
-        this.app.getLogger().info(".create", path.toString(), getContext(ctx));
-        if (ctx.type.isDirectory) {
-            this.fs.createFolderHierarchy(path.toString());
-        } else {
-            this.fs.createRAMFileHierarchy(path.toString(), path.fileName(), new Date());
+        this.client.getLogger().info(".create", path.toString(), getContext(ctx));
+
+        const exists = this.fs.existsSync(path.toString());
+        if(exists){
+            return callback(Errors.ResourceAlreadyExists);
         }
+
+        if(ctx.type.isDirectory){
+            this.fs.mkdirSync(path.toString(), {recursive: true});
+        }
+
+        if(ctx.type.isFile){
+            this.setFile(path, {
+                name: path.fileName(),
+                size: 0,
+                created: new Date(),
+                modified: new Date(),
+                chunks: [],
+                uploaded: false
+            });
+        }
+
+        this.client.markDirty();
         return callback();
     }
 
 
     // called on file download.
     async _openReadStream(path: v2.Path, ctx: v2.OpenReadStreamInfo, callback: v2.ReturnCallback<Readable>): Promise<void> {
-        this.app.getLogger().info(".openReadStream (path, estimatedSize, ctx)", path.toString(), ctx.estimatedSize, getContext(ctx));
-        const entry = this.fs.getEntryByPath(path.toString());
+        this.client.getLogger().info(".openReadStream (path, estimatedSize, ctx)", path.toString(), ctx.estimatedSize, getContext(ctx));
 
-        if (entry.isUnknown || entry.isFolder) {
+        const stat = this.fs.statSync(path.toString());
+
+        if(!stat.isFile()){
             return callback(Errors.ResourceNotFound);
         }
 
-        const file = entry.entry as FileBase;
-        this.app.getLogger().info("read: ", file);
-
-        if (file instanceof RamFile) {
-            this.app.getLogger().info(".openReadStream", "Opening ram file: " + path.toString());
-            return callback(undefined, (file as RamFile).getReadable());
+        const file = this.getFile(path)
+        if(!file.uploaded){
+            return callback(undefined, Readable.from(Buffer.from([])));
         }
 
-        this.app.getLogger().info(".openReadStream, fetching: ", file.toString());
-        const readStream = await this.app.getDiscordFileManager().getDownloadableReadStream(file as RemoteFile)
-        this.app.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
+        this.client.getLogger().info(".openReadStream, fetching: ", file.toString());
+        const readStream = await this.client.getDiscordFileManager().getDownloadableReadStream(file)
+        this.client.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
 
         return callback(undefined, readStream);
     }
 
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         const { targetSource, estimatedSize, mode } = ctx;
-        this.app.getLogger().info(".openWriteStream", targetSource, estimatedSize, mode, "shouldEncrypt: ", this.app.shouldEncryptFiles());
+        this.client.getLogger().info(".openWriteStream", targetSource, estimatedSize, mode, "shouldEncrypt: ", this.client.shouldEncryptFiles());
 
-        const entry = this.fs.getEntryByPath(path.toString());
 
-        if(entry.isUnknown || entry.isFolder) {
+        const stat = this.fs.statSync(path.toString());
+
+        if(!stat.isFile()){
             return callback(Errors.InvalidOperation);
         }
 
-        let file = entry.entry as FileBase;
+        const file = this.getFile(path);
 
-        // looks like most managers does not provide estimated size on  newly created file. 
-        // So we put it into ram to be able to say that file is created and give it back to open on client to allow modify it without have user to wait for initial upload.
-        // TODO: debug for big sizes.
-        if (ctx.estimatedSize == -1 && entry.entry instanceof RamFile) {
-            this.app.getLogger().info(".openWriteStream, ram file created: ", file.getAbsolutePath());
-            return callback(undefined, entry.entry.getWritable());
+        // if uploaded
+        if(file.uploaded){
+            for(const chunk of file.chunks){
+                this.client.addToDeletionQueue({
+                    channel: (await this.client.getFileChannel()).id,
+                    message: chunk.id
+                });
+            }
+            file.chunks = [];
+            file.uploaded = false;
+            this.setFile(path, file);
         }
 
-        // at this point we need to update file with new attachments. since discord does not allow to update attachments, we need to delete old one and upload new one.
-        // to do that we removing old file from VirtualFS and from discord, then creating new one and uploading it and putting it into VirtualFS back
-        if (file instanceof RemoteFile) {
-            await this.app.getDiscordFileManager().deleteFile(file);
-        }
 
-        file = new RemoteFile(path.fileName(), ctx.estimatedSize, file.rm(), file.getCreationDate());
-
-        const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(file as RemoteFile, ctx.estimatedSize, {
+        const writeStream = await this.client.getDiscordFileManager().getUploadWritableStream(file, {
             onFinished: async () => {
-                this.app.getLogger().info(".openWriteStream", "File uploaded: " + path.toString());
-                await this.app.getDiscordFileManager().postMetaFile(file as RemoteFile);
-            },
+                this.client.getLogger().info(".openWriteStream", "Stream finished: " + path.toString());
+                file.uploaded = true;
+                this.setFile(path, file, true);
+            }
         });
 
-        this.app.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
-
-
+        this.client.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
+        
         return callback(undefined, writeStream);
     }
 
 
     async _delete(path: v2.Path, ctx: v2.DeleteInfo, callback: v2.SimpleCallback): Promise<void> {
-        this.app.getLogger().info(".delete", path.toString(), getContext(ctx));
-        const entry = this.fs.getEntryByPath(path.toString());
-        if (entry.isUnknown) {
-            return callback(Errors.InvalidOperation);
-        }
+        this.client.getLogger().info(".delete", path.toString(), getContext(ctx));
 
-        if (entry.isFolder) {
-            const entires = (entry.entry as Folder).getallEntriesRecursiveThis();
+        const stat = this.fs.statSync(path.toString());
 
-            for (const e of entires) {
-                if (e.entry instanceof FileBase) {
-                    if (e.entry instanceof RemoteFile) {
-                        await this.app.getDiscordFileManager().deleteFile(e.entry, false);
-                    }
-                    e.entry.rm();
+        if(stat.isFile()){
+            const file = this.getFile(path);
+
+            if(file.uploaded){
+                for(const chunk of file.chunks){
+                    this.client.addToDeletionQueue({
+                        channel: (await this.client.getFileChannel()).id,
+                        message: chunk.id
+                    });
                 }
+        
             }
-
-            this.fs.removeFolderHierarchy(entry.entry as Folder);
-            return callback(undefined);
         }
 
-        const file = entry.entry as FileBase;
-        this.app.getLogger().info(".delete, Trying to delete file", file)
-
-        if (file instanceof RemoteFile) {
-            await this.app.getDiscordFileManager().deleteFile(file, false);
+        if(stat.isDirectory()){
+            // TODO: delete all files in directory
+            return callback(Errors.Forbidden);
         }
-        file.rm();
-        callback();
+
+
+        this.fs.rmSync(path.toString(), {recursive: true});
+        this.client.markDirty();
+        return callback();
     }
 
 
     // serverside copy
-    async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        const source = this.fs.getEntryByPath(pathFrom.toString());
-        const target = this.fs.getEntryByPath(pathTo.toString());
+    // async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
+    //     const source = this.fs.getEntryByPath(pathFrom.toString());
+    //     const target = this.fs.getEntryByPath(pathTo.toString());
 
-        if (source.isUnknown || !target.isUnknown) {
-            return callback(Errors.InvalidOperation);
-        }
+    //     if (source.isUnknown || !target.isUnknown) {
+    //         return callback(Errors.InvalidOperation);
+    //     }
 
-        if (source.isFile) {
-            const sourceTyped = source.entry as FileBase;
-            const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
+    //     if (source.isFile) {
+    //         const sourceTyped = source.entry as FileBase;
+    //         const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
 
-            const newFile = new RemoteFile(pathTo.fileName(), sourceTyped.getSize(), newFolder, sourceTyped.getCreationDate());
-            newFile.updateModifyDate();
+    //         const newFile = new RemoteFile(pathTo.fileName(), sourceTyped.getSize(), newFolder, sourceTyped.getCreationDate());
+    //         newFile.updateModifyDate();
 
-            const writeStream = await this.app.getDiscordFileManager().getUploadWritableStream(newFile as RemoteFile, sourceTyped.getSize(), {
-                onFinished: async () => {
-                    this.app.getLogger().info(".copy", "File uploaded: " + pathTo.toString());
-                    await this.app.getDiscordFileManager().postMetaFile(newFile as RemoteFile);
-                }
-            });
+    //         const writeStream = await this.client.getDiscordFileManager().getUploadWritableStream(newFile as RemoteFile, sourceTyped.getSize(), {
+    //             onFinished: async () => {
+    //                 this.client.getLogger().info(".copy", "File uploaded: " + pathTo.toString());
+    //                 await this.client.getDiscordFileManager().postMetaFile(newFile as RemoteFile);
+    //             }
+    //         });
 
-            if (sourceTyped instanceof RamFile) {
-                sourceTyped.getReadable().pipe(writeStream);
-            } else {
-                const readStream = (await this.app.getDiscordFileManager().getDownloadableReadStream(sourceTyped as RemoteFile));
-                patchEmitter(readStream, "readStream", [/data/]);
-                readStream.pipe(writeStream);
+    //         if (sourceTyped instanceof RamFile) {
+    //             sourceTyped.getReadable().pipe(writeStream);
+    //         } else {
+    //             const readStream = (await this.client.getDiscordFileManager().getDownloadableReadStream(sourceTyped as RemoteFile));
+    //             patchEmitter(readStream, "readStream", [/data/]);
+    //             readStream.pipe(writeStream);
 
-            }
+    //         }
 
-            writeStream.on("finish", () => {
-                this.app.getLogger().info(".copy", "File copied: " + pathTo.toString());
-                callback(undefined, true);
-            });
+    //         writeStream.on("finish", () => {
+    //             this.client.getLogger().info(".copy", "File copied: " + pathTo.toString());
+    //             callback(undefined, true);
+    //         });
 
-            writeStream.on("error", (err) => {
-                this.app.getLogger().error(".copy", "Error while copying file: " + pathTo.toString(), err);
-                callback(err);
-            });
+    //         writeStream.on("error", (err) => {
+    //             this.client.getLogger().error(".copy", "Error while copying file: " + pathTo.toString(), err);
+    //             callback(err);
+    //         });
 
-        }
+    //     }
 
-        if (source.isFolder) {
-            return callback(Errors.InvalidOperation); // TODO: implement
-        }
-    }
+    //     if (source.isFolder) {
+    //         return callback(Errors.InvalidOperation); // TODO: implement
+    //     }
+    // }
 
-    // very, VERY dirty, TODO: clean up
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
-        this.app.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), getContext(ctx));
+        this.client.getLogger().info(".move", pathFrom.toString(), pathTo.toString(), getContext(ctx));
 
-        const sourceEntry = this.fs.getEntryByPath(pathFrom.toString());
-        const targetEntry = this.fs.getEntryByPath(pathTo.toString());
+        const sourceExists = this.fs.existsSync(pathFrom.toString());
+        const targetExists = this.fs.existsSync(pathTo.toString());
 
-        if (sourceEntry.isUnknown || !targetEntry.isUnknown) {
+        if (!sourceExists || targetExists) {
             return callback(Errors.InvalidOperation);
         }
 
-        if (sourceEntry.isFile) {
-            const file = sourceEntry.entry as FileBase;
+        this.fs.renameSync(pathFrom.toString(), pathTo.toString());
+        this.client.markDirty();
 
-            const newFolder = this.fs.prepareFileHierarchy(pathTo.toString());
-            const oldFolder = file.getFolder()!;
-            file.setFolder(newFolder);
-            file.setFileName(pathTo.fileName());
-
-            this.app.getLogger().info("pathTo: " + pathTo.fileName());
-            this.app.getLogger().info("absolutePath: " + newFolder.getAbsolutePath());
-            this.fs.moveFile(file, oldFolder, newFolder.getAbsolutePath());
-            if (file instanceof RemoteFile) {
-                await this.app.getDiscordFileManager().updateMetaFile(file);
-            }
-            return callback(undefined, true);
-        }
-
-        if (sourceEntry.isFolder) {
-            const oldFolder = sourceEntry.entry as Folder;
-            const newFolder = this.fs.prepareFolderHierarchy(pathTo.toString());
-
-            oldFolder.getFiles().forEach(file => {
-                newFolder.addFile(file);
-            });
-
-            newFolder.setFolders(oldFolder.getFolders(), true);
-
-            oldFolder.removeThisFolder();
-            oldFolder.setParentFolder(null);
-
-            // TODO: maybe paths should be cached only in client and let user do path managing manually to avoid this loop?
-            // or we should to extra table of folders and bind path to folderId to avoid this loop?
-            for (let file of newFolder.getallEntriesRecursiveThis()) {
-                if (file.isFile && file.entry instanceof RemoteFile) {
-                    await this.app.getDiscordFileManager().updateMetaFile(file.entry as RemoteFile);
-                }
-            }
-
-            return callback(undefined, false)
-        }
-
-        return callback(Errors.InvalidOperation);
+        return callback(undefined, true);
     }
 
     async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
-        const entry = this.fs.getEntryByPath(pathFrom.toString());
-        if (entry.isUnknown) {
-            return callback(Errors.ResourceNotFound);
-        }
 
-        if (entry.isFolder) {
-            (entry.entry as Folder).setName(newName);
-            return callback(undefined, true);
-        }
+        const oldPath = pathFrom.toString();
+        const newPath = pathFrom.parentName() + "/" + newName;
 
-        const file = entry.entry as FileBase;
-        file.setFileName(newName);
-        if (file instanceof RemoteFile) {
-            await this.app.getDiscordFileManager().updateMetaFile(file);
-        }
-        return callback(undefined, true);
+        this.fs.renameSync(oldPath, newPath);
+        callback(undefined, true);
+
+    //     const entry = this.fs.getEntryByPath(pathFrom.toString());
+    //     if (entry.isUnknown) {
+    //         return callback(Errors.ResourceNotFound);
+    //     }
+
+    //     if (entry.isFolder) {
+    //         (entry.entry as Folder).setName(newName);
+    //         return callback(undefined, true);
+    //     }
+
+    //     const file = entry.entry as FileBase;
+    //     file.setFileName(newName);
+    //     if (file instanceof RemoteFile) {
+    //         await this.client.getDiscordFileManager().updateMetaFile(file);
+    //     }
+    //     return callback(undefined, true);
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entry = this.fs.getEntryByPath(path.toString());
-        if (entry.isUnknown) {
-            return callback(Errors.ResourceNotFound);
-        }
+        // this.client.getLogger().info(".lastModifiedDate", path.toString());
 
-        if (entry.isFolder) {
+        const stat = this.fs.statSync(path.toString());
+
+        if(stat.isDirectory()) {
             return callback(undefined, 0);
         }
 
-        const file = entry.entry as FileBase;
-        this.app.getLogger().info("getModDate: " + path.toString() + " " + file.getModifyDate());
-
-        return callback(undefined, file.getModifyDate().valueOf());
+        return callback(undefined, stat.mtimeMs);
     }
 
     protected _creationDate(path: v2.Path, ctx: v2.CreationDateInfo, callback: v2.ReturnCallback<number>): void {
-        const entry = this.fs.getEntryByPath(path.toString());
-        if (entry.isUnknown) {
-            return callback(Errors.ResourceNotFound);
-        }
+        // this.client.getLogger().info(".creationDate", path.toString());
 
-        if (entry.isFolder) {
+        const stat = this.fs.statSync(path.toString());
+
+        if(stat.isDirectory()) {
             return callback(undefined, 0);
         }
 
-        const file = entry.entry as FileBase;
-        this.app.getLogger().info("getCreationDate: " + path.toString() + " " + file.getModifyDate());
-
-        return callback(undefined, file.getCreationDate().valueOf());
+        return callback(undefined, stat.birthtime.valueOf());
     }
 
 
 
     protected _etag(path: v2.Path, ctx: v2.ETagInfo, callback: v2.ReturnCallback<string>): void {
-        this.app.getLogger().info(".etag", path.toString());
-        const entry = this.fs.getEntryByPath(path.toString());
-        if (entry.isUnknown) {
-            return callback(Errors.ResourceNotFound);
-        }
+        // this.client.getLogger().info(".etag", path.toString());
 
-        if (entry.isFolder) {
+        const stat = this.fs.statSync(path.toString());
+
+        if(stat.isDirectory()) {
             return callback(undefined, "0");
         }
 
-        const tag = entry.entry instanceof FileBase ? (entry.entry as FileBase).getETag() : Math.random().toString();
-        this.app.getLogger().info("etag: " + path.toString() + " " + tag);
-        callback(undefined, tag);
+        return callback(undefined, stat.mtimeMs.toString());
     }
 
 }
