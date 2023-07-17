@@ -4,9 +4,9 @@ import { Errors } from "webdav-server/lib/index.v2.js";
 import { Volume } from "memfs/lib/volume.js";
 import mime from "mime-types";
 import path from "path";
-import FileStorageApp from "../../DICloudApp.js";
+import DICloudApp from "../../DICloudApp.js";
 import { IFile } from "../../file/IFile.js";
-import getFilesRecursive from "../../memfs/MemfsHelper.js";
+import getFilesRecursive from "../../helper/MemfsHelper.js";
 
 
 function getContext(ctx: v2.IContextInfo) {
@@ -20,7 +20,6 @@ function getContext(ctx: v2.IContextInfo) {
 
 /**
  * Virtual file system wrapper on top of DiscordFileStorageApp.
- * Some methods are not implemented yet or not implemented at all but some basic functionality is working.
  */
 export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializer {
     uid(): string {
@@ -34,13 +33,13 @@ export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializ
     }
 }
 
-export default class WebdavFilesystemHandler extends v2.FileSystem {
-    private client: FileStorageApp;
+export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
+    private client: DICloudApp;
     private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
     private fs: Volume;
 
-    constructor(client: FileStorageApp) {
+    constructor(client: DICloudApp) {
         super(new VirtualDiscordFileSystemSerializer());
         this.client = client;
         this.fs = client.getFs();
@@ -64,12 +63,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, []);
     }
 
-    private fixPath(path: v2.Path) {
-        if(!path.toString().startsWith("/")){
-            return new v2.Path("/" + path.toString());
-        }
-        return path;
-    }
 
     /**
      * Returns the mime type of the file according to the file extension. (Not by the file content)
@@ -341,23 +334,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         this.fs.renameSync(oldPath, newPath);
         callback(undefined, true);
-
-    //     const entry = this.fs.getEntryByPath(pathFrom.toString());
-    //     if (entry.isUnknown) {
-    //         return callback(Errors.ResourceNotFound);
-    //     }
-
-    //     if (entry.isFolder) {
-    //         (entry.entry as Folder).setName(newName);
-    //         return callback(undefined, true);
-    //     }
-
-    //     const file = entry.entry as FileBase;
-    //     file.setFileName(newName);
-    //     if (file instanceof RemoteFile) {
-    //         await this.client.getDiscordFileManager().updateMetaFile(file);
-    //     }
-    //     return callback(undefined, true);
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
@@ -383,7 +359,6 @@ export default class WebdavFilesystemHandler extends v2.FileSystem {
 
         return callback(undefined, stat.birthtime.valueOf());
     }
-
 
 
     protected _etag(path: v2.Path, ctx: v2.ETagInfo, callback: v2.ReturnCallback<string>): void {

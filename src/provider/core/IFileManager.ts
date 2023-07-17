@@ -1,4 +1,4 @@
-import { IFile } from "../file/IFile";
+import { IFile } from "../../file/IFile";
 import { Readable, Writable } from "stream";
 
 

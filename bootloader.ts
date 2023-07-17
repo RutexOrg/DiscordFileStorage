@@ -5,9 +5,9 @@ import fs from "node:fs";
 import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
 import color from "colors/safe.js";
-import FileStorageApp, { print, printAndExit } from "./src/DICloudApp.js";
+import DICloudApp, { print, printAndExit } from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
-import WebdavFilesystemHandler from "./src/provider/discord/DiscordWebdavFilesystemHandler.js";
+import DiscordWebdavFilesystemHandler from "./src/provider/discord/DiscordWebdavFilesystemHandler.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -65,9 +65,9 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
 
 export async function boot(data: IBootParams){
     console.log(`NodeJS version: ${process.version}`);
-    console.log(color.yellow("Starting DiscordFileStorage..."));
+    console.log(color.yellow("Starting DICloud..."));
     const params = bootPrecheck(data);
-    const app = new FileStorageApp({
+    const app = new DICloudApp({
         intents: [
             GatewayIntentBits.MessageContent,
         ],
@@ -89,7 +89,7 @@ export async function boot(data: IBootParams){
     if (params.startWebdavServer) {
         const serverLaunchOptions: ServerOptions = {
             port: params.webdavPort,   
-            rootFileSystem: new WebdavFilesystemHandler(app),
+            rootFileSystem: new DiscordWebdavFilesystemHandler(app),
         }
 
         if (params.enableHttps) {

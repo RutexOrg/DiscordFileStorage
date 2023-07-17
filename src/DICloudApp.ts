@@ -1,7 +1,7 @@
 import color from 'colors/safe.js';
 import nodeFS from 'fs';
 import os from 'os';
-import DiscordFileManager from './provider/discord/DiscordFileProvider.js';
+import DiscordFileProvider from './provider/discord/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
 import { Volume } from 'memfs/lib/volume.js';
@@ -15,7 +15,7 @@ interface IDelayedDeletionEntry {
     message: string;
 }
 
-export interface DiscordFileStorageAppOptions extends ClientOptions {
+export interface DICloudAppOptions extends ClientOptions {
     metaChannelName: string;
     filesChannelName: string;
 
@@ -24,41 +24,42 @@ export interface DiscordFileStorageAppOptions extends ClientOptions {
 }
 
 /**
- * Main class of the DiscordFileStorageApp. It is a Discord.js client with some additional functionality.
+ * Main class of the DICloud. It is a Discord.js client with some additional functionality.
  */
-export default class FileStorageApp extends Client {
+export default class DICloudApp extends Client {
 
     private guildId: string;
     private metaChannelName: string;
     private filesChannelId: string;
     private channelsToCreate: Array<string>;
-    private currentProvider: DiscordFileManager;
+    private currentProvider: DiscordFileProvider;
 
     private shouldEncrypt;
     private encryptPassword;
 
-    public static instance: FileStorageApp;
-    private logger = make("DiscordFileStorageApp", true);
+    public static instance: DICloudApp;
+    private logger = make("DICloud", true);
 
     private preloadComplete: boolean = false;
     private metadataMessageId: string | undefined;
     private fs!: Volume;
+
     private debounceTimeout: NodeJS.Timeout | undefined;
     private debounceTimeoutTime: number = 4000;
 
-    private fileDeletionQueue: Array<IDelayedDeletionEntry> = [];
 
     private tickInterval: NodeJS.Timeout | undefined;
     private tickIntervalTime: number = 1000;
+    private fileDeletionQueue: Array<IDelayedDeletionEntry> = [];
 
-    private medataInfoMessage: string = "DiscordFS Metadata ✔";
+    private readonly medataInfoMessage: string = "DiscordFS Metadata ✔";
 
-    constructor(options: DiscordFileStorageAppOptions, guildId: string) {
+    constructor(options: DICloudAppOptions, guildId: string) {
         super(options);
-        if (FileStorageApp.instance) {
-            throw new Error("DiscordFileStorageApp already exists");
+        if (DICloudApp.instance) {
+            throw new Error("DICloud already running");
         }
-        FileStorageApp.instance = this;
+        DICloudApp.instance = this;
 
         this.channelsToCreate = [
             options.metaChannelName,
@@ -72,8 +73,7 @@ export default class FileStorageApp extends Client {
         this.encryptPassword = options.encryptPassword ?? "";
 
         this.guildId = guildId;
-        this.currentProvider = new DiscordFileManager(this);
-
+        this.currentProvider = new DiscordFileProvider(this);
 
     }
 
@@ -272,7 +272,7 @@ export default class FileStorageApp extends Client {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    public getCurrentProvider(): DiscordFileManager {
+    public getCurrentProvider(): DiscordFileProvider {
         return this.currentProvider;
     }
 

@@ -1,7 +1,7 @@
 import { HTTPCodes, v2 as webdav } from "webdav-server";
 import { Server, IncomingMessage, ServerResponse } from "http";
 import { HTTPMethod } from "webdav-server/lib/index.v2";
-import FileStorageApp from "../DICloudApp";
+import DICloudApp from "../DICloudApp";
 
 export interface IUserData {
     username: string;
@@ -14,15 +14,15 @@ export interface ServerOptions extends webdav.WebDAVServerOptions {
 };
 
 export default class WebdavServer extends webdav.WebDAVServer {
-    private app: FileStorageApp;
+    private app: DICloudApp;
     
-    private constructor(options: ServerOptions, app: FileStorageApp) {
+    private constructor(options: ServerOptions, app: DICloudApp) {
         super(options);
         this.app = app;
         // this.setupBeforeRequestHandler();
     }
 
-    public static createServer(options: ServerOptions, app: FileStorageApp): WebdavServer {
+    public static createServer(options: ServerOptions, app: DICloudApp): WebdavServer {
         const userManager = new webdav.SimpleUserManager();
         const privManager = new webdav.SimplePathPrivilegeManager();
         

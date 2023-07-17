@@ -1,15 +1,15 @@
 import path from "path";
 import { AttachmentBuilder, TextBasedChannel } from "discord.js";
 import { Writable, Readable, Transform, pipeline } from "stream";
-import FileStorageApp from "../../DICloudApp.js";
+import DICloudApp from "../../DICloudApp.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import { IWriteStreamCallbacks } from "../IFileManager.js";
+import { IWriteStreamCallbacks } from "../core/IFileManager.js";
 import MutableBuffer from "../../helper/MutableBuffer.js";
 import crypto from "crypto";
 import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
 import { patchEmitter } from "../../helper/EventPatcher.js";
 import { IFile } from "../../file/IFile.js";
-import IProvider from "../IProvider.js";
+import IProvider from "../core/IProvider.js";
 
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of 8 old MB. 
@@ -17,10 +17,10 @@ export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb
 /**
  * Class that handles all the remote file management on discord.
  */
-export default class DiscordFileManager implements IProvider {
-    private app: FileStorageApp;
+export default class DiscordFileProvider implements IProvider {
+    private app: DICloudApp;
 
-    constructor(client: FileStorageApp) {
+    constructor(client: DICloudApp) {
         this.app = client;
     }
 
