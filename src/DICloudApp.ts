@@ -265,7 +265,7 @@ export default class DICloudApp extends Client {
     public addToDeletionQueue(info: IDelayedDeletionEntry) {
         this.fileDeletionQueue.push(info);
     }
-    
+
     // public async sleep(ms: number) {
     //     return new Promise(resolve => setTimeout(resolve, ms));
     // }
@@ -282,10 +282,6 @@ export default class DICloudApp extends Client {
     public getFs() {
         return this.fs;
     }
-
-
-
-
 
 }
 
