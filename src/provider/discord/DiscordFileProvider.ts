@@ -3,12 +3,12 @@ import { AttachmentBuilder, TextBasedChannel } from "discord.js";
 import { Writable, Readable, Transform, pipeline } from "stream";
 import DICloudApp from "../../DICloudApp.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import { IWriteStreamCallbacks } from "../core/IFileManager.js";
+import { IWriteStreamCallbacks } from "../core/IRemoteFileProvider.js";
 import MutableBuffer from "../../helper/MutableBuffer.js";
 import crypto from "crypto";
 import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
 import { patchEmitter } from "../../helper/EventPatcher.js";
-import { IFile } from "../../file/IFile.js";
+import { IFileDesc } from "../../file/IFile.js";
 import IProvider from "../core/IProvider.js";
 
 
@@ -45,7 +45,7 @@ export default class DiscordFileProvider implements IProvider {
         return (str.length > n) ? str.substr(0, n - 1) : str;
     }
 
-    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFile) {
+    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFileDesc) {
         this.app.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
@@ -95,7 +95,7 @@ export default class DiscordFileProvider implements IProvider {
         return chiper;
     }
 
-    public async getDownloadableReadStream(file: IFile): Promise<Readable> {
+    public async getDownloadReadStream(file: IFileDesc): Promise<Readable> {
         this.app.getLogger().info(".getDownloadableReadStream() - file: " + file.name);
         const readStream = (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
 
@@ -119,7 +119,7 @@ export default class DiscordFileProvider implements IProvider {
     }
 
 
-    public async getUploadWritableStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
+    public async getUploadWriteStream(file: IFileDesc, callbacks: IWriteStreamCallbacks): Promise<Writable> {
         this.app.getLogger().info(".getUploadWritableStream() - file: " + file.name);
 
         const size = file.size;
@@ -129,7 +129,7 @@ export default class DiscordFileProvider implements IProvider {
 
         let currentChunkNumber = 1;
 
-        const write = new Writable({
+        const writeStream = new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
                 // console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
@@ -156,11 +156,19 @@ export default class DiscordFileProvider implements IProvider {
 
                 this.app.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
+            },
+            destroy: (err, callback) => {
+                this.app.getLogger().info("destroy() Destroying write stream (error: " + err + ")");
+                buffer.destory();
+                if (callbacks.onAbort) {
+                    callbacks.onAbort(err);
+                }
+                callback(err);
             }
         });
 
         if (!this.app.shouldEncryptFiles()) {
-            return write;
+            return writeStream;
         }
 
 
@@ -168,7 +176,7 @@ export default class DiscordFileProvider implements IProvider {
         // Since we give the encryption stream back and it closes too early, the write stream stream is not flushed all its data in discord, what results in a corrupted file or telling client at wrong time that the file is uploaded, when it is not. 
         // this is why we need to wait for the write stream to finish before we close the encryption stream.
         const cipher = this.createEncryptor(false);
-        cipher.pipe(write);
+        cipher.pipe(writeStream);
 
         const pt = new Writable({
             write: (chunk, encoding, callback) => {
@@ -176,20 +184,20 @@ export default class DiscordFileProvider implements IProvider {
             },
             final: (callback) => {
                 cipher.end();
-                write.once("finish", () => {
+                writeStream.once("finish", () => {
                     callback();
                 });
             }
         });
 
-        write.on("error", (err) => {
+        writeStream.on("error", (err) => {
             this.app.getLogger().info("write.on('error')", err);
             pt.destroy(err);
             cipher.emit("end");
             cipher.destroy();
         });
 
-        write.on("finish", () => {
+        writeStream.on("finish", () => {
             pt.end();
             cipher.emit("end");
             cipher.destroy();

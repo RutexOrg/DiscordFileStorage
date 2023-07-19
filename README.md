@@ -49,10 +49,12 @@ Create a bot with admin permissions and invite it to your server. If you already
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
 ## Setup
-1. Install [NodeJS (Tested on 18)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
+1. Install [NodeJS (Tested on 16)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
-4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data.
+4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data (token, server id). Other settings are optional and documented in the file. \
+__If you dont have opportunity to use .env file, you can set environment variables instead, they should have the same names as in `.env.example` file.__
+
 5. To run the bot, run ``yarn start``. This will compile the project and start the bot.
 
 ## SSL
@@ -70,11 +72,11 @@ Files in discord are not encrypted. Because of this, the server supports encrypt
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
 2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. \
-**WARNING**. If you lose this password, you will not be able to decrypt your files.
+**WARNING**. If you lose this password, you **WILL NOT** be able to decrypt your files.
 
 
 
-**Warning**. Still being tested. If you see any error like ``decipher Error: Unsupported state or unable to authenticate data``, this is **normal**, the decrypted file **isnt corrupted** (you can check this with any hashing tool yourself).  I will try to fix this in the future.
+**Warning**. Unless its look to work stable, encryption feature still being tested. If you see any error like ``decipher Error: Unsupported state or unable to authenticate data``, this is **normal**, the decrypted file **isnt corrupted** (you can check this with any hashing tool yourself).  I will try to fix this in the future.
 
 ## Authorization
 You can set authorization for the server. To do this, set ``AUTH`` to ``true`` in ``.env`` file.

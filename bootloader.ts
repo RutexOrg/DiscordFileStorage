@@ -131,7 +131,7 @@ export async function boot(data: IBootParams){
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", arg.responseBody);
+            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
             next();
         });
     }
@@ -145,7 +145,6 @@ export async function envBoot() {
     const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name", "string", "files");
     const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name", "string", "meta");
 
-    const startWebdavServer = checkEnvVariableIsSet("START_WEBDAV", "Please set the START_WEBDAV to true or false to start webdav server", "boolean", true) as boolean;
     const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
 
     const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
@@ -162,7 +161,7 @@ export async function envBoot() {
         filesChannelName,
         metaChannelName,
         webdavPort,
-        startWebdavServer,
+        startWebdavServer: true,
         enableHttps,
         enableAuth,
         users: users,
@@ -235,7 +234,6 @@ export function readFileSyncOrUndefined(path: string): string | undefined {
         return undefined;
     }
 }
-
 
 
 process.on("uncaughtException", (err) => {

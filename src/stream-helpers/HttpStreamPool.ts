@@ -66,7 +66,6 @@ export default class HttpStreamPool {
 				return;
 			}
 
-			// print download progress in percentage each 10%. at 0, 10, 20, 30, ... 100%
 			res.data.on("data", (chunk: Buffer) => {
 				self.gotSize += chunk.length;
 				stream.emit("progress", self.gotSize, self.totalSize);
@@ -79,7 +78,7 @@ export default class HttpStreamPool {
 
 			res.data.on("error", (err: Error) => {
 				console.error(err);
-				// stream.emit("error", err);
+				stream.emit("error", err);
 			});
 
 			res.data.pipe(stream, { end: false });

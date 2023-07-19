@@ -5,7 +5,7 @@ import DiscordFileProvider from './provider/discord/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
 import { Volume } from 'memfs/lib/volume.js';
-import { IFiles } from './file/IFile.js';
+import { IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextBasedChannel, TextChannel } from 'discord.js';
 
 
@@ -45,7 +45,7 @@ export default class DICloudApp extends Client {
     private fs!: Volume;
 
     private debounceTimeout: NodeJS.Timeout | undefined;
-    private debounceTimeoutTime: number = 4000;
+    private debounceTimeoutTime: number = 2000;
 
 
     private tickInterval: NodeJS.Timeout | undefined;
@@ -195,17 +195,12 @@ export default class DICloudApp extends Client {
         }
 
         const file = await axios.get(attachment.url, { responseType: "arraybuffer" });
-        const data = JSON.parse(file.data.toString()) as IFiles;
+        const data = JSON.parse(file.data.toString()) as IFilesDesc;
 
         this.fs = Volume.fromJSON(data as any);
     }
 
     public async saveFiles() {
-        if (!this.fs) {
-            console.log(color.red("No filesystem loaded, can't save files"));
-            return;
-        }
-
         console.log(color.yellow("Saving files..."));
         if (!this.metadataMessageId) {
             console.log(color.red("No metadata message id found, can't save files. Did you load the files?"));
@@ -221,14 +216,18 @@ export default class DICloudApp extends Client {
             return;
         }
 
-        const obj = this.fs.toJSON()
-        const file = JSON.stringify(obj);
+        const jsonfs = this.fs.toJSON()
+        const file = JSON.stringify(jsonfs);
+
         await msg.edit({
             files: [{
                 name: "discordfs.json",
                 attachment: Buffer.from(file)
             }],
-            content: this.medataInfoMessage + '\n\n' + 'Last saved: ' + new Date().toLocaleString() + '\n' + 'Database Size: ' + file.length + ' bytes' + '\n' + 'Files: ' + Object.keys(obj).length + ' files'
+            content: this.medataInfoMessage 
+                + '\n\n' + 'Last saved: ' + new Date().toLocaleString() 
+                + '\n' + 'Database Size: ' + file.length + ' bytes' 
+                + '\n' + 'Files: ' + Object.keys(jsonfs).length + ' files'
         })
     }
 
@@ -266,11 +265,10 @@ export default class DICloudApp extends Client {
     public addToDeletionQueue(info: IDelayedDeletionEntry) {
         this.fileDeletionQueue.push(info);
     }
-
-
-    public async sleep(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    
+    // public async sleep(ms: number) {
+    //     return new Promise(resolve => setTimeout(resolve, ms));
+    // }
 
     public getCurrentProvider(): DiscordFileProvider {
         return this.currentProvider;
