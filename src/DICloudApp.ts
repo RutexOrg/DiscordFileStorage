@@ -7,6 +7,7 @@ import { make } from './Log.js';
 import { Volume } from 'memfs/lib/volume.js';
 import { IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextBasedChannel, TextChannel } from 'discord.js';
+import VolumeEx from './file/VolumeEx.js';
 
 
 
@@ -42,7 +43,7 @@ export default class DICloudApp extends Client {
 
     private preloadComplete: boolean = false;
     private metadataMessageId: string | undefined;
-    private fs!: Volume;
+    private fs!: VolumeEx;
 
     private debounceTimeout: NodeJS.Timeout | undefined;
     private debounceTimeoutTime: number = 2000;
@@ -197,7 +198,7 @@ export default class DICloudApp extends Client {
         const file = await axios.get(attachment.url, { responseType: "arraybuffer" });
         const data = JSON.parse(file.data.toString()) as IFilesDesc;
 
-        this.fs = Volume.fromJSON(data as any);
+        this.fs = VolumeEx.fromJSON(data as any);
     }
 
     public async saveFiles() {

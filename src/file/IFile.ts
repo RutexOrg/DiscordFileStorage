@@ -1,10 +1,10 @@
-export interface IFileDesc {
+export interface IFile {
     name: string; // the name isnt really needed/used since everything handled by memfs, but its nice to have it (for debugging and stuff) 
     size: number;
     chunks: IChunkInfo[]
     created: Date;
     modified: Date;
-    uploaded: boolean; 
+    // uploaded: boolean;
 }
 
 export interface IChunkInfo {
@@ -14,4 +14,4 @@ export interface IChunkInfo {
 }
 
 
-export type IFilesDesc = Record<string, IFileDesc>;
+export type IFilesDesc = Record<string, IFile>;

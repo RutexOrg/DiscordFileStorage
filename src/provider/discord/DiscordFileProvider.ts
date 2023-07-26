@@ -1,6 +1,6 @@
 import path from "path";
 import { AttachmentBuilder, TextBasedChannel } from "discord.js";
-import { Writable, Readable, Transform, pipeline } from "stream";
+import { Writable, Readable } from "stream";
 import DICloudApp from "../../DICloudApp.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
 import { IWriteStreamCallbacks } from "../core/IRemoteFileProvider.js";
@@ -8,11 +8,11 @@ import MutableBuffer from "../../helper/MutableBuffer.js";
 import crypto from "crypto";
 import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
 import { patchEmitter } from "../../helper/EventPatcher.js";
-import { IFileDesc } from "../../file/IFile.js";
+import { IFile } from "../../file/IFile.js";
 import IProvider from "../core/IProvider.js";
 
 
-export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of 8 old MB. 
+export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
 
 /**
  * Class that handles all the remote file management on discord.
@@ -41,11 +41,11 @@ export default class DiscordFileProvider implements IProvider {
     // truncates a string to a certain length. 
     // truncate("hello world", 5) => "hello",
     // truncate("hello world", 2) => "he"
-    private truncate(str: string, n: number) {
-        return (str.length > n) ? str.substr(0, n - 1) : str;
+    private truncate(str: string, n: number, includeDots: boolean = false) {
+        return ((str.length > n) ? str.substr(0, n - 1) : str) + (includeDots && str.length > n ? '...' : '');
     }
 
-    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFileDesc) {
+    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFile) {
         this.app.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
@@ -95,7 +95,7 @@ export default class DiscordFileProvider implements IProvider {
         return chiper;
     }
 
-    public async getDownloadReadStream(file: IFileDesc): Promise<Readable> {
+    public async getDownloadReadStream(file: IFile): Promise<Readable> {
         this.app.getLogger().info(".getDownloadableReadStream() - file: " + file.name);
         const readStream = (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
 
@@ -119,7 +119,7 @@ export default class DiscordFileProvider implements IProvider {
     }
 
 
-    public async getUploadWriteStream(file: IFileDesc, callbacks: IWriteStreamCallbacks): Promise<Writable> {
+    public async getUploadWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
         this.app.getLogger().info(".getUploadWritableStream() - file: " + file.name);
 
         const size = file.size;

@@ -1,4 +1,4 @@
-import { IFileDesc } from "../../file/IFile";
+import { IFile } from "../../file/IFile";
 import { Readable, Writable } from "stream";
 
 
@@ -10,6 +10,6 @@ export interface IWriteStreamCallbacks {
 
 
 export default interface IFIleManager {
-    getDownloadReadStream(file: IFileDesc, callback: (stream: Readable) => void): void;
-    getUploadWriteStream(file: IFileDesc, callbacks: IWriteStreamCallbacks): Promise<Writable>;
+    getDownloadReadStream(file: IFile, callback: (stream: Readable) => void): void;
+    getUploadWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
 }

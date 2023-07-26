@@ -5,8 +5,9 @@ import { Volume } from "memfs/lib/volume.js";
 import mime from "mime-types";
 import path from "path";
 import DICloudApp from "../../DICloudApp.js";
-import { IFileDesc } from "../../file/IFile.js";
+import { IFile } from "../../file/IFile.js";
 import getFilesPathsRecursive from "../../helper/MemfsHelper.js";
+import VolumeEx from "../../file/VolumeEx.js";
 
 
 function getContext(ctx: v2.IContextInfo) {
@@ -37,17 +38,12 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     private client: DICloudApp;
     private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
-    private fs: Volume;
+    private fs: VolumeEx;
 
     constructor(client: DICloudApp) {
         super(new VirtualDiscordFileSystemSerializer());
         this.client = client;
         this.fs = client.getFs();
-
-
-        // this.fs.watch("/", {recursive: true}, (event, filename) => {
-        // console.log("delete!!!!" , event, filename);
-        // });
     }
 
 
@@ -74,30 +70,13 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
-    private getFile(path: v2.Path): IFileDesc {
-        return JSON.parse(this.fs.readFileSync(path.toString()).toString(), (k, v) => {
-            if (k === "created" || k === "modified") {
-                return new Date(v);
-            }
-            return v;
-        }) as IFileDesc;
-    }
-
-    private setFile(path: v2.Path, file: IFileDesc, notifyAboutChanges: boolean = false) {
-        this.fs.writeFileSync(path.toString(), JSON.stringify(file));
-        if (notifyAboutChanges) {
-            this.client.markDirty();
-        }
-    }
-
-
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
         this.client.getLogger().info(".size", path.toString(), getContext(ctx));
 
         const stat = this.fs.statSync(path.toString());
 
         if (stat.isFile()) {
-            return callback(undefined, this.getFile(path).size);
+            return callback(undefined, this.fs.getFile(path.toString()).size);
         }
 
         return callback(Errors.NoSizeForAFolder);
@@ -105,7 +84,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
         this.client.getLogger().info(".readDir", path.toString(), getContext(ctx));
-
 
         const stat = this.fs.statSync(path.toString());
 
@@ -162,16 +140,15 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         }
 
         if (ctx.type.isFile) {
-            this.setFile(path, {
+            this.fs.setFile(path.toString(), {
                 name: path.fileName(),
                 size: 0,
                 created: new Date(),
                 modified: new Date(),
                 chunks: [],
-                uploaded: false
             });
         }
-
+        
         this.client.markDirty();
         return callback();
     }
@@ -187,8 +164,8 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.ResourceNotFound);
         }
 
-        const file = this.getFile(path)
-        if (!file.uploaded) {
+        const file = this.fs.getFile(path.toString())
+        if (file.chunks.length == 0) {
             return callback(undefined, Readable.from(Buffer.from([])));
         }
 
@@ -209,28 +186,27 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             return callback(Errors.InvalidOperation);
         }
 
-        const file = this.getFile(path);
+        const file = this.fs.getFile(path.toString());
 
         // if uploaded
-        if (file.uploaded) {
-            for (const chunk of file.chunks) {
-                this.client.addToDeletionQueue({
-                    channel: (await this.client.getFileChannel()).id,
-                    message: chunk.id
-                });
-            }
-            file.chunks = [];
-            file.uploaded = false;
-            this.setFile(path, file);
+        for (const chunk of file.chunks) {
+            this.client.addToDeletionQueue({
+                channel: (await this.client.getFileChannel()).id,
+                message: chunk.id
+            });
         }
+        file.chunks = [];
+        this.fs.setFile(path.toString(), file);
+        this.client.markDirty();
 
 
         const writeStream = await this.client.getCurrentProvider().getUploadWriteStream(file, {
             onFinished: async () => {
                 this.client.getLogger().info(".openWriteStream", "Stream finished: " + path.toString());
-                file.uploaded = true;
-                this.setFile(path, file, true);
+                this.fs.setFile(path.toString(), file);
+                this.client.markDirty();
             },
+
             onAbort: (err) => {
                 if (err) {
                     this.client.getLogger().info(".openWriteStream", "Stream aborted: " + path.toString());
@@ -250,28 +226,22 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         this.client.getLogger().info(".delete", path.toString(), getContext(ctx));
 
         const stat = this.fs.statSync(path.toString());
+        const filesToDelete = [];
 
         if (stat.isFile()) {
-            for (const chunk of this.getFile(path).chunks) {
+            filesToDelete.push(path.toString());
+        }
+
+        if (stat.isDirectory()) {
+            filesToDelete.push(...getFilesPathsRecursive(this.fs, path.toString()));
+        }
+
+        for (const fileToDelete of filesToDelete) {
+            for (const chunk of this.fs.getFile(fileToDelete).chunks) {
                 this.client.addToDeletionQueue({
                     channel: (await this.client.getFileChannel()).id,
                     message: chunk.id
                 });
-            }
-        }
-
-        if (stat.isDirectory()) {
-            const pathFiles = getFilesPathsRecursive(this.fs, path.toString());
-            for (const pathFile of pathFiles) {
-                const file = this.getFile(new v2.Path(pathFile));
-                if (file.uploaded) {
-                    for (const chunk of file.chunks) {
-                        this.client.addToDeletionQueue({
-                            channel: (await this.client.getFileChannel()).id,
-                            message: chunk.id
-                        });
-                    }
-                }
             }
         }
 
@@ -282,6 +252,38 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
+
+    private copyFile(pathFrom: v2.Path, pathTo: v2.Path): Promise<boolean> {
+        return new Promise(async (resolve, reject) => {
+            const oldFile = this.fs.getFile(pathFrom.toString());
+            const newFile: IFile = {
+                name: pathTo.fileName(),
+                created: new Date(),
+                modified: new Date(),
+                size: oldFile.size,
+                chunks: []
+            }
+
+            const readStream = await this.client.getCurrentProvider().getDownloadReadStream(oldFile);
+            const writeStream = await this.client.getCurrentProvider().getUploadWriteStream(newFile, {
+                onFinished: async () => {
+                    this.client.getLogger().info(".copy", "Stream finished: " + pathTo.toString());
+                    this.fs.setFile(pathTo.toString(), newFile);
+                    this.client.markDirty();
+
+                    return resolve(true)
+                },
+                onAbort: (err) => {
+                    if (err) {
+                        return reject(Errors.InvalidOperation);
+                    }
+                },
+            });
+
+            readStream.pipe(writeStream);
+        });
+    }
+
     // serverside copy
     async _copy(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.CopyInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
         this.client.getLogger().info(".copy", pathFrom + " | " + pathTo);
@@ -289,36 +291,26 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         const sourceExists = this.fs.existsSync(pathFrom.toString());
         const targetExists = this.fs.existsSync(pathTo.toString());
 
+
         if (!sourceExists || targetExists) {
             return callback(Errors.Forbidden);
         }
 
-        const oldFile = this.getFile(pathFrom);
-        const newFile: IFileDesc = {
-            name: pathTo.fileName(),
-            created: new Date(),
-            modified: new Date(),
-            size: oldFile.size,
-            uploaded: false,
-            chunks: []
+        const sourceStat = this.fs.statSync(pathFrom.toString());
+
+        if(sourceStat.isDirectory()) {
+            // TODO: copy directory
+            return callback(Errors.InvalidOperation);
         }
 
-        const readStream = await this.client.getCurrentProvider().getDownloadReadStream(oldFile);
-        const writeStream = await this.client.getCurrentProvider().getUploadWriteStream(newFile, {
-            onFinished: async () => {
-                this.client.getLogger().info(".copy", "Stream finished: " + pathTo.toString());
-                newFile.uploaded = true;
-                this.setFile(pathTo, newFile, true);
-                return callback(undefined, true);
-            },
-            onAbort: (err) => {
-                if (err) {
-                    return callback(Errors.InvalidOperation);
-                }
-            },
-        });
+        if (sourceStat.isFile()) {
+            const result = await this.copyFile(pathFrom, pathTo);
+            if(!result) {
+                return callback(Errors.InvalidOperation);
+            }
+        }
 
-        readStream.pipe(writeStream);
+        return callback(undefined, true);
     }
 
     async _move(pathFrom: v2.Path, pathTo: v2.Path, ctx: v2.MoveInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
@@ -337,7 +329,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         return callback(undefined, true);
     }
 
-    async _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): Promise<void> {
+    _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): void {
         //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
 
         const oldPath = pathFrom.toString();
@@ -354,7 +346,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, new Date().getTime());
         }
 
-        const file = this.getFile(path);
+        const file = this.fs.getFile(path.toString());
         return callback(undefined, file.modified.getTime());
     }
 
@@ -365,7 +357,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, new Date().getTime());
         }
 
-        const file = this.getFile(path);
+        const file = this.fs.getFile(path.toString());
         return callback(undefined, file.created.getTime());
     }
 
