@@ -28,8 +28,7 @@ export default class WebdavServer extends webdav.WebDAVServer {
         
         if (options.users) {
             options.users.forEach((user) => {
-                const webdavUser = userManager.addUser(user.username, user.password, true);
-                privManager.setRights(webdavUser, "/", ["all"]);
+                privManager.setRights(userManager.addUser(user.username, user.password, true), "/", ["all"]);
             });
         }
 

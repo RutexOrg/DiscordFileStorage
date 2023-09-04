@@ -8,7 +8,7 @@ export interface IFile {
 }
 
 export interface IChunkInfo {
-    id: string; // discord (or any other) message id
+    id: string; // discord (or any other provider) message id
     size: number;
     url: string;
 }

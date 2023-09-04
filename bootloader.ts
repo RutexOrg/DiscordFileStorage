@@ -7,7 +7,7 @@ import { GatewayIntentBits } from "discord.js";
 import color from "colors/safe.js";
 import DICloudApp, { print, printAndExit } from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
-import DiscordWebdavFilesystemHandler from "./src/provider/discord/DiscordWebdavFilesystemHandler.js";
+import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -31,6 +31,9 @@ export interface IBootParams {
     users: string;
     enableEncrypt: boolean;
     encryptPassword: string;
+    saveTimeout: number;
+    saveToDisk: boolean;
+
 }
 
 export interface IBootParamsParsed extends IBootParams {
@@ -56,6 +59,10 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
         printAndExit("USERS env variable is empty. Please set at least one user.");
     }
 
+    if(params.saveTimeout < 1){
+        printAndExit("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
+    }
+
     return {
         ...params,
         usersParsed,
@@ -76,6 +83,9 @@ export async function boot(data: IBootParams){
         
         shouldEncrypt: params.enableEncrypt,
         encryptPassword: params.encryptPassword,
+
+        saveTimeout: params.saveTimeout,
+        saveToDisk: params.saveToDisk,
     }, params.guildId);
 
     console.log(color.yellow("Logging in..."));
@@ -155,6 +165,9 @@ export async function envBoot() {
     const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption", "boolean", false) as boolean;
     const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password", "string", "") as string;
 
+    const saveTimeout = checkEnvVariableIsSet("SAVE_TIMEOUT", "Please set the SAVE_TIMEOUT to your save timeout in ms", "number", 2000) as number;
+    const saveToDisk = checkEnvVariableIsSet("SAVE_TO_DISK", "Please set the SAVE_TO_DISK to true or false to enable saving to disk", "boolean", false) as boolean;
+
     return await boot({
         token,
         guildId,
@@ -167,6 +180,8 @@ export async function envBoot() {
         users: users,
         enableEncrypt,
         encryptPassword,
+        saveTimeout,
+        saveToDisk,
     })
 
     

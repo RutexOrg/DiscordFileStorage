@@ -1,15 +1,12 @@
 import path from "path";
-import { AttachmentBuilder, TextBasedChannel } from "discord.js";
+import { AttachmentBuilder, TextBasedChannel, TextChannel } from "discord.js";
 import { Writable, Readable } from "stream";
-import DICloudApp from "../../DICloudApp.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import { IWriteStreamCallbacks } from "../core/IRemoteFileProvider.js";
 import MutableBuffer from "../../helper/MutableBuffer.js";
-import crypto from "crypto";
 import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
-import { patchEmitter } from "../../helper/EventPatcher.js";
 import { IFile } from "../../file/IFile.js";
-import IProvider from "../core/IProvider.js";
+import BaseProvider, { IWriteStreamCallbacks } from "../core/BaseProvider.js";
+import { truncate } from "../../helper/utils.js";
 
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
@@ -17,148 +14,87 @@ export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb
 /**
  * Class that handles all the remote file management on discord.
  */
-export default class DiscordFileProvider implements IProvider {
-    private app: DICloudApp;
+export default class DiscordFileProvider extends BaseProvider {
 
-    constructor(client: DICloudApp) {
-        this.app = client;
-    }
-
-    private getAttachmentBuilderFromBuffer(buff: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt",) {
-        const builder = new AttachmentBuilder(buff);
+    // Function that returns a AttachmentBuilder from a buffer with proper name.
+    private getAttachmentBuilderFromBuffer(buffer: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt",) : AttachmentBuilder {
+        const builder = new AttachmentBuilder(buffer);
         const name = (chunkNummer ? chunkNummer + "-" : "") + chunkName + (addExtension ? "." + extension : "") + (encrypt ? ".enc" : "");
 
         builder.setName(name);
         return builder;
     }
 
-    private getAttachmentBuilderFromBufferWithoutExt(buff: Buffer, chunkName: string, chunkNummer: number = 0, encrypt: boolean, extension: string = "txt",) {
-        return this.getAttachmentBuilderFromBuffer(buff, path.parse(chunkName).name, chunkNummer, false, encrypt, extension);
-    }
-
-
-
-    // truncates a string to a certain length. 
-    // truncate("hello world", 5) => "hello",
-    // truncate("hello world", 2) => "he"
-    private truncate(str: string, n: number, includeDots: boolean = false) {
-        return ((str.length > n) ? str.substr(0, n - 1) : str) + (includeDots && str.length > n ? '...' : '');
-    }
-
-    private async uploadFileChunkAndAttachToFile(buffer: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFile) {
-        this.app.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
+    /**
+     * Uploads a chunk to discord with a given naming and adds the chunk to the file object.
+     * FLUSHES THE MUTABLE BUFFER!
+     * @param chunk Buffer to upload
+     * @param chunkNumber Chunk number (starts at 1)
+     * @param totalChunks Total chunks, used only for logging, looks like is broken anyway at the moment
+     * @param filesChannel Channel to upload the chunk to
+     * @param file File that the chunk belongs to and will be added to after upload. 
+     */
+    private async uploadChunkToDiscord(chunk: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFile) {
+        this.client.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [
-                this.getAttachmentBuilderFromBufferWithoutExt(buffer.flush(), this.truncate(file.name, 15), chunkNumber, this.app.shouldEncryptFiles())
+                this.getAttachmentBuilderFromBuffer(chunk.flush(), path.parse(truncate(file.name, 15)).name, chunkNumber, false, this.client.shouldEncryptFiles())
             ],
         });
 
-        this.app.getLogger().info(`[${file.name}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
+        this.client.getLogger().info(`[${file.name}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
         file.chunks.push({
             id: message.id,
             url: message.attachments.first()!.url,
-            size: buffer.size,
+            size: chunk.size,
         });
-        this.app.getLogger().info(file.chunks)
+        this.client.getLogger().info(file.chunks);
     }
 
-    // reason: TypeError: authTagLength required for chacha20-poly1305
-    private createDecryptor(autoDestroy = true) {
-        const decipher = crypto.createDecipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy,
-            authTagLength: 16
-        } as any);
-
-        // backport to nodejs 16.14.2
-        if(decipher.setAuthTag){
-            decipher.setAuthTag(Buffer.alloc(16, 0));
-        }
-
-        decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
-            this.app.getLogger().info("Decipher", err);
-        });
-
-        return decipher;
+    public async createRawReadStream(file: IFile): Promise<Readable> {
+        this.client.getLogger().info(".getDownloadableReadStream() - file: " + file.name);
+        return (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
     }
 
-    private createEncryptor(autoDestroy = true) {
-        const chiper = crypto.createCipher("chacha20-poly1305", this.app.getEncryptPassword(), {
-            autoDestroy,
-            authTagLength: 16
-        } as any);
+    public async createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
+        this.client.getLogger().info(".getUploadWritableStream() - file: " + file.name);
 
-
-        chiper.once("error", (err) => {
-            this.app.getLogger().info("Chiper", err);
-        });
-
-        return chiper;
-    }
-
-    public async getDownloadReadStream(file: IFile): Promise<Readable> {
-        this.app.getLogger().info(".getDownloadableReadStream() - file: " + file.name);
-        const readStream = (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
-
-        if (!this.app.shouldEncryptFiles()) {
-            return readStream;
-        }
-
-        const decipher = this.createDecryptor();
-
-        // calling .end on decipher stream will throw an error and not emit end event. so we need to do this manually. 
-        decipher.once("unpipe", () => {
-            patchEmitter(decipher, "decipher");
-            patchEmitter(readStream, "read");
-            setImmediate(() => { // idk if this work as it should... but looks like it does.
-                decipher.emit("end");
-                decipher.destroy();
-            });
-        });
-
-        return readStream.pipe(decipher, { end: false });
-    }
-
-
-    public async getUploadWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
-        this.app.getLogger().info(".getUploadWritableStream() - file: " + file.name);
-
-        const size = file.size;
-        const filesChannel = await this.app.getFileChannel();
-        const totalChunks = Math.ceil(size / MAX_REAL_CHUNK_SIZE);
+        const channel = this.client.getFilesChannel();
+        const totalChunks = Math.ceil(file.size / MAX_REAL_CHUNK_SIZE);
         const buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
 
-        let currentChunkNumber = 1;
+        let chunkId = 1;
 
-        const writeStream = new Writable({
+        return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
                 // console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
-                    await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
+                    await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                     if (callbacks.onChunkUploaded) {
-                        await callbacks.onChunkUploaded(currentChunkNumber, totalChunks);
+                        await callbacks.onChunkUploaded(chunkId, totalChunks);
                     }
-                    currentChunkNumber++;
+                    chunkId++;
                 }
                 file.size += chunk.length;
                 buffer.write(chunk, encoding);
                 callback();
             },
             final: async (callback) => {
-                this.app.getLogger().info("final() Finalizing upload.")
+                this.client.getLogger().info("final() Finalizing upload.");
                 if (buffer.size > 0) {
-                    await this.uploadFileChunkAndAttachToFile(buffer, currentChunkNumber, totalChunks, filesChannel, file);
+                    await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                 }
 
-                this.app.getLogger().info("final() uploaded .")
+                this.client.getLogger().info("final() uploaded .")
                 if (callbacks.onFinished) {
                     await callbacks.onFinished();
                 }
 
-                this.app.getLogger().info("final() write stream finished, onFinished() called.")
+                this.client.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
             },
             destroy: (err, callback) => {
-                this.app.getLogger().info("destroy() Destroying write stream (error: " + err + ")");
+                this.client.getLogger().info("destroy() Destroying write stream (error: " + err + ")");
                 buffer.destory();
                 if (callbacks.onAbort) {
                     callbacks.onAbort(err);
@@ -166,44 +102,22 @@ export default class DiscordFileProvider implements IProvider {
                 callback(err);
             }
         });
-
-        if (!this.app.shouldEncryptFiles()) {
-            return writeStream;
-        }
-
-
-        // The problem is that the encryption stream is closing before the write stream is flushed all its data.
-        // Since we give the encryption stream back and it closes too early, the write stream stream is not flushed all its data in discord, what results in a corrupted file or telling client at wrong time that the file is uploaded, when it is not. 
-        // this is why we need to wait for the write stream to finish before we close the encryption stream.
-        const cipher = this.createEncryptor(false);
-        cipher.pipe(writeStream);
-
-        const pt = new Writable({
-            write: (chunk, encoding, callback) => {
-                cipher.write(chunk, encoding, callback);
-            },
-            final: (callback) => {
-                cipher.end();
-                writeStream.once("finish", () => {
-                    callback();
-                });
-            }
-        });
-
-        writeStream.on("error", (err) => {
-            this.app.getLogger().info("write.on('error')", err);
-            pt.destroy(err);
-            cipher.emit("end");
-            cipher.destroy();
-        });
-
-        writeStream.on("finish", () => {
-            pt.end();
-            cipher.emit("end");
-            cipher.destroy();
-        });
-
-        return pt;
     }
+
+    public async processDeletionQueue(): Promise<void> {
+        if (this.deletionQueue.length > 0) {
+            const info = this.deletionQueue.shift()!;
+            const channel = this.client.channels.cache.get(info.channel) as TextChannel;
+            
+            if (!channel) {
+                this.client.getLogger().error("Failed to find channel: " + info.channel);
+                return;
+            }
+
+            await channel.messages.delete(info.message);
+        }
+    }
+
+
 
 }

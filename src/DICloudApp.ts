@@ -1,20 +1,14 @@
 import color from 'colors/safe.js';
 import nodeFS from 'fs';
 import os from 'os';
-import DiscordFileProvider from './provider/discord/DiscordFileProvider.js';
+import DiscordFileProvider, { MAX_REAL_CHUNK_SIZE } from './provider/discord/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
-import { Volume } from 'memfs/lib/volume.js';
-import { IFilesDesc } from './file/IFile.js';
+import { IFile, IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextBasedChannel, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
+import objectHash from "object-hash";
 
-
-
-interface IDelayedDeletionEntry {
-    channel: string;
-    message: string;
-}
 
 export interface DICloudAppOptions extends ClientOptions {
     metaChannelName: string;
@@ -22,6 +16,9 @@ export interface DICloudAppOptions extends ClientOptions {
 
     shouldEncrypt: boolean;
     encryptPassword?: string;
+
+    saveTimeout: number;
+    saveToDisk: boolean;
 }
 
 /**
@@ -32,8 +29,8 @@ export default class DICloudApp extends Client {
     private guildId: string;
     private metaChannelName: string;
     private filesChannelId: string;
-    private channelsToCreate: Array<string>;
-    private currentProvider: DiscordFileProvider;
+    private createChannels: Array<string>;
+    private provider: DiscordFileProvider;
 
     private shouldEncrypt;
     private encryptPassword;
@@ -41,19 +38,24 @@ export default class DICloudApp extends Client {
     public static instance: DICloudApp;
     private logger = make("DICloud", true);
 
-    private preloadComplete: boolean = false;
     private metadataMessageId: string | undefined;
     private fs!: VolumeEx;
 
     private debounceTimeout: NodeJS.Timeout | undefined;
-    private debounceTimeoutTime: number = 2000;
+    private debounceTimeoutTime: number;
+
+    private saveToDisk: boolean = false;
 
 
     private tickInterval: NodeJS.Timeout | undefined;
     private tickIntervalTime: number = 1000;
-    private fileDeletionQueue: Array<IDelayedDeletionEntry> = [];
 
     private readonly medataInfoMessage: string = "DiscordFS Metadata ✔";
+
+    private guild!: Guild;
+    private metaChannel!: TextBasedChannel;
+    private filesChannel!: TextBasedChannel;
+
 
     constructor(options: DICloudAppOptions, guildId: string) {
         super(options);
@@ -62,7 +64,7 @@ export default class DICloudApp extends Client {
         }
         DICloudApp.instance = this;
 
-        this.channelsToCreate = [
+        this.createChannels = [
             options.metaChannelName,
             options.filesChannelName
         ];
@@ -73,8 +75,21 @@ export default class DICloudApp extends Client {
         this.shouldEncrypt = options.shouldEncrypt;
         this.encryptPassword = options.encryptPassword ?? "";
 
+
+        this.debounceTimeoutTime = options.saveTimeout;
+        this.saveToDisk = options.saveToDisk;
+
+
         this.guildId = guildId;
-        this.currentProvider = new DiscordFileProvider(this);
+        this.provider = new DiscordFileProvider(this);
+
+        // catch all process errors and unhandled rejections, save files to disk before exiting.
+        process.on('uncaughtException', async (err) => {
+            console.log(color.red("Uncaught Exception: " + err));
+            console.log(color.red("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )"));
+            await DICloudApp.instance.saveFiles(true);
+            process.exit(1);
+        });
 
     }
 
@@ -86,17 +101,16 @@ export default class DICloudApp extends Client {
         return this.encryptPassword;
     }
 
-
-    public async getGuild(): Promise<Guild> {
-        return this.guilds.cache.get(this.guildId)!.fetch();
+    public getGuild(): Guild {
+        return this.guild;
     };
 
-    public async getMetadataChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name == this.metaChannelName) as TextBasedChannel;
+    public getMetadataChannel(): TextBasedChannel {
+        return this.metaChannel;
     }
 
-    public async getFileChannel(): Promise<TextBasedChannel> {
-        return (await this.getGuild()).channels.cache.find(channel => channel.name == this.filesChannelId) as TextBasedChannel;
+    public getFilesChannel(): TextBasedChannel {
+        return this.filesChannel;
     }
 
     public async waitForReady(): Promise<void> {
@@ -105,43 +119,55 @@ export default class DICloudApp extends Client {
         });
     }
 
+    /**
+     * Should be called after the bot is ready.
+     * Preloads required data and starts the tick interval.
+     */
     public async preload() {
+        this.logger.info("Fetching guilds...");
+        await this.guilds.fetch();
+
         if (!this.guilds.cache.has(this.guildId)) {
-            printAndExit("Guild not found");
+            printAndExit("Provided guild not found. Is the bot in the guild?");
         }
 
-        const guild = await this.guilds.cache.get(this.guildId)?.fetch()!;
+        const guild = await this.guilds.cache.get(this.guildId)?.fetch();
         if (!guild) {
             printAndExit("Failed to fetch guild: " + this.guildId);
         }
+        this.guild = guild!;
+        this.logger.info("Guild found: " + this.guild.name);
+        this.logger.info("Fetching channels...");
 
-        this.logger.info("Guild found: " + guild.name);
+        // check if channels exist
+        await this.guild.channels.fetch();
+
         console.log(color.yellow("Fetching channels..."));
-        await guild.channels.fetch();
-        const guildChannels = guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
-        
-        for (const channelToCreate of this.channelsToCreate) {
-            if (!guildChannels.some(channel => channel.name == channelToCreate)) {
-                console.log("Creating channel: " + channelToCreate);
-                await guild.channels.create({
-                    name: channelToCreate,
+        await this.guild.channels.fetch();
+        const channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
+
+        for (const channel of this.createChannels) {
+            if (!channels.some(c => c.name == channel)) {
+                console.log("Creating channel: " + channel);
+                await this.guild.channels.create({
+                    name: channel,
                     type: ChannelType.GuildText,
                 });
-            } else {
-                console.log(color.green("Channel already exists: " + channelToCreate + ", skipping"));
             }
         }
+
+        this.metaChannel = channels.find(channel => channel.name == this.metaChannelName) as TextBasedChannel;
+        this.filesChannel = channels.find(channel => channel.name == this.filesChannelId) as TextBasedChannel;
 
         this.tickInterval = setInterval(() => {
             this.tick();
         }, this.tickIntervalTime);
 
-        this.preloadComplete = true;
     }
 
     async getAllMessages(channelId: string): Promise<Message[]> {
         const channel = await this.channels.fetch(channelId) as TextChannel;
-        let allMessages: Message[] = [];
+        let messages: Message[] = [];
         let last: string | undefined;
 
         while (true) {
@@ -150,59 +176,67 @@ export default class DICloudApp extends Client {
                 options.before = last;
             }
 
-            const messages = [... (await channel.messages.fetch(options)).values()];
+            const channelMessages = [... (await channel.messages.fetch(options)).values()];
 
-            allMessages = allMessages.concat(messages);
-            console.log("[getAllMessages] got block of " + messages.length + " messages")
-            if (messages.length < 100) {
+            messages = messages.concat(channelMessages);
+            console.log("[getAllMessages] got block of " + channelMessages.length + " messages")
+            if (channelMessages.length < 100) {
                 break;
             }
 
-            last = messages.pop()!.id;
+            last = channelMessages.pop()!.id;
         }
 
-        return allMessages;
+        return messages;
     }
 
 
     public async loadFiles() {
-        const messages = await this.getAllMessages((await this.getMetadataChannel()).id);
-        let metaMessage;
+        const messages = await this.getAllMessages(this.getMetadataChannel().id);
+        let message; // meta message
 
-        if(messages.length > 1){
-            throw new Error("Invalid amount of messages in metadata channel, there should only be one message");
-        }
-
-        metaMessage = messages[0];
-        if (messages.length != 1) {
-            const message = await (await this.getMetadataChannel()).send({
+        // check if there is a message with the metadata info. If not, create one.
+        if (messages.length == 0) { // no messages
+            message = await this.getMetadataChannel().send({
                 files: [{
-                    attachment: Buffer.from(JSON.stringify({})),
+                    attachment: "{}", // empty json file
                     name: "discordfs.json"
                 }],
                 content: this.medataInfoMessage
             })
-            metaMessage = message;
+        } else if (messages.length == 1) { // one message
+            message = messages[0];
+        } else {
+            throw new Error("Invalid amount of messages in metadata channel, there should only be one message. Maybe wrong channel is provided?");
         }
-        this.metadataMessageId = metaMessage.id;
 
-        if (metaMessage.attachments.size != 1) {
+        this.metadataMessageId = message.id;
+
+        if (message.attachments.size != 1) {
             throw new Error("Invalid amount of attachments in metadata message");
         }
 
-        const attachment = metaMessage.attachments.first()!;
+        const attachment = message.attachments.first()!;
         if (attachment.name != "discordfs.json") {
-            throw new Error("Invalid attachment name in metadata message");
+            throw new Error("Invalid attachment name in metadata message, expected discordfs.json, got: " + attachment.name);
         }
 
         const file = await axios.get(attachment.url, { responseType: "arraybuffer" });
-        const data = JSON.parse(file.data.toString()) as IFilesDesc;
+        let data;
+        try {
+            data = JSON.parse(file.data.toString()) as IFilesDesc;
+        } catch (e) {
+            console.log(e);
+            printAndExit("Failed to parse JSON file. Is the file corrupted?");
+        }
 
         this.fs = VolumeEx.fromJSON(data as any);
     }
 
-    public async saveFiles() {
+    public async saveFiles(saveToDriveOnly: boolean = false) {
         console.log(color.yellow("Saving files..."));
+
+
         if (!this.metadataMessageId) {
             console.log(color.red("No metadata message id found, can't save files. Did you load the files?"));
             console.log(color.red("Trying to dump files into temp dir in the current real filesystem."));
@@ -211,24 +245,34 @@ export default class DICloudApp extends Client {
             return;
         }
 
-        const msg = await (await this.getMetadataChannel()).messages.fetch(this.metadataMessageId);
+        if (this.saveToDisk) {
+            nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
+
+            if (saveToDriveOnly) {
+                return;
+            }
+        }
+
+        const msg = await this.getMetadataChannel().messages.fetch(this.metadataMessageId);
         if (!msg) {
-            console.log(color.red("Failed to fetch metadata message"));
+            console.log(color.red("Failed to fetch metadata. Is the message deleted?"));
             return;
         }
 
-        const jsonfs = this.fs.toJSON()
-        const file = JSON.stringify(jsonfs);
+        const json = this.fs.toJSON()
+        const file = JSON.stringify(json);
 
         await msg.edit({
             files: [{
                 name: "discordfs.json",
                 attachment: Buffer.from(file)
             }],
-            content: this.medataInfoMessage 
-                + '\n\n' + 'Last saved: ' + new Date().toLocaleString() 
-                + '\n' + 'Database Size: ' + file.length + ' bytes' 
-                + '\n' + 'Files: ' + Object.keys(jsonfs).length + ' files'
+            content: this.medataInfoMessage
+                + '\n\n' + 'Last saved: ' + new Date().toLocaleString()
+                + '\n' + 'Database Size: ' + file.length + ' bytes (' + Math.floor(file.length / MAX_REAL_CHUNK_SIZE * 100) + ' %)'
+                + '\n' + 'Files: ' + Object.keys(json).length + ' files'
+                + '\n' + 'Total Size: ' + (Math.floor(this.fs.getTreeSizeRecursive("/") / 1000 / 1000)) + ' MB'
+                + '\n' + 'Hash: (' + objectHash(json) + ')'
         })
     }
 
@@ -250,29 +294,11 @@ export default class DICloudApp extends Client {
      * Queue is used to prevent ratelimiting and blocking the bot from doing other things.
      */
     private async tick() {
-        if (this.fileDeletionQueue.length > 0) {
-            const info = this.fileDeletionQueue.shift()!;
-            const channel = this.channels.cache.get(info.channel) as TextChannel;
-            
-            if (!channel) {
-                this.logger.error("Failed to find channel: " + info.channel);
-                return;
-            }
-
-            await channel.messages.delete(info.message);
-        }
+        await this.provider.processDeletionQueue();
     }
 
-    public addToDeletionQueue(info: IDelayedDeletionEntry) {
-        this.fileDeletionQueue.push(info);
-    }
-
-    // public async sleep(ms: number) {
-    //     return new Promise(resolve => setTimeout(resolve, ms));
-    // }
-
-    public getCurrentProvider(): DiscordFileProvider {
-        return this.currentProvider;
+    public getProvider(): DiscordFileProvider {
+        return this.provider;
     }
 
 
@@ -286,12 +312,10 @@ export default class DICloudApp extends Client {
 
 }
 
-
 export function printAndExit(message: string, exitCode: number = 1) {
     console.log(color.red(message));
     process.exit(exitCode);
 }
-
 
 export function print(message: string) {
     console.log(color.green(message));

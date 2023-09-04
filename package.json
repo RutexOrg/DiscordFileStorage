@@ -1,7 +1,7 @@
 {
   "name": "dicloud",
   "version": "2.2.0",
-  "main": "out/indexBoot.js",
+  "main": "out/boot.js",
   "license": "MIT",
   "type": "module",
   "dependencies": {
@@ -14,7 +14,7 @@
     "dotenv": "^16.0.3",
     "memfs": "^4.2.0",
     "mime-types": "^2.1.35",
-    "typed-emitter": "^2.1.0",
+    "object-hash": "^3.0.0",
     "webdav-server": "^2.6.2",
     "winston": "^3.8.2"
   },
@@ -23,8 +23,8 @@
     "yarn": ">=1.22.0"
   },
   "scripts": {
-    "start": "node --no-warnings out/indexBoot.js",
-    "boot": "tsc && node --no-warnings out/indexBoot.js",
+    "start": "node --no-warnings out/boot.js",
+    "boot": "tsc && node --no-warnings out/boot.js",
     "build": "tsc",
     "test": "yarn build && mocha --no-warnings out/tests/",
     "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
@@ -36,6 +36,7 @@
     "@types/mime-types": "^2.1.1",
     "@types/mocha": "^10.0.1",
     "@types/node": "^18.16.1",
+    "@types/object-hash": "^3.0.3",
     "@types/sinon": "^10.0.14",
     "@types/ungap__structured-clone": "^0.3.0",
     "chai": "^4.3.7",

@@ -16,14 +16,14 @@
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
 
-Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 7 GB in multifile mode.
+Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
 - Manage folders (Create, Delete, Rename, Move)
 
 # State and details
-Not even alpha. **Created for fun and ONLY for fun**. Dont use it in production, since it *active development* and *contains bugs, LOT of _bugs_*.  Use it only for testing and playing around.
+Not even alpha. **Created for fun and ONLY for fun**. Dont use it as important storage, since it *active development, contains bugs, LOT of _bugs_ and im still making LOT of breaking changes*. Use it only for testing and playing around.
 
 Please look at the [Known issues](#known-issues) section for more information.
 
@@ -49,13 +49,13 @@ Create a bot with admin permissions and invite it to your server. If you already
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
 ## Setup
-1. Install [NodeJS (Tested on 16)](https://nodejs.org/en/), [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
+1. Install [NodeJS (Tested on 16)](https://nodejs.org/en/) and [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
 2. Clone this repo.
 3. Navigate to the root of the project and run ``yarn install``.
 4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data (token, server id). Other settings are optional and documented in the file. \
 __If you dont have opportunity to use .env file, you can set environment variables instead, they should have the same names as in `.env.example` file.__
 
-5. To run the bot, run ``yarn start``. This will compile the project and start the bot.
+5. To run the bot, run ``yarn boot``. This will compile the project and start the bot. There are also other commands, you can find them in ``package.json`` file.
 
 ## SSL
 Warning! At the moment SSL support **is not complete**. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests. \
@@ -68,6 +68,7 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 4. Enable HTTPS in ``.env`` file. Set ``ENABLE_HTTPS`` to ``true``.
 
 ## Encryption
+
 Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
@@ -75,15 +76,15 @@ To enable encryption:
 **WARNING**. If you lose this password, you **WILL NOT** be able to decrypt your files.
 
 
-
-**Warning**. Unless its look to work stable, encryption feature still being tested. If you see any error like ``decipher Error: Unsupported state or unable to authenticate data``, this is **normal**, the decrypted file **isnt corrupted** (you can check this with any hashing tool yourself).  I will try to fix this in the future.
+***WANING***. Unless its look to work stable, encryption feature **still being tested**. Im not experienced in cryptography, so i cant guarantee that it will be secure or stable. Use it at your own risk.
 
 ## Authorization
 You can set authorization for the server. To do this, set ``AUTH`` to ``true`` in ``.env`` file.
 
 Then add your username and password to ``.env`` file. Set ``USERS`` to ``username:password``. You can add multiple users, just separate them with ``,``. For example: ``USERS=username1:password1,username2:password2``. At the moment, only basic authorization is supported. 
 
-___
+
+
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
@@ -94,13 +95,18 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 # Known issues
 
 1. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
-This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit. Script may be found in: ***scripts/webdav.reg*** \
+This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit (up to 4GB)
+. Script may be found in: ***scripts/webdav.reg*** \
 If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
 **You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
 
 2. Uploading and downloading big files (~1GB+) is working unstable, so if you really need it, split big file into smaller chunks (lets say 100MB, with any archiver like [7zip](https://www.7-zip.org/) or [WinRAR](https://www.rarlab.com/)) and upload them one by one. After downloading, you can merge them back.  \
+Current tested limit for a single file is about 750MB, but i guess it depends on your internet connection.
 For now no other solution for this, sorry. 
 
-3. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. 
+3. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. \
+Will do some work in the future to fix this.
 
-4. Not all webdav clients are working as expected. Will do some work in the future to fix this.
+4. Half working encryption support. You can use it, but you have to be aware of potential security issues, since im not experienced in cryptography and i cant guarantee that it will be secure. But for now it looks like its working pretty stable.
+
+5. Not all webdav clients are working as expected. Will do some work in the future to fix this.
