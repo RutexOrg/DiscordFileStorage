@@ -144,13 +144,12 @@ export default class DICloudApp extends Client {
         }
         this.guild = guild!;
         this.logger.info("Guild found: " + this.guild.name);
-        this.logger.info("Fetching channels...");
 
         this.logger.info("Fetching channels...");
         await this.guild.channels.fetch();
         let channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
 
-        let wasChannelCreated = false;
+        let wasChannelCreated = false; // using for caching
         for (const channel of this.createChannels) {
             if (!channels.some(c => c.name == channel)) {
                 this.logger.info("Creating channel: " + channel);
@@ -281,7 +280,7 @@ export default class DICloudApp extends Client {
 
     private saveToDrive() {
         this.logger.info("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )");
-        // nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
+        nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
     }
 
 
