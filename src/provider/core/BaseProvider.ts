@@ -35,14 +35,25 @@ export default abstract class BaseProvider {
         return this.fileDeletionQueue;
     }
 
-    
+    /**
+     * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
+     */
     public abstract processDeletionQueue(): Promise<void>;
         
+    /**
+     * Method that should provide raw read stream for downloading files from provider. Only basic read stream from provider, no decryption or anything else.
+     * @param file - File which should be downloaded.
+     */
     public abstract createRawReadStream(file: IFile): Promise<Readable>;
+    /**
+     * Method that should provide raw write stream for uploading files to provider. Only basic write stream to provider, no encryption or anything else.
+     * @param file - File which should be uploaded.
+     * @param callbacks  - Callbacks for write stream.
+     */
     public abstract createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
 
 
-    public createEncryptor(autoDestroy = true) {
+    private createEncryptor(autoDestroy = true) {
         const chiper = crypto.createCipher("chacha20-poly1305", this.client.getEncryptPassword(), {
             autoDestroy,
             authTagLength: 16
@@ -50,14 +61,14 @@ export default abstract class BaseProvider {
 
 
         chiper.once("error", (err) => {
-            console.log("Chiper", err);
+            this.client.getLogger().info("Chiper", err);
         });
 
         return chiper;
     }
 
     // reason: TypeError: authTagLength required for chacha20-poly1305
-    public createDecryptor(autoDestroy = true) {
+    private createDecryptor(autoDestroy = true) {
         const decipher = crypto.createDecipher("chacha20-poly1305", this.client.getEncryptPassword(), {
             autoDestroy,
             authTagLength: 16
@@ -69,7 +80,7 @@ export default abstract class BaseProvider {
         }
 
         decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
-            console.log("Decipher", err);
+            this.client.getLogger().info("Decipher", err);
         });
 
         return decipher;
@@ -161,7 +172,7 @@ export default abstract class BaseProvider {
         }
     }
 
-    public createFile(name: string, size: number): IFile {
+    public createVFile(name: string, size: number): IFile {
         return {
             name,
             size,

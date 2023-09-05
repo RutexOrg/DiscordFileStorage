@@ -1,4 +1,3 @@
-import color from 'colors/safe.js';
 import nodeFS from 'fs';
 import os from 'os';
 import DiscordFileProvider, { MAX_REAL_CHUNK_SIZE } from './provider/discord/DiscordFileProvider.js';
@@ -38,7 +37,7 @@ export default class DICloudApp extends Client {
     public static instance: DICloudApp;
     private logger = make("DICloud", true);
 
-    private metadataMessageId: string | undefined;
+    private metadataMessage!: Message<boolean>;
     private fs!: VolumeEx;
 
     private debounceTimeout: NodeJS.Timeout | undefined;
@@ -84,10 +83,9 @@ export default class DICloudApp extends Client {
         this.provider = new DiscordFileProvider(this);
 
         // catch all process errors and unhandled rejections, save files to disk before exiting.
-        process.on('uncaughtException', async (err) => {
-            console.log(color.red("Uncaught Exception: " + err));
-            console.log(color.red("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )"));
-            await DICloudApp.instance.saveFiles(true);
+        process.on('uncaughtException', (err) => {
+            console.trace(err);
+            this.saveToDrive();
             process.exit(1);
         });
 
@@ -119,11 +117,20 @@ export default class DICloudApp extends Client {
         });
     }
 
+    public async init() {
+        this.logger.info("Initializing DICloud...");
+        await this.waitForReady();
+        this.logger.info("Client authenticated...")
+        await this.preload();
+        await this.loadFiles();
+        this.logger.info("DICloud initialized, files loaded...");
+    }
+
     /**
      * Should be called after the bot is ready.
      * Preloads required data and starts the tick interval.
      */
-    public async preload() {
+    private async preload() {
         this.logger.info("Fetching guilds...");
         await this.guilds.fetch();
 
@@ -139,21 +146,26 @@ export default class DICloudApp extends Client {
         this.logger.info("Guild found: " + this.guild.name);
         this.logger.info("Fetching channels...");
 
-        // check if channels exist
+        this.logger.info("Fetching channels...");
         await this.guild.channels.fetch();
+        let channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
 
-        console.log(color.yellow("Fetching channels..."));
-        await this.guild.channels.fetch();
-        const channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
-
+        let wasChannelCreated = false;
         for (const channel of this.createChannels) {
             if (!channels.some(c => c.name == channel)) {
-                console.log("Creating channel: " + channel);
+                this.logger.info("Creating channel: " + channel);
                 await this.guild.channels.create({
                     name: channel,
                     type: ChannelType.GuildText,
                 });
+                wasChannelCreated = true;
             }
+        }
+
+        // Caching again, because we created new ones
+        if(wasChannelCreated) {
+            await this.guild.channels.fetch();
+            channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
         }
 
         this.metaChannel = channels.find(channel => channel.name == this.metaChannelName) as TextBasedChannel;
@@ -164,6 +176,8 @@ export default class DICloudApp extends Client {
         }, this.tickIntervalTime);
 
     }
+
+    
 
     async getAllMessages(channelId: string): Promise<Message[]> {
         const channel = await this.channels.fetch(channelId) as TextChannel;
@@ -179,7 +193,7 @@ export default class DICloudApp extends Client {
             const channelMessages = [... (await channel.messages.fetch(options)).values()];
 
             messages = messages.concat(channelMessages);
-            console.log("[getAllMessages] got block of " + channelMessages.length + " messages")
+            this.logger.info("[getAllMessages] got block of " + channelMessages.length + " messages")
             if (channelMessages.length < 100) {
                 break;
             }
@@ -191,7 +205,7 @@ export default class DICloudApp extends Client {
     }
 
 
-    public async loadFiles() {
+    private async loadFiles() {
         const messages = await this.getAllMessages(this.getMetadataChannel().id);
         let message; // meta message
 
@@ -199,7 +213,7 @@ export default class DICloudApp extends Client {
         if (messages.length == 0) { // no messages
             message = await this.getMetadataChannel().send({
                 files: [{
-                    attachment: "{}", // empty json file
+                    attachment: Buffer.from("{}"), // empty json file
                     name: "discordfs.json"
                 }],
                 content: this.medataInfoMessage
@@ -210,7 +224,7 @@ export default class DICloudApp extends Client {
             throw new Error("Invalid amount of messages in metadata channel, there should only be one message. Maybe wrong channel is provided?");
         }
 
-        this.metadataMessageId = message.id;
+
 
         if (message.attachments.size != 1) {
             throw new Error("Invalid amount of attachments in metadata message");
@@ -226,43 +240,29 @@ export default class DICloudApp extends Client {
         try {
             data = JSON.parse(file.data.toString()) as IFilesDesc;
         } catch (e) {
-            console.log(e);
+            this.logger.info(e);
             printAndExit("Failed to parse JSON file. Is the file corrupted?");
         }
 
         this.fs = VolumeEx.fromJSON(data as any);
+        this.metadataMessage = message;
     }
 
-    public async saveFiles(saveToDriveOnly: boolean = false) {
-        console.log(color.yellow("Saving files..."));
+    public async saveFiles(saveToDriveOnly: boolean = false, driveSaveForce: boolean = false) {
+        this.logger.info("Saving files...");
 
-
-        if (!this.metadataMessageId) {
-            console.log(color.red("No metadata message id found, can't save files. Did you load the files?"));
-            console.log(color.red("Trying to dump files into temp dir in the current real filesystem."));
-
-            nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
-            return;
-        }
-
-        if (this.saveToDisk) {
-            nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
+        if (this.saveToDisk || driveSaveForce) {
+            this.saveToDrive();
 
             if (saveToDriveOnly) {
                 return;
             }
         }
 
-        const msg = await this.getMetadataChannel().messages.fetch(this.metadataMessageId);
-        if (!msg) {
-            console.log(color.red("Failed to fetch metadata. Is the message deleted?"));
-            return;
-        }
-
         const json = this.fs.toJSON()
         const file = JSON.stringify(json);
 
-        await msg.edit({
+        await this.metadataMessage.edit({
             files: [{
                 name: "discordfs.json",
                 attachment: Buffer.from(file)
@@ -273,11 +273,22 @@ export default class DICloudApp extends Client {
                 + '\n' + 'Files: ' + Object.keys(json).length + ' files'
                 + '\n' + 'Total Size: ' + (Math.floor(this.fs.getTreeSizeRecursive("/") / 1000 / 1000)) + ' MB'
                 + '\n' + 'Hash: (' + objectHash(json) + ')'
-        })
+        }).catch((err) => {
+            this.logger.info("Failed to save metadata message: " + err);
+            this.saveToDrive();
+        });
+    }
+
+    private saveToDrive() {
+        this.logger.info("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )");
+        // nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
     }
 
 
-    public markDirty() {
+    /**
+     * Method that indicates that files were changed and should be saved to the provider.
+     */
+    public markForUpload() {
         if (this.debounceTimeout) {
             clearTimeout(this.debounceTimeout);
             this.debounceTimeout = undefined;
@@ -313,10 +324,10 @@ export default class DICloudApp extends Client {
 }
 
 export function printAndExit(message: string, exitCode: number = 1) {
-    console.log(color.red(message));
+    console.log(message);
     process.exit(exitCode);
 }
 
 export function print(message: string) {
-    console.log(color.green(message));
+    console.log(message);
 }

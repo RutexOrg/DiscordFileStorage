@@ -1,7 +1,7 @@
 import path from "path"
 import util from "util"
 import { createLogger, format, transports, config } from "winston"
-
+import fs from "fs"
 
 export function setup(loggerName: string, logToConsole: boolean = true) {
 	if (!loggerName) {
@@ -31,6 +31,10 @@ export function setup(loggerName: string, logToConsole: boolean = true) {
 	}
 
 	if(process.env.FILE_LOGGING_ENABLED) {
+		if(!fs.existsSync(path.join(process.cwd(), "logs"))) {
+			fs.mkdirSync(path.join(process.cwd(), "logs"))
+		}
+
 		logger.transports.push(new transports.File({filename: path.join(process.cwd(), "logs", loggerName + ".log")}))
 	}
 

@@ -4,7 +4,6 @@ dotenv.config();
 import fs from "node:fs";
 import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
-import color from "colors/safe.js";
 import DICloudApp, { print, printAndExit } from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
 import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
@@ -72,7 +71,7 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
 
 export async function boot(data: IBootParams){
     console.log(`NodeJS version: ${process.version}`);
-    console.log(color.yellow("Starting DICloud..."));
+    console.log("Starting DICloud...");
     const params = bootPrecheck(data);
     const app = new DICloudApp({
         intents: [
@@ -88,13 +87,9 @@ export async function boot(data: IBootParams){
         saveToDisk: params.saveToDisk,
     }, params.guildId);
 
-    console.log(color.yellow("Logging in..."));
+    app.getLogger().info("Logging in...");
     await app.login(params.token);
-    await app.waitForReady();
-    await app.preload();
-
-    console.log(color.yellow("Loading files..."));
-    await app.loadFiles();
+    await app.init();
 
     if (params.startWebdavServer) {
         const serverLaunchOptions: ServerOptions = {
@@ -132,7 +127,7 @@ export async function boot(data: IBootParams){
         const webdavServer = WebdavServer.createServer(serverLaunchOptions, app);
 
         await webdavServer.startAsync();
-        console.log(color.green("WebDAV server started at port " + params.webdavPort + "."));
+        app.getLogger().info("WebDAV server started at port " + params.webdavPort + ".");
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
@@ -252,13 +247,11 @@ export function readFileSyncOrUndefined(path: string): string | undefined {
 
 
 process.on("uncaughtException", (err) => {
-    console.log(color.red("Uncaught exception"));
-    console.log(color.red(err.name));
-    console.log(color.red(err.message));
-    console.log(color.red(err.stack!));
+    console.log("Uncaught exception");
+    console.trace(err)
     // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-	console.error("Unhandled Rejection at:", promise, "reason:", reason);
+    console.trace(reason);
 });

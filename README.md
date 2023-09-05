@@ -55,7 +55,7 @@ Copy the link and visit it. Follow the instructions to invite the bot to your se
 4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data (token, server id). Other settings are optional and documented in the file. \
 __If you dont have opportunity to use .env file, you can set environment variables instead, they should have the same names as in `.env.example` file.__
 
-5. To run the bot, run ``yarn boot``. This will compile the project and start the bot. There are also other commands, you can find them in ``package.json`` file.
+5. To run the bot, run ``yarn boot``. This will compile the project and start the bot.
 
 ## SSL
 Warning! At the moment SSL support **is not complete**. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests. \
@@ -95,8 +95,7 @@ You can also open the webdav server in your **explorer directly**. Just go to ``
 # Known issues
 
 1. Problems with downloading big (~50+ MB) files from **windows** explorer directly. \
-This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit (up to 4GB)
-. Script may be found in: ***scripts/webdav.reg*** \
+This is *limitation* of the windows explorer, which limiting downloading files to *50MB*. This repo contains a registry file, which can be used to increase this limit (up to 4GB). Script may be found in: ***scripts/webdav.reg*** \
 If you still having issues with this, i recommend to use [WinSCP](https://winscp.net/eng/index.php) for downloading big files. \
 **You can also** download big files directly via http. For example, you can use this url: ``http://localhost:3000/file.ext`` or ``http://localhost:3000/my/path/to/file.ext`` to download file ``file.ext`` from root folder or from ``/my/path/to`` folder respectively.
 
