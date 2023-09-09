@@ -131,12 +131,12 @@ export async function boot(data: IBootParams){
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            app.getLogger().info("[S] <<<< ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
+            app.getLogger().info("[S] >>>> ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
             next();
         });
     }
@@ -229,7 +229,7 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
         return number;
     }
 
-    if(type == "string" && value.length == 0){
+    if(type == "string" && value.length  == 0){
         printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     }
 

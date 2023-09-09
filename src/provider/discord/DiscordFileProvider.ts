@@ -1,13 +1,12 @@
-import path from "path";
 import { AttachmentBuilder, TextBasedChannel, TextChannel } from "discord.js";
-import { Writable, Readable } from "stream";
-import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import MutableBuffer from "../../helper/MutableBuffer.js";
-import structuredClone from "@ungap/structured-clone"; // backport to nodejs 16
-import { IFile } from "../../file/IFile.js";
 import BaseProvider, { IWriteStreamCallbacks } from "../core/BaseProvider.js";
+import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
+import structuredClone from "@ungap/structured-clone"; // polyfill for structured clone
+import MutableBuffer from "../../helper/MutableBuffer.js";
+import { Writable, Readable } from "stream";
 import { truncate } from "../../helper/utils.js";
-
+import { IFile } from "../../file/IFile.js";
+import path from "path";
 
 export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
 

@@ -1,4 +1,4 @@
-## Table of Contents
+## Contents
 - [DICloud](#dicloud)
 - [State and details](#state-and-details)
 - [How to setup and play with this](#how-to-setup-and-play-with-this)
@@ -14,7 +14,7 @@
 
 
 # DICloud
-File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
+File manager that allows you to upload and download files to and from Discord and manage them in various file managers via webdav protocol. 
 
 Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
 
@@ -28,7 +28,7 @@ Not even alpha. **Created for fun and ONLY for fun**. Dont use it as important s
 Please look at the [Known issues](#known-issues) section for more information.
 
 
-Has been tested __MAINLY__ on Windows 10 and on some third party webdav clients, like OwlFiles, WinSCP, dolphin. 
+Has been tested __MAINLY__ on Windows 10 and on some third party webdav clients: OwlFiles (Android), WinSCP (Windows), dolphin (Linux). 
 
 
 # How to setup and play with this
@@ -88,7 +88,7 @@ Then add your username and password to ``.env`` file. Set ``USERS`` to ``usernam
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
-Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive.
+Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive. 
 
 You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
 
