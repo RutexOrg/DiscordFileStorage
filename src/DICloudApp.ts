@@ -7,6 +7,7 @@ import { IFile, IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextBasedChannel, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
+import { printAndExit } from './helper/utils.js';
 
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -322,11 +323,3 @@ export default class DICloudApp extends Client {
 
 }
 
-export function printAndExit(message: string, exitCode: number = 1) {
-    console.log(message);
-    process.exit(exitCode);
-}
-
-export function print(message: string) {
-    console.log(message);
-}

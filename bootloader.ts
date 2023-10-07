@@ -4,9 +4,10 @@ dotenv.config();
 import fs from "node:fs";
 import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
-import DICloudApp, { print, printAndExit } from "./src/DICloudApp.js";
+import DICloudApp from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
 import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
+import { checkEnvVariableIsSet, checkIfFileExists, printAndExit, readFileSyncOrUndefined } from "./src/helper/utils.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -32,7 +33,6 @@ export interface IBootParams {
     encryptPassword: string;
     saveTimeout: number;
     saveToDisk: boolean;
-
 }
 
 export interface IBootParamsParsed extends IBootParams {
@@ -178,72 +178,12 @@ export async function envBoot() {
         saveTimeout,
         saveToDisk,
     })
-
     
 }
 
 
-export function checkIfFileExists(path: string, soft: boolean, assertString: string = ""): boolean {
-    try {
-        if (!fs.statSync(path).isFile()) {
-            const string = "File " + path + " is not found" + (assertString.length > 0 ? ": " + assertString : "");
-            if (!soft) {
-                throw new Error(string);
-            }
-            console.warn(string);
-            return false;
-        }
-    } catch (e) {
-        return false;
-    }
-    return true;
-}
 
-export function checkEnvVariableIsSet(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: any): any {
-    const value = process.env[name]!;
-    if (!value) {
-        if (defaultValue !== undefined) {
-            print("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + (defaultValue === "" ? "N/A" : defaultValue));
-            return defaultValue;
-        }
-        printAndExit("Required env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-    };
 
-    const valueLower = value.toLowerCase();
-
-    if (type == "boolean") {
-        if (valueLower === "true") {
-            return true;
-        } else if (valueLower === "false") {
-            return false;
-        } else {
-            printAndExit("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-        }
-    }
-
-    if (type == "number") {
-        const number = parseInt(value!);
-        if (isNaN(number)) {
-            printAndExit("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-        }
-        return number;
-    }
-
-    if(type == "string" && value.length  == 0){
-        printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-    }
-
-    return value;
-}
-
-export function readFileSyncOrUndefined(path: string): string | undefined {
-    try {
-        let file = fs.readFileSync(path);
-        return file.toString();
-    } catch (error) {
-        return undefined;
-    }
-}
 
 
 process.on("uncaughtException", (err) => {

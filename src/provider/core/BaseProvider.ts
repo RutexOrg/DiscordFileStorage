@@ -92,8 +92,8 @@ export default abstract class BaseProvider {
 
         // calling .end on decipher stream will throw an error and not emit end event. so we need to do this manually. 
         decipher.once("unpipe", () => {
-            patchEmitter(decipher, "decipher"); // debug 
-            patchEmitter(stream, "read"); // debug
+            // patchEmitter(decipher, "decipher"); // debug 
+            // patchEmitter(stream, "read"); // debug
             setImmediate(() => { // idk if this work as it should... but looks like it does.
                 decipher.emit("end");
                 decipher.destroy();

@@ -17,19 +17,10 @@ function getContext(ctx: v2.IContextInfo) {
     }
 }
 
-/**
- * Virtual file system wrapper on top of DiscordFileStorageApp.
- */
-export class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializer {
-    uid(): string {
-        return "virtual-discord-file-system@1.0.0";
-    }
-    serialize(fs: v2.FileSystem, callback: v2.ReturnCallback<any>): void {
-        throw new Error("Method not implemented.");
-    }
-    unserialize(serializedData: any, callback: v2.ReturnCallback<v2.FileSystem>): void {
-        throw new Error("Method not implemented.");
-    }
+class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializer {
+    uid(): string { return "virtual-discord-file-system@1.0.0"; }
+    serialize(fs: v2.FileSystem, callback: v2.ReturnCallback<any>): void { throw new Error("Method not implemented."); }
+    unserialize(serializedData: any, callback: v2.ReturnCallback<v2.FileSystem>): void { throw new Error("Method not implemented."); }
 }
 
 export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
@@ -126,11 +117,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
     _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         this.client.getLogger().info(".create", path.toString(), getContext(ctx));
-
-        const exists = this.fs.existsSync(path.toString());
-        if (exists) {
-            return callback(Errors.ResourceAlreadyExists);
-        }
 
         if (ctx.type.isDirectory) {
             this.fs.mkdirSync(path.toString(), { recursive: true });
@@ -240,8 +226,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         this.client.markForUpload();
         return callback();
     }
-
-
 
     /**
      * Copies a file from pathFrom to pathTo. Automatically marks the client as dirty and updates the file system.
