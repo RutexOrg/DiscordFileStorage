@@ -27,6 +27,32 @@ class DICloudLockManager extends v2.LocalLockManager {
     constructor() {
         super();
     }
+
+    getLock(uuid: string, callback: v2.ReturnCallback<v2.Lock>): void {
+        console.log("getLock", uuid);
+        super.getLock(uuid, callback);
+    }
+
+    getLocks(callback: v2.ReturnCallback<v2.Lock[]>): void {
+        console.log("getLocks");
+        super.getLocks(callback);
+    }
+
+    refresh(uuid: string, timeoutSeconds: number, callback: v2.ReturnCallback<v2.Lock>): void {
+        console.log("refresh", uuid, timeoutSeconds);
+        super.refresh(uuid, timeoutSeconds, callback);
+    }
+
+    setLock(lock: v2.Lock, callback: v2.SimpleCallback): void {
+        console.log("setLock", lock);
+        super.setLock(lock, callback);
+    }
+
+    removeLock(uuid: string, callback: v2.SimpleCallback): void {
+        console.log("removeLock", uuid);
+        super.removeLock(uuid, callback);
+    }
+    
 }
 
 export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
@@ -137,8 +163,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         if (ctx.type.isFile) {
             this.fs.setFile(path.toString(), this.client.getProvider().createVFile(path.fileName(), 0));
         }
-
-        
 
         this.client.markForUpload();
         return callback();
