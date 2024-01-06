@@ -27,6 +27,15 @@ export default abstract class BaseProvider {
         return this._app;
     }
 
+    public deleteFile(file: IFile) {
+        for(let chunk of file.chunks) {
+            this.addToDeletionQueue({
+                channel: this.client.getFilesChannel().id,
+                message: chunk.id
+            });
+        }
+    }
+
     public addToDeletionQueue(info: IDelayedDeletionEntry) {
         this.fileDeletionQueue.push(info);
     }

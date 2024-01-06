@@ -23,9 +23,15 @@ class VirtualDiscordFileSystemSerializer implements v2.FileSystemSerializer {
     unserialize(serializedData: any, callback: v2.ReturnCallback<v2.FileSystem>): void { throw new Error("Method not implemented."); }
 }
 
+class DICloudLockManager extends v2.LocalLockManager {
+    constructor() {
+        super();
+    }
+}
+
 export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     private client: DICloudApp;
-    private cLockManager: v2.LocalLockManager = new v2.LocalLockManager();
+    private cLockManager: DICloudLockManager = new DICloudLockManager();
     private cPropertyManager: v2.LocalPropertyManager = new v2.LocalPropertyManager();
     private fs: VolumeEx;
 
@@ -45,9 +51,15 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _availableLocks(path: v2.Path, ctx: v2.AvailableLocksInfo, callback: v2.ReturnCallback<v2.LockKind[]>): void {
-        return callback(undefined, []);
-    }
+        const stats = this.fs.statSync(path.toString());
+        if (stats.isDirectory()) {
+            return callback(undefined, []);
+        }
 
+        return callback(undefined, [
+            new v2.LockKind(v2.LockScope.Exclusive, v2.LockType.Write),
+        ]);
+    }
 
     /**
      * Returns the mime type of the file according to the file extension. (Not by the file content)
@@ -126,6 +138,8 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             this.fs.setFile(path.toString(), this.client.getProvider().createVFile(path.fileName(), 0));
         }
 
+        
+
         this.client.markForUpload();
         return callback();
     }
@@ -165,12 +179,8 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
         const file = this.fs.getFile(path.toString());
 
-        for (const chunk of file.chunks) {
-            this.client.getProvider().addToDeletionQueue({
-                channel: this.client.getFilesChannel().id,
-                message: chunk.id
-            });
-        }
+        this.client.getProvider().deleteFile(file);
+
         file.chunks = [];
         file.modified = new Date();
         this.fs.setFile(path.toString(), file);
@@ -214,12 +224,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         }
 
         for (const fileToDelete of filesToDelete) {
-            for (const chunk of this.fs.getFile(fileToDelete).chunks) {
-                this.client.getProvider().addToDeletionQueue({
-                    channel: this.client.getFilesChannel().id,
-                    message: chunk.id
-                });
-            }
+            this.client.getProvider().deleteFile(this.fs.getFile(fileToDelete));
         }
 
         this.fs.rmSync(path.toString(), { recursive: true });
