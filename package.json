@@ -3,7 +3,6 @@
   "version": "2.2.0",
   "main": "out/boot.js",
   "license": "MIT",
-  "type": "module",
   "dependencies": {
     "@ungap/structured-clone": "^1.2.0",
     "app-root-path": "^3.1.0",

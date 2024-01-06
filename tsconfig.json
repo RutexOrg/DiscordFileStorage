@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		/*Visithttps://aka.ms/tsconfigtoreadmoreaboutthisfile*/
 		"target": "ES2016",
-		"module": "ES6",
+		"module": "CommonJS",
 		"moduleResolution": "node",
 		"strict": true,                                 /* Enable all strict type-checking options. */
 		"forceConsistentCasingInFileNames": true,        /* Disallow inconsistently-cased references to the same file. */
