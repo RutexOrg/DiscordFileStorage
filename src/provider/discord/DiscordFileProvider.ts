@@ -9,7 +9,7 @@ import BaseProvider, { IWriteStreamCallbacks } from "../core/BaseProvider.js";
 import { truncate } from "../../helper/utils.js";
 
 
-export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
+export const MAX_REAL_CHUNK_SIZE: number = 10 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
 
 /**
  * Class that handles all the remote file management on discord.
