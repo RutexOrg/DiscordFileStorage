@@ -131,14 +131,15 @@ export async function boot(data: IBootParams){
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            app.getLogger().info("[S] <<<< ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            app.getLogger().info("[S] IN ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("[S] >>>> ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
+            app.getLogger().info("[S] OUT ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
             next();
         });
+
     }
 
     return app;
