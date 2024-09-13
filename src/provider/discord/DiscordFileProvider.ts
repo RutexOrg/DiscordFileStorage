@@ -1,4 +1,4 @@
-import { AttachmentBuilder, TextBasedChannel, TextChannel } from "discord.js";
+import { AttachmentBuilder, TextChannel } from "discord.js";
 import BaseProvider, { IWriteStreamCallbacks } from "../core/BaseProvider.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
 import structuredClone from "@ungap/structured-clone"; // polyfill for structured clone
@@ -44,7 +44,7 @@ export default class DiscordFileProvider extends BaseProvider {
      * @param filesChannel Channel to upload the chunk to
      * @param file File that the chunk belongs to and will be added to after upload. 
      */
-    private async uploadChunkToDiscord(chunk: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextBasedChannel, file: IFile) {
+    private async uploadChunkToDiscord(chunk: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextChannel, file: IFile) {
         this.client.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
         const message = await filesChannel.send({
             files: [

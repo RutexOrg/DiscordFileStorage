@@ -25,7 +25,7 @@
     "start": "node --no-warnings out/boot.js",
     "boot": "tsc && node --no-warnings out/boot.js",
     "build": "tsc",
-    "test": "yarn build && mocha --no-warnings out/tests/",
+    "test": "yarn build && node --no-warnings out/tests/raw.spec.js",
     "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
     "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test",
     "del": "del /s /q out"
@@ -42,6 +42,7 @@
     "mocha": "^10.2.0",
     "sinon": "^15.0.4",
     "typescript": "^5.0.4",
+    "uvu": "^0.5.6",
     "webdav": "^5.0.0-r3",
     "yarn-upgrade-all": "^0.7.2"
   }

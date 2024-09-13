@@ -167,14 +167,17 @@ export default abstract class BaseProvider {
      * @param callbacks - callbacks for write stream. 
      * @returns write stream
      */
-    async createWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
+    async createWriteStream(file: IFile, callbacks?: IWriteStreamCallbacks): Promise<Writable> {
         if (this.client.shouldEncryptFiles()) {
-            return await this.createWriteStreamWithEncryption(file, callbacks);
+            return await this.createWriteStreamWithEncryption(file, callbacks || {});
         } else {
-            return await this.createRawWriteStream(file, callbacks);
+            return await this.createRawWriteStream(file, callbacks || {});
         }
     }
 
+    /**
+     * Returns file struct, no remote operations are done.
+     */
     public createVFile(name: string, size: number): IFile {
         return {
             name,

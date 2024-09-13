@@ -157,7 +157,7 @@ export async function boot(data: IBootParams){
 
     }
 
-    return app;
+    return app
 }
 
 export async function envBoot() {

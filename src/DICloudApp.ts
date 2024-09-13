@@ -4,10 +4,11 @@ import DiscordFileProvider, { MAX_REAL_CHUNK_SIZE } from './provider/discord/Dis
 import axios from './helper/AxiosInstance.js';
 import { make } from './Log.js';
 import { IFile, IFilesDesc } from './file/IFile.js';
-import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextBasedChannel, TextChannel } from 'discord.js';
+import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
 import { printAndExit } from './helper/utils.js';
+import BaseProvider from './provider/core/BaseProvider.js';
 
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -30,7 +31,7 @@ export default class DICloudApp extends Client {
     private metaChannelName: string;
     private filesChannelId: string;
     private createChannels: Array<string>;
-    private provider: DiscordFileProvider;
+    private provider: BaseProvider;
 
     private shouldEncrypt;
     private encryptPassword;
@@ -52,8 +53,8 @@ export default class DICloudApp extends Client {
     private readonly medataInfoMessage: string = "DiscordFS Metadata ✔";
 
     private guild!: Guild;
-    private metaChannel!: TextBasedChannel;
-    private filesChannel!: TextBasedChannel;
+    private metaChannel!: TextChannel;
+    private filesChannel!: TextChannel;
 
 
     constructor(options: DICloudAppOptions, guildId: string) {
@@ -103,11 +104,11 @@ export default class DICloudApp extends Client {
         return this.guild;
     };
 
-    public getMetadataChannel(): TextBasedChannel {
+    public getMetadataChannel(): TextChannel {
         return this.metaChannel;
     }
 
-    public getFilesChannel(): TextBasedChannel {
+    public getFilesChannel(): TextChannel {
         return this.filesChannel;
     }
 
@@ -167,8 +168,8 @@ export default class DICloudApp extends Client {
             channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
         }
 
-        this.metaChannel = channels.find(channel => channel.name == this.metaChannelName) as TextBasedChannel;
-        this.filesChannel = channels.find(channel => channel.name == this.filesChannelId) as TextBasedChannel;
+        this.metaChannel = channels.find(channel => channel.name == this.metaChannelName) as TextChannel
+        this.filesChannel = channels.find(channel => channel.name == this.filesChannelId) as TextChannel;
 
         this.tickInterval = setInterval(() => {
             this.tick();
@@ -307,7 +308,7 @@ export default class DICloudApp extends Client {
         await this.provider.processDeletionQueue();
     }
 
-    public getProvider(): DiscordFileProvider {
+    public getProvider(): BaseProvider {
         return this.provider;
     }
 

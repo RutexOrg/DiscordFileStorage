@@ -85,3 +85,13 @@ export function ensureStringLength(str: string, requiredLength: number, fillWith
 export function getIv(len = 24){
     return randomBytes(len);
 }
+
+export function withResolvers() {
+    let resolve: any;
+    let reject: any;
+    const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+    });
+    return { promise, resolve, reject };
+}

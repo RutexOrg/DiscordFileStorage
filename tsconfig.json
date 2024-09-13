@@ -1,7 +1,7 @@
 {
 	"compilerOptions": {
 		/*Visithttps://aka.ms/tsconfigtoreadmoreaboutthisfile*/
-		"target": "ES2016",
+		"target": "ESNext",
 		"module": "CommonJS",
 		"moduleResolution": "node",
 		"strict": true,                                 /* Enable all strict type-checking options. */
