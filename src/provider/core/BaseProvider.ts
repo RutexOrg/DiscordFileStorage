@@ -111,7 +111,7 @@ export default abstract class BaseProvider {
         const buffer = new MutableBuffer(this.maxProviderFileSize());
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
-                console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
+                // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 const rest = this.maxProviderFileSize() - buffer.size;
                 if (chunk.length < rest) {
                     buffer.write(chunk, encoding);

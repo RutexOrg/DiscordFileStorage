@@ -16,7 +16,7 @@
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in various file managers via webdav protocol. 
 
-Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
+Yes, even ***above 10MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
@@ -69,7 +69,7 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 
 ## Encryption
 
-Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
+Files in discord are not encrypted. Because of this, the server supports encryption via __AES256-GCM__ algorithm. 
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
 2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. \
@@ -91,6 +91,10 @@ Once server started, the webdav server will be available on port 3000.
 Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive. 
 
 You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
+
+# Limitations
+
+Does not suitable for low memory devices. Uploading and downloading uing in-memory buffer, so it can consume memory.
 
 # Known issues
 
