@@ -75,23 +75,22 @@ export default class DiscordFileProvider extends BaseProvider {
         const buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
 
         let chunkId = 1;
-
+        const self = this;
         return new Writable({
-            write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
+            write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written to stream.
                 const rest = MAX_REAL_CHUNK_SIZE - buffer.size;
 
                 if (chunk.length < rest) {
                     buffer.write(chunk, encoding);
                 } else {
-                    const firstPart = chunk.slice(0, rest);
-                    const secondPart = chunk.slice(rest);
-                    buffer.write(firstPart, encoding);
-                    await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
+                    buffer.write(chunk.slice(0, rest), encoding);
+                    await self.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                     if (callbacks.onChunkUploaded) {
                         await callbacks.onChunkUploaded(chunkId, totalChunks);
                     }
+                    // this.emit("chunkUploaded", chunkId, totalChunks);
                     chunkId++;
-                    buffer.write(secondPart, encoding);
+                    buffer.write(chunk.slice(rest), encoding);
                 }
 
                 file.size += chunk.length;

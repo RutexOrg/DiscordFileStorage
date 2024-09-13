@@ -1,4 +1,3 @@
-// import crypto from "crypto";
 import { IFile } from "../../file/IFile";
 import { PassThrough, Readable, Transform, Writable } from "stream";
 import DICloudApp from "../../DICloudApp";
@@ -6,8 +5,6 @@ import DICloudApp from "../../DICloudApp";
 import { gcm } from '@noble/ciphers/aes';
 import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
 import { randomBytes } from '@noble/ciphers/webcrypto';
-
-import { bytesToUtf8 } from '@noble/ciphers/utils';
 
 import MutableBuffer from "../../helper/MutableBuffer";
 import { withResolvers } from "../../helper/utils";
@@ -44,23 +41,7 @@ export default abstract class BaseProvider {
         return this.fileDeletionQueue;
     }
 
-    /**
-     * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
-     */
-    public abstract processDeletionQueue(): Promise<void>;
-        
-    /**
-     * Method that should provide raw read stream for downloading files from provider. Only basic read stream from provider, no decryption or anything else.
-     * @param file - File which should be downloaded.
-     */
-    public abstract createRawReadStream(file: IFile): Promise<Readable>;
-    /**
-     * Method that should provide raw write stream for uploading files to provider. Only basic write stream to provider, no encryption or anything else.
-     * @param file - File which should be uploaded.
-     * @param callbacks  - Callbacks for write stream.
-     */
-    public abstract createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
-
+  
     private createCipher(iv: Uint8Array): Cipher {
         const key = utf8ToBytes(this.client.getEncryptPassword());
         return gcm(key, iv);
@@ -69,11 +50,11 @@ export default abstract class BaseProvider {
     private async createReadStreamWithDecryption(file: IFile): Promise<Readable> {
         const readStream = await this.createRawReadStream(file);
         const decipher = this.createCipher(file.iv);
+
+        const decryptedRead = new PassThrough();    
+        const buffer = new MutableBuffer(this.getMaxFileSizeWithOverhead()); // encrypted data is bigger than decrypted data   
     
-        const decryptedRead = new PassThrough();
-    
-        const buffer = new MutableBuffer(this.getMaxFileSizeWithOverhead());    
-        const processBuffer = (chunk: any) => {
+        readStream.on("data", (chunk) => {
             const rest = this.getMaxFileSizeWithOverhead() - buffer.size;
             if (chunk.length < rest) {
                 buffer.write(chunk);
@@ -84,10 +65,6 @@ export default abstract class BaseProvider {
                 buffer.clear();
                 buffer.write(chunk.slice(rest));
             }
-        };
-    
-        readStream.on("data", (chunk) => {
-            processBuffer(chunk);
         });
     
         readStream.on("end", () => {
@@ -96,6 +73,7 @@ export default abstract class BaseProvider {
                 decryptedRead.push(decrypted);
             }
             decryptedRead.push(null);
+            buffer.destory();
         });
     
         readStream.on("error", (err) => {
@@ -106,19 +84,20 @@ export default abstract class BaseProvider {
     }
 
     private async createWriteStreamWithEncryption(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
-        const stream = await this.createRawWriteStream(file, callbacks);
+        const rawWriteStream = await this.createRawWriteStream(file, callbacks);
         const cipher = this.createCipher(file.iv);
         const writeStreamAwaiter = withResolvers();
+        
+        const buffer = new MutableBuffer(this.maxProviderFileSize());
 
-        stream.on("finish", () => {
+        rawWriteStream.on("finish", () => {
             writeStreamAwaiter.resolve();
         });
 
-        stream.on("error", (err) => {
+        rawWriteStream.on("error", (err) => {
             writeStreamAwaiter.reject(err);
         });
 
-        const buffer = new MutableBuffer(this.maxProviderFileSize());
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
                 // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
@@ -127,7 +106,7 @@ export default abstract class BaseProvider {
                     buffer.write(chunk, encoding);
                 } else {
                     buffer.write(chunk.subarray(0, rest), encoding);
-                    stream.write(cipher.encrypt(buffer.flush()));
+                    rawWriteStream.write(cipher.encrypt(buffer.flush()));
                     buffer.clear();
                     buffer.write(chunk.subarray(rest), encoding);
                 }
@@ -136,9 +115,9 @@ export default abstract class BaseProvider {
             final: async (callback) => {
                 console.log("[BaseProvider] final() Finalizing upload.");
                 if (buffer.size > 0) {
-                    stream.write(cipher.encrypt(buffer.flush()));
+                    rawWriteStream.write(cipher.encrypt(buffer.flush()));
                 }
-                stream.end();
+                rawWriteStream.end();
                 await writeStreamAwaiter.promise;
                 callback();
             },
@@ -199,6 +178,24 @@ export default abstract class BaseProvider {
             iv: randomBytes(),
         };
     }
+
+      /**
+     * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
+     */
+      public abstract processDeletionQueue(): Promise<void>;
+        
+      /**
+       * Method that should provide raw read stream for downloading files from provider. Only basic read stream from provider, no decryption or anything else.
+       * @param file - File which should be downloaded.
+       */
+      public abstract createRawReadStream(file: IFile): Promise<Readable>;
+      /**
+       * Method that should provide raw write stream for uploading files to provider. Only basic write stream to provider, no encryption or anything else.
+       * @param file - File which should be uploaded.
+       * @param callbacks  - Callbacks for write stream.
+       */
+      public abstract createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
+      
 
     /**
      * Custom provider should implement this method to provide max file size.

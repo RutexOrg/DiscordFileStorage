@@ -54,6 +54,7 @@ test("create and read small", async () => {
     });
     writeStream.write(Buffer.from(data.content));
     writeStream.end();
+    // 
 
     await promise;
 
@@ -75,25 +76,66 @@ test("create and read big", async () => {
     let readedContent = "";
     const file = provider.createVFile(data.name, data.size);
 
-    const writeStream = await provider.createWriteStream(file, {
-        onFinished: async () => {
-            const readStream = await provider.createReadStream(file);
-            readStream.on("data", (chunk) => {
-                readedContent += chunk.toString();
-            });
+    const writeStream = await provider.createWriteStream(file);
 
-            readStream.on("end", () => {
-                resolve(true);
-            });
+    writeStream.on("finish", async () => {
+        const readStream = await provider.createReadStream(file);
+        readStream.on("data", (chunk) => {
+            readedContent += chunk.toString();
+        });
 
-            readStream.on("error", (err) => {
-                assert.not.ok(err);
-            });
-        }
+        readStream.on("end", () => {
+            resolve(true);
+        });
+
+        readStream.on("error", (err) => {
+            assert.not.ok(err);
+        });
+
+        
+
+
     });
 
     Readable.from(data.content).pipe(writeStream);
-    
+
+    await promise;
+
+    assert.is(readedContent, data.content);
+});
+
+test("create empty file", async () => {
+    const { promise, resolve, reject } = withResolvers();
+
+    const provider = app.getProvider();
+    const data = {
+        name: "empty.txt",
+        content: "",
+        size: 0
+    }
+
+    let readedContent = "";
+    const file = provider.createVFile(data.name, data.size);
+
+    const writeStream = await provider.createWriteStream(file);
+
+    writeStream.on("finish", async () => {
+        const readStream = await provider.createReadStream(file);
+        readStream.on("data", (chunk) => {
+            readedContent += chunk.toString();
+        });
+
+        readStream.on("end", () => {
+            resolve(true);
+        });
+
+        readStream.on("error", (err) => {
+            assert.not.ok(err);
+        });
+    });
+
+    Readable.from(data.content).pipe(writeStream);
+
     await promise;
 
     assert.is(readedContent, data.content);
