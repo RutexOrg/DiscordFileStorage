@@ -17,9 +17,10 @@ export const MAX_MB_CHUNK_SIZE = 10; // megabytes chunk size. Discord allows 10M
  */
 export const ENCRYPTION_OVERHEAD = 16;
 /**
- * Maximum chunk size in bytes. Total stored chunk will be SIZE + encryption overhead.
+ * Maximum chunk size in bytes minus encryption overhead. 
+ * Total stored chunk will be SIZE + encryption overhead.
  */
-export const MAX_REAL_CHUNK_SIZE = ( MAX_MB_CHUNK_SIZE * 1000 * 1000 ) - ENCRYPTION_OVERHEAD;
+export const MAX_REAL_CHUNK_SIZE = (MAX_MB_CHUNK_SIZE * 1000 * 1000) - ENCRYPTION_OVERHEAD;
 
 /**
  * Class that handles all the remote file management on discord.
@@ -27,7 +28,7 @@ export const MAX_REAL_CHUNK_SIZE = ( MAX_MB_CHUNK_SIZE * 1000 * 1000 ) - ENCRYPT
 export default class DiscordFileProvider extends BaseProvider {
 
     // Function that returns a AttachmentBuilder from a buffer with proper name.
-    private getAttachmentBuilderFromBuffer(buffer: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt",) : AttachmentBuilder {
+    private getAttachmentBuilderFromBuffer(buffer: Buffer, chunkName: string, chunkNummer: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt",): AttachmentBuilder {
         const builder = new AttachmentBuilder(buffer);
         const name = (chunkNummer ? chunkNummer + "-" : "") + chunkName + (addExtension ? "." + extension : "") + (encrypt ? ".enc" : "");
 
@@ -37,7 +38,7 @@ export default class DiscordFileProvider extends BaseProvider {
 
     /**
      * Uploads a chunk to discord with a given naming and adds the chunk to the file object.
-     * FLUSHES THE MUTABLE BUFFER!
+     * FLUSHES THE MUTABLE BUFFER! Mutates the buffer and the file object.
      * @param chunk Buffer to upload
      * @param chunkNumber Chunk number (starts at 1)
      * @param totalChunks Total chunks, used only for logging, looks like is broken anyway at the moment
@@ -77,17 +78,25 @@ export default class DiscordFileProvider extends BaseProvider {
 
         return new Writable({
             write: async (chunk, encoding, callback) => { // write is called when a chunk of data is ready to be written to stream.
-                // console.log("write() chunk.length: " + chunk.length + " - encoding: " + encoding);
-                if (buffer.size + chunk.length > MAX_REAL_CHUNK_SIZE) {
+                const rest = MAX_REAL_CHUNK_SIZE - buffer.size;
+
+                if (chunk.length < rest) {
+                    buffer.write(chunk, encoding);
+                } else {
+                    const firstPart = chunk.slice(0, rest);
+                    const secondPart = chunk.slice(rest);
+                    buffer.write(firstPart, encoding);
                     await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                     if (callbacks.onChunkUploaded) {
                         await callbacks.onChunkUploaded(chunkId, totalChunks);
                     }
                     chunkId++;
+                    buffer.write(secondPart, encoding);
                 }
+
                 file.size += chunk.length;
-                buffer.write(chunk, encoding);
-                callback();
+                callback()
+
             },
             final: async (callback) => {
                 this.client.getLogger().info("final() Finalizing upload.");
@@ -118,7 +127,7 @@ export default class DiscordFileProvider extends BaseProvider {
         if (this.deletionQueue.length > 0) {
             const info = this.deletionQueue.shift()!;
             const channel = this.client.channels.cache.get(info.channel) as TextChannel;
-            
+
             if (!channel) {
                 this.client.getLogger().error("Failed to find channel: " + info.channel);
                 return;

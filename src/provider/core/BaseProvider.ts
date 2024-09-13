@@ -10,6 +10,7 @@ import { randomBytes } from '@noble/ciphers/webcrypto';
 import { bytesToUtf8 } from '@noble/ciphers/utils';
 
 import MutableBuffer from "../../helper/MutableBuffer";
+import { withResolvers } from "../../helper/utils";
 
 
 export interface IWriteStreamCallbacks {
@@ -107,11 +108,20 @@ export default abstract class BaseProvider {
     private async createWriteStreamWithEncryption(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
         const stream = await this.createRawWriteStream(file, callbacks);
         const cipher = this.createCipher(file.iv);
+        const writeStreamAwaiter = withResolvers();
+
+        stream.on("finish", () => {
+            writeStreamAwaiter.resolve();
+        });
+
+        stream.on("error", (err) => {
+            writeStreamAwaiter.reject(err);
+        });
 
         const buffer = new MutableBuffer(this.maxProviderFileSize());
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
-                console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
+                // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 const rest = this.maxProviderFileSize() - buffer.size;
                 if (chunk.length < rest) {
                     buffer.write(chunk, encoding);
@@ -129,6 +139,7 @@ export default abstract class BaseProvider {
                     stream.write(cipher.encrypt(buffer.flush()));
                 }
                 stream.end();
+                await writeStreamAwaiter.promise;
                 callback();
             },
             destroy: (err, callback) => {
