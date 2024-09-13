@@ -4,6 +4,7 @@ export interface IFile {
     chunks: IChunkInfo[]
     created: Date;
     modified: Date;
+    iv: Uint8Array
     // uploaded: boolean;
 }
 

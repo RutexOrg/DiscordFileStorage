@@ -1,8 +1,16 @@
-import crypto from "crypto";
-import { IChunkInfo, IFile } from "../../file/IFile";
-import { Readable, Writable } from "stream";
+// import crypto from "crypto";
+import { IFile } from "../../file/IFile";
+import { PassThrough, Readable, Transform, Writable } from "stream";
 import DICloudApp from "../../DICloudApp";
-import { patchEmitter } from "../../helper/EventPatcher.js";
+
+import { gcm } from '@noble/ciphers/aes';
+import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
+import { randomBytes } from '@noble/ciphers/webcrypto';
+
+import { bytesToUtf8 } from '@noble/ciphers/utils';
+
+import MutableBuffer from "../../helper/MutableBuffer";
+
 
 export interface IWriteStreamCallbacks {
     onFinished?: () => Promise<void>;
@@ -52,92 +60,87 @@ export default abstract class BaseProvider {
      */
     public abstract createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
 
-
-    private createEncryptor(autoDestroy = true) {
-        const chiper = crypto.createCipher("chacha20-poly1305", this.client.getEncryptPassword(), {
-            autoDestroy,
-            authTagLength: 16
-        } as any);
-
-
-        chiper.once("error", (err) => {
-            this.client.getLogger().info("Chiper", err);
-        });
-
-        return chiper;
-    }
-
-    // reason: TypeError: authTagLength required for chacha20-poly1305
-    private createDecryptor(autoDestroy = true) {
-        const decipher = crypto.createDecipher("chacha20-poly1305", this.client.getEncryptPassword(), {
-            autoDestroy,
-            authTagLength: 16
-        } as any);
-
-        // backport to nodejs 16.14.2
-        if (decipher.setAuthTag) {
-            decipher.setAuthTag(Buffer.alloc(16, 0));
-        }
-
-        decipher.once("error", (err) => { // TODO: debug error, for now just ignore, seems like md5 is normal.
-            this.client.getLogger().info("Decipher", err);
-        });
-
-        return decipher;
+    private createCipher(iv: Uint8Array): Cipher {
+        const key = utf8ToBytes(this.client.getEncryptPassword());
+        return gcm(key, iv);
     }
 
     private async createReadStreamWithDecryption(file: IFile): Promise<Readable> {
-        const stream = await this.createRawReadStream(file);
-        const decipher = this.createDecryptor();
-
-        // calling .end on decipher stream will throw an error and not emit end event. so we need to do this manually. 
-        decipher.once("unpipe", () => {
-            // patchEmitter(decipher, "decipher"); // debug 
-            // patchEmitter(stream, "read"); // debug
-            setImmediate(() => { // idk if this work as it should... but looks like it does.
-                decipher.emit("end");
-                decipher.destroy();
-            });
+        const readStream = await this.createRawReadStream(file);
+        const decipher = this.createCipher(file.iv);
+    
+        const decryptedRead = new PassThrough();
+    
+        const buffer = new MutableBuffer(this.getMaxFileSizeWithOverhead());    
+        const processBuffer = (chunk: any) => {
+            const rest = this.getMaxFileSizeWithOverhead() - buffer.size;
+            if (chunk.length < rest) {
+                buffer.write(chunk);
+            } else {
+                buffer.write(chunk.slice(0, rest));
+                const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
+                decryptedRead.push(decrypted);
+                buffer.clear();
+                buffer.write(chunk.slice(rest));
+            }
+        };
+    
+        readStream.on("data", (chunk) => {
+            processBuffer(chunk);
         });
-
-        return stream.pipe(decipher, { end: false });
+    
+        readStream.on("end", () => {
+            if (buffer.size > 0) {
+                const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
+                decryptedRead.push(decrypted);
+            }
+            decryptedRead.push(null);
+        });
+    
+        readStream.on("error", (err) => {
+            decryptedRead.destroy(err);
+        });
+    
+        return decryptedRead;
     }
 
     private async createWriteStreamWithEncryption(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
         const stream = await this.createRawWriteStream(file, callbacks);
-        const cipher = this.createEncryptor(false);
+        const cipher = this.createCipher(file.iv);
 
-        // The problem is that the encryption stream is closing before the write stream is flushed all its data.
-        // Since we give the encryption stream back and it closes too early, the write stream stream is not flushed all its data in provider, what results in a corrupted file or telling client at wrong time that the file is uploaded, when it is not. 
-        // this is why we need to wait for the write stream to finish before we close the encryption stream.
-        cipher.pipe(stream);
-
-        const pt = new Writable({
-            write: (chunk, encoding, callback) => {
-                cipher.write(chunk, encoding, callback);
+        const buffer = new MutableBuffer(this.maxProviderFileSize());
+        return new Writable({
+            write: async (chunk: Buffer, encoding, callback) => {
+                console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
+                const rest = this.maxProviderFileSize() - buffer.size;
+                if (chunk.length < rest) {
+                    buffer.write(chunk, encoding);
+                } else {
+                    buffer.write(chunk.subarray(0, rest), encoding);
+                    stream.write(cipher.encrypt(buffer.flush()));
+                    buffer.clear();
+                    buffer.write(chunk.subarray(rest), encoding);
+                }
+                callback();
             },
-            final: (callback) => {
-                cipher.end();
-                stream.once("finish", () => {
-                    callback();
-                });
+            final: async (callback) => {
+                console.log("[BaseProvider] final() Finalizing upload.");
+                if (buffer.size > 0) {
+                    stream.write(cipher.encrypt(buffer.flush()));
+                }
+                stream.end();
+                callback();
+            },
+            destroy: (err, callback) => {
+                console.log("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
+                buffer.destory();
+                if (callbacks.onAbort) {
+                    callbacks.onAbort(err);
+                }
+                callback(err);
             }
         });
 
-        stream.on("error", (err) => {
-            this.client.getLogger().info("write.on('error')", err);
-            pt.destroy(err);
-            cipher.emit("end");
-            cipher.destroy();
-        });
-
-        stream.on("finish", () => {
-            pt.end();
-            cipher.emit("end");
-            cipher.destroy();
-        });
-
-        return pt;
     }
 
 
@@ -178,7 +181,14 @@ export default abstract class BaseProvider {
             size,
             chunks: [],
             created: new Date(),
-            modified: new Date()
+            modified: new Date(),
+            iv: randomBytes(),
         };
     }
+
+    /**
+     * Custom provider should implement this method to provide max file size.
+     */
+    abstract maxProviderFileSize(): number;
+    abstract getMaxFileSizeWithOverhead(): number;
 }

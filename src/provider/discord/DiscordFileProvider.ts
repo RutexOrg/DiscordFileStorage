@@ -8,7 +8,18 @@ import { truncate } from "../../helper/utils.js";
 import { IFile } from "../../file/IFile.js";
 import path from "path";
 
-export const MAX_REAL_CHUNK_SIZE: number = 25 * 1000 * 1000; // Looks like 25 mb is a new discord limit from 13.04.23 instead of old 8 MB. 
+/**
+ * Discord allows 10MB per file, so we need to split the file into chunks. 
+ */
+export const MAX_MB_CHUNK_SIZE = 10; // megabytes chunk size. Discord allows 10MB per file.
+/**
+ * Encryption overhead for AES-GCM is 16 bytes.
+ */
+export const ENCRYPTION_OVERHEAD = 16;
+/**
+ * Maximum chunk size in bytes. Total stored chunk will be SIZE + encryption overhead.
+ */
+export const MAX_REAL_CHUNK_SIZE = ( MAX_MB_CHUNK_SIZE * 1000 * 1000 ) - ENCRYPTION_OVERHEAD;
 
 /**
  * Class that handles all the remote file management on discord.
@@ -115,6 +126,14 @@ export default class DiscordFileProvider extends BaseProvider {
 
             await channel.messages.delete(info.message);
         }
+    }
+
+    maxProviderFileSize(): number {
+        return MAX_REAL_CHUNK_SIZE;
+    }
+
+    getMaxFileSizeWithOverhead(): number {
+        return MAX_REAL_CHUNK_SIZE + ENCRYPTION_OVERHEAD
     }
 
 

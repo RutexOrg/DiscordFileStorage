@@ -46,7 +46,6 @@ export default class DICloudApp extends Client {
 
     private saveToDisk: boolean = false;
 
-
     private tickInterval: NodeJS.Timeout | undefined;
     private tickIntervalTime: number = 1000;
 

@@ -1,4 +1,5 @@
 import fs from "fs";
+import { randomBytes } from '@noble/ciphers/webcrypto';
 
 export function truncate(str: string, n: number, includeDots: boolean = false) {
     return ((str.length > n) ? str.substr(0, n - 1) : str) + (includeDots && str.length > n ? '...' : '');
@@ -39,7 +40,7 @@ export function checkEnvVariableIsSet(name: string, assertString: string, type: 
         return number;
     }
 
-    if(type == "string" && value.length  == 0){
+    if (type == "string" && value.length == 0) {
         printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
     }
 
@@ -69,4 +70,18 @@ export function checkIfFileExists(path: string, soft: boolean, assertString: str
         return false;
     }
     return true;
+}
+
+
+export function ensureStringLength(str: string, requiredLength: number, fillWith: string = "0"): string {
+    if (str.length < requiredLength) {
+        return str.padStart(requiredLength, fillWith);
+    } else if (str.length > requiredLength) {
+        return str.slice(0, requiredLength);
+    }
+    return str;
+}
+
+export function getIv(len = 24){
+    return randomBytes(len);
 }

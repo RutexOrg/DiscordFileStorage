@@ -10,3 +10,5 @@ logs/
 .space
 Spacefile
 index.js
+
+test.ts

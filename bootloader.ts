@@ -7,7 +7,7 @@ import { GatewayIntentBits } from "discord.js";
 import DICloudApp from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
 import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
-import { checkEnvVariableIsSet, checkIfFileExists, printAndExit, readFileSyncOrUndefined } from "./src/helper/utils.js";
+import { checkEnvVariableIsSet, checkIfFileExists, readFileSyncOrUndefined, ensureStringLength } from "./src/helper/utils.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -39,14 +39,28 @@ export interface IBootParamsParsed extends IBootParams {
     usersParsed: IUserRecord[];
 }
 
+/**
+ * Checks if the params are correct and in correct format. Function mutates the params object. Throws error if the params are not correct.
+ * @param params - params to check
+ * @returns - parsed params. 
+ */
 function bootPrecheck(params: IBootParams): IBootParamsParsed {
-    if (params.enableEncrypt && !params.encryptPassword) {
-        printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password.");
+
+    if (params.enableEncrypt){
+        if (!params.encryptPassword) {
+            throw new Error("Please set the ENCRYPT_PASSWORD to your encryption password.");
+        }
+
+        if (params.encryptPassword.length <= 0 && params.encryptPassword.length > 32) {
+            throw new Error("ENCRYPT_PASSWORD env variable is not in correct format. Please set it to a password between 1 and 32 characters. Current length: " + params.encryptPassword.length);
+        }
+
+        params.encryptPassword = ensureStringLength(params.encryptPassword, 32);
     }
 
     // regex: key:value,key:value,...
     if(params.enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(params.users)){
-        printAndExit("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
+        throw new Error("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
     }
 
     const usersParsed: IUserRecord[] = params.users.split(",").map((user) => {
@@ -55,11 +69,11 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
     });
 
     if (params.enableAuth && usersParsed.length == 0) {
-        printAndExit("USERS env variable is empty. Please set at least one user.");
+        throw new Error("USERS env variable is empty. Please set at least one user.");
     }
 
     if(params.saveTimeout < 1){
-        printAndExit("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
+        throw new Error("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
     }
 
     return {
@@ -115,11 +129,12 @@ export async function boot(data: IBootParams){
 
         if (params.enableAuth) {
             if(params.users.length === 0) {
-                printAndExit("Please set the USERS to your users in format username:password,username:password or add at least one user.");
+                console.log("Please set the USERS to your users in format username:password,username:password or add at least one user.");
+                console.log("Adding default user: admin:admin");
+                params.usersParsed.push({ username: "admin", password: "admin" });
             }
 
             console.log("Detected AUTH env variable. Starting webdav server with auth enabled.");
-            serverLaunchOptions.enableAuth = true;
             serverLaunchOptions.users = params.usersParsed;
         }
 

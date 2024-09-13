@@ -15,6 +15,10 @@ export default class VolumeEx extends Volume {
             if (k === "created" || k === "modified") {
                 return new Date(v);
             }
+            if (k === "iv") {
+                return new Uint8Array(Object.values(v));
+            }
+
             return v;
         }) as IFile;
     }

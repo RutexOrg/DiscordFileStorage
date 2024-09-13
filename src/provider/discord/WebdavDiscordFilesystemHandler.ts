@@ -146,7 +146,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             return callback(undefined, Readable.from(Buffer.from([])));
         }
 
-        this.client.getLogger().info(".openReadStream, fetching: ", file.toString());
+        this.client.getLogger().info(".openReadStream, fetching: ", file);
         const readStream = await this.client.getProvider().createReadStream(file)
         this.client.getLogger().info(".openReadStream", "Stream opened: " + path.toString());
 
