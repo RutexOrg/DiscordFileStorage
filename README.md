@@ -69,7 +69,7 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 
 ## Encryption
 
-Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
+Files in discord are not encrypted. Because of this, the server supports encryption via __AES256-GCM__ algorithm. 
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
 2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. \
