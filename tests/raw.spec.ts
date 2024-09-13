@@ -36,22 +36,23 @@ test("create and read small", async () => {
 
     let readedContent = "";
     const file = provider.createVFile(data.name, data.size);
-    const writeStream = await provider.createWriteStream(file, {
-        onFinished: async () => {
-            const readStream = await provider.createReadStream(file);
-            readStream.on("data", (chunk) => {
-                readedContent += chunk.toString();
-            });
+    const writeStream = await provider.createWriteStream(file);
 
-            readStream.on("end", () => {
-                resolve(true);
-            });
+    writeStream.on("finish", async () => {
+        const readStream = await provider.createReadStream(file);
+        readStream.on("data", (chunk) => {
+            readedContent += chunk.toString();
+        });
 
-            readStream.on("error", (err) => {
-                assert.not.ok(err);
-            });
-        }
+        readStream.on("end", () => {
+            resolve(true);
+        });
+
+        readStream.on("error", (err) => {
+            assert.not.ok(err);
+        });
     });
+
     writeStream.write(Buffer.from(data.content));
     writeStream.end();
     // 
@@ -92,7 +93,7 @@ test("create and read big", async () => {
             assert.not.ok(err);
         });
 
-        
+
 
 
     });

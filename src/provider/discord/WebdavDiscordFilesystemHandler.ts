@@ -177,21 +177,21 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         this.client.markForUpload();
 
 
-        const writeStream = await this.client.getProvider().createWriteStream(file, {
-            onFinished: async () => {
-                this.client.getLogger().info(".openWriteStream", "Stream finished: " + path.toString());
-                this.fs.setFile(path.toString(), file);
-                this.client.markForUpload();
-            },
+        const writeStream = await this.client.getProvider().createWriteStream(file);
 
-            onAbort: (err) => {
-                if (err) {
-                    this.client.getLogger().info(".openWriteStream", "Stream aborted: " + path.toString());
-                    this.fs.rmSync(path.toString(), { recursive: true });
-                }
-
-            }
+        writeStream.on("finish", () => {
+            this.client.getLogger().info(".openWriteStream", "Stream finished: " + path.toString());
+            this.fs.setFile(path.toString(), file);
+            this.client.markForUpload();
         });
+
+        writeStream.on("error", (err) => {
+            this.client.getLogger().info(".openWriteStream", "Stream error: " + path.toString() + " | " + err);
+            this.fs.rmSync(path.toString(), { recursive: true });
+        });
+
+
+
 
         this.client.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
 
@@ -245,20 +245,19 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             const newFile = this.client.getProvider().createVFile(pathTo.fileName(), oldFile.size);
 
             const readStream = await this.client.getProvider().createReadStream(oldFile);
-            const writeStream = await this.client.getProvider().createWriteStream(newFile, {
-                onFinished: async () => {
-                    this.client.getLogger().info(".copy", "Stream finished: " + pathTo.toString());
-                    this.fs.setFile(pathTo.toString(), newFile);
-                    this.client.markForUpload();
+            const writeStream = await this.client.getProvider().createWriteStream(newFile);
 
-                    return resolve(true);
-                },
-                onAbort: (err) => {
-                    if (err) {
-                        this.client.getLogger().info(".copy", "Stream aborted: " + pathTo.toString() + " | " + err);
-                        return reject(false);
-                    }
-                },
+            writeStream.on("error", (err) => {
+                this.client.getLogger().info(".copy", "Stream error: " + pathTo.toString() + " | " + err);
+                return reject(false);
+            });
+
+            writeStream.on("finish", () => {
+                this.client.getLogger().info(".copy", "Stream finished: " + pathTo.toString());
+                this.fs.setFile(pathTo.toString(), newFile);
+                this.client.markForUpload();
+
+                return resolve(true);
             });
 
             readStream.pipe(writeStream);

@@ -9,13 +9,6 @@ import { randomBytes } from '@noble/ciphers/webcrypto';
 import MutableBuffer from "../../helper/MutableBuffer";
 import { withResolvers } from "../../helper/utils";
 
-
-export interface IWriteStreamCallbacks {
-    onFinished?: () => Promise<void>;
-    onChunkUploaded?: (chunkNumber: number, totalChunks: number) => Promise<void>;
-    onAbort?: (error: Error | null) => void;
-}
-
 export interface IDelayedDeletionEntry {
     channel: string;
     message: string;
@@ -83,8 +76,8 @@ export default abstract class BaseProvider {
         return decryptedRead;
     }
 
-    private async createWriteStreamWithEncryption(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
-        const rawWriteStream = await this.createRawWriteStream(file, callbacks);
+    private async createWriteStreamWithEncryption(file: IFile): Promise<Writable> {
+        const rawWriteStream = await this.createRawWriteStream(file);
         const cipher = this.createCipher(file.iv);
         const writeStreamAwaiter = withResolvers();
         
@@ -124,9 +117,10 @@ export default abstract class BaseProvider {
             destroy: (err, callback) => {
                 console.log("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
                 buffer.destory();
-                if (callbacks.onAbort) {
-                    callbacks.onAbort(err);
-                }
+                // if (callbacks.onAbort) {
+                    // callbacks.onAbort(err);
+                // }
+                
                 callback(err);
             }
         });
@@ -157,11 +151,11 @@ export default abstract class BaseProvider {
      * @param callbacks - callbacks for write stream. 
      * @returns write stream
      */
-    async createWriteStream(file: IFile, callbacks?: IWriteStreamCallbacks): Promise<Writable> {
+    async createWriteStream(file: IFile): Promise<Writable> {
         if (this.client.shouldEncryptFiles()) {
-            return await this.createWriteStreamWithEncryption(file, callbacks || {});
+            return await this.createWriteStreamWithEncryption(file);
         } else {
-            return await this.createRawWriteStream(file, callbacks || {});
+            return await this.createRawWriteStream(file);
         }
     }
 
@@ -194,7 +188,7 @@ export default abstract class BaseProvider {
        * @param file - File which should be uploaded.
        * @param callbacks  - Callbacks for write stream.
        */
-      public abstract createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable>;
+      public abstract createRawWriteStream(file: IFile): Promise<Writable>;
       
 
     /**

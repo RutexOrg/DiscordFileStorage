@@ -1,5 +1,5 @@
 import { AttachmentBuilder, TextChannel } from "discord.js";
-import BaseProvider, { IWriteStreamCallbacks } from "../core/BaseProvider.js";
+import BaseProvider from "../core/BaseProvider.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
 import structuredClone from "@ungap/structured-clone"; // polyfill for structured clone
 import MutableBuffer from "../../helper/MutableBuffer.js";
@@ -67,7 +67,7 @@ export default class DiscordFileProvider extends BaseProvider {
         return (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
     }
 
-    public async createRawWriteStream(file: IFile, callbacks: IWriteStreamCallbacks): Promise<Writable> {
+    public async createRawWriteStream(file: IFile): Promise<Writable> {
         this.client.getLogger().info(".getUploadWritableStream() - file: " + file.name);
 
         const channel = this.client.getFilesChannel();
@@ -85,10 +85,7 @@ export default class DiscordFileProvider extends BaseProvider {
                 } else {
                     buffer.write(chunk.slice(0, rest), encoding);
                     await self.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
-                    if (callbacks.onChunkUploaded) {
-                        await callbacks.onChunkUploaded(chunkId, totalChunks);
-                    }
-                    // this.emit("chunkUploaded", chunkId, totalChunks);
+                    this.emit("chunkUploaded", chunkId, totalChunks);
                     chunkId++;
                     buffer.write(chunk.slice(rest), encoding);
                 }
@@ -104,9 +101,9 @@ export default class DiscordFileProvider extends BaseProvider {
                 }
 
                 this.client.getLogger().info("final() uploaded .")
-                if (callbacks.onFinished) {
-                    await callbacks.onFinished();
-                }
+                // if (callbacks.onFinished) {
+                //     await callbacks.onFinished();
+                // }
 
                 this.client.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
@@ -114,9 +111,9 @@ export default class DiscordFileProvider extends BaseProvider {
             destroy: (err, callback) => {
                 this.client.getLogger().info("destroy() Destroying write stream (error: " + err + ")");
                 buffer.destory();
-                if (callbacks.onAbort) {
-                    callbacks.onAbort(err);
-                }
+                // if (callbacks.onAbort) {
+                //     callbacks.onAbort(err);
+                // }
                 callback(err);
             }
         });
