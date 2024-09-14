@@ -9,6 +9,7 @@ import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
 import { printAndExit } from './helper/utils.js';
 import BaseProvider from './provider/core/BaseProvider.js';
+import WebdavServer from './webdav/WebdavServer.js';
 
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -55,6 +56,8 @@ export default class DICloudApp extends Client {
     private guild!: Guild;
     private metaChannel!: TextChannel;
     private filesChannel!: TextChannel;
+
+    private webdavServer: WebdavServer | undefined;
 
 
     constructor(options: DICloudAppOptions, guildId: string) {
@@ -319,6 +322,14 @@ export default class DICloudApp extends Client {
 
     public getFs() {
         return this.fs;
+    }
+
+    public setWebdavServer(server: WebdavServer) {
+        this.webdavServer = server;
+    }
+
+    public getWebdavServer() {
+        return this.webdavServer;
     }
 
 }

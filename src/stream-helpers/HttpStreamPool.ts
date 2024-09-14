@@ -7,7 +7,7 @@ import { IChunkInfo } from "../file/IFile.js";
  * Class that combines list of urls into a single Readable stream. 
  */
 export default class HttpStreamPool {
-	private urls: IChunkInfo[];
+	private chunks: IChunkInfo[];
 	private totalSize: number;
 	private gotSize = 0;
 	private currentUrlIndex = 0;
@@ -15,7 +15,7 @@ export default class HttpStreamPool {
 	private downloadingFileName: string;
 	
 	constructor(info: IChunkInfo[], totalSize: number, filename: string) {
-		this.urls = info;
+		this.chunks = info;
 		this.totalSize = totalSize;
 		this.downloadingFileName = filename;
 	}
@@ -26,9 +26,9 @@ export default class HttpStreamPool {
 	 * Not tested much and may !crash or leak your memory! 
 	 * @returns Readable stream that emits data from all urls sequentially. 
 	 */
-	public async getDownloadStream(): Promise<Readable> {
-		if(this.urls.length == 0) {
-			console.warn("No urls to download, returning empty stream");
+	public async getDownloadStream(resolver: (id: string) => Promise<string>): Promise<Readable> {
+		if(this.chunks.length == 0) {
+			console.warn("[HttpStreamPool] No urls to download, returning empty stream");
 			return Readable.from([]);
 		}
 
@@ -36,24 +36,26 @@ export default class HttpStreamPool {
 		const self = this;
 
 		let next = async () => {
-			if (self.currentUrlIndex >= self.urls.length) {
+			if (self.currentUrlIndex >= self.chunks.length) {
 				stream.once("unpipe", () => {
-					console.log("Downloading finished: " + self.downloadingFileName);
+					console.log("[HttpStreamPool] Downloading finished: " + self.downloadingFileName);
 					stream.end(null);
 				});
 				return;
 			}
 
 			if(stream.closed || stream.destroyed) {
-				console.log("stream closed; aborting");
+				console.log("[HttpStreamPool] stream closed; aborting");
 				return;
 			}
 
-			let url = self.urls[self.currentUrlIndex];
+			let fileChunk = self.chunks[self.currentUrlIndex];
 			let res: AxiosResponse;
 			try {
-				console.log("getting: " + url.url);
-				res = await client.get(url.url, {
+				console.log("[HttpStreamPool] getting: become new url of a file: " + fileChunk.id);
+				const url = await resolver(fileChunk.id);
+				console.log("[HttpStreamPool] Got: " + url);
+				res = await client.get(url, {
 					responseType: "stream",
 					headers: {
 						"User-Agent": self.userAgent,

@@ -83,7 +83,7 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
 }
 
 
-export async function boot(data: IBootParams){
+export async function boot(data: IBootParams): Promise<DICloudApp> {
     console.log(`NodeJS version: ${process.version}`);
     console.log("Starting DICloud...");
     const params = bootPrecheck(data);
@@ -154,6 +154,8 @@ export async function boot(data: IBootParams){
             app.getLogger().info("[S] OUT ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
             next();
         });
+
+        app.setWebdavServer(webdavServer);
 
     }
 

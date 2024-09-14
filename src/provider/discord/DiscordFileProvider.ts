@@ -56,19 +56,21 @@ export default class DiscordFileProvider extends BaseProvider {
         this.client.getLogger().info(`[${file.name}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
         file.chunks.push({
             id: message.id,
-            url: message.attachments.first()!.url,
+            // url: message.attachments.first()!.id,
             size: chunk.size,
         });
         this.client.getLogger().info(file.chunks);
     }
 
     public async createRawReadStream(file: IFile): Promise<Readable> {
-        this.client.getLogger().info(".getDownloadableReadStream() - file: " + file.name);
-        return (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name)).getDownloadStream());
+        this.client.getLogger().info(".createRawReadStream() - file: " + file.name);
+        return (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name).getDownloadStream(async (id) => {
+            return (await this.client.getFilesChannel().messages.fetch(id)).attachments.first()!.url; // we need to resolve id -> url, since discord updates urls.
+        })));
     }
 
     public async createRawWriteStream(file: IFile): Promise<Writable> {
-        this.client.getLogger().info(".getUploadWritableStream() - file: " + file.name);
+        this.client.getLogger().info(".createRawWriteStream() - file: " + file.name);
 
         const channel = this.client.getFilesChannel();
         const totalChunks = Math.ceil(file.size / MAX_REAL_CHUNK_SIZE);
@@ -77,17 +79,17 @@ export default class DiscordFileProvider extends BaseProvider {
         let chunkId = 1;
         const self = this;
         return new Writable({
-            write: async function (chunk, encoding, callback){ // write is called when a chunk of data is ready to be written to stream.
-                const rest = MAX_REAL_CHUNK_SIZE - buffer.size;
+            write: async function (chunk, encoding, callback) { // write is called when a chunk of data is ready to be written to stream.
+                const left = MAX_REAL_CHUNK_SIZE - buffer.size;
 
-                if (chunk.length < rest) {
+                if (chunk.length < left) {
                     buffer.write(chunk, encoding);
                 } else {
-                    buffer.write(chunk.slice(0, rest), encoding);
+                    buffer.write(chunk.slice(0, left), encoding);
                     await self.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                     this.emit("chunkUploaded", chunkId, totalChunks);
                     chunkId++;
-                    buffer.write(chunk.slice(rest), encoding);
+                    buffer.write(chunk.slice(left), encoding);
                 }
 
                 file.size += chunk.length;
@@ -99,21 +101,12 @@ export default class DiscordFileProvider extends BaseProvider {
                 if (buffer.size > 0) {
                     await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
                 }
-
-                this.client.getLogger().info("final() uploaded .")
-                // if (callbacks.onFinished) {
-                //     await callbacks.onFinished();
-                // }
-
                 this.client.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
             },
             destroy: (err, callback) => {
                 this.client.getLogger().info("destroy() Destroying write stream (error: " + err + ")");
                 buffer.destory();
-                // if (callbacks.onAbort) {
-                //     callbacks.onAbort(err);
-                // }
                 callback(err);
             }
         });

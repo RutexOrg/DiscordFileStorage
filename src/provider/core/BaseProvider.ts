@@ -48,15 +48,15 @@ export default abstract class BaseProvider {
         const buffer = new MutableBuffer(this.getMaxFileSizeWithOverhead()); // encrypted data is bigger than decrypted data   
     
         readStream.on("data", (chunk) => {
-            const rest = this.getMaxFileSizeWithOverhead() - buffer.size;
-            if (chunk.length < rest) {
+            const left = this.getMaxFileSizeWithOverhead() - buffer.size;
+            if (chunk.length < left) {
                 buffer.write(chunk);
             } else {
-                buffer.write(chunk.slice(0, rest));
+                buffer.write(chunk.slice(0, left));
                 const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
                 decryptedRead.push(decrypted);
                 buffer.clear();
-                buffer.write(chunk.slice(rest));
+                buffer.write(chunk.slice(left));
             }
         });
     
@@ -94,14 +94,14 @@ export default abstract class BaseProvider {
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
                 // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
-                const rest = this.maxProviderFileSize() - buffer.size;
-                if (chunk.length < rest) {
+                const left = this.maxProviderFileSize() - buffer.size;
+                if (chunk.length < left) {
                     buffer.write(chunk, encoding);
                 } else {
-                    buffer.write(chunk.subarray(0, rest), encoding);
+                    buffer.write(chunk.subarray(0, left), encoding);
                     rawWriteStream.write(cipher.encrypt(buffer.flush()));
                     buffer.clear();
-                    buffer.write(chunk.subarray(rest), encoding);
+                    buffer.write(chunk.subarray(left), encoding);
                 }
                 callback();
             },
@@ -117,10 +117,6 @@ export default abstract class BaseProvider {
             destroy: (err, callback) => {
                 console.log("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
                 buffer.destory();
-                // if (callbacks.onAbort) {
-                    // callbacks.onAbort(err);
-                // }
-                
                 callback(err);
             }
         });
