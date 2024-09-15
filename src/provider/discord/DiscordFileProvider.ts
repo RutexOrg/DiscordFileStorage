@@ -1,7 +1,6 @@
 import { AttachmentBuilder, TextChannel } from "discord.js";
 import BaseProvider from "../core/BaseProvider.js";
 import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import structuredClone from "@ungap/structured-clone"; // polyfill for structured clone
 import MutableBuffer from "../../helper/MutableBuffer.js";
 import { Writable, Readable } from "stream";
 import { truncate } from "../../helper/utils.js";
@@ -64,7 +63,7 @@ export default class DiscordFileProvider extends BaseProvider {
 
     public async createRawReadStream(file: IFile): Promise<Readable> {
         this.client.getLogger().info(".createRawReadStream() - file: " + file.name);
-        return (await (new HttpStreamPool(structuredClone(file.chunks), file.size, file.name).getDownloadStream(async (id) => {
+        return (await (new HttpStreamPool(file).getDownloadStream(async (id) => {
             return (await this.client.getFilesChannel().messages.fetch(id)).attachments.first()!.url; // we need to resolve id -> url, since discord updates urls.
         })));
     }
@@ -126,11 +125,11 @@ export default class DiscordFileProvider extends BaseProvider {
         }
     }
 
-    maxProviderFileSize(): number {
+    calculateProviderMaxSize(): number {
         return MAX_REAL_CHUNK_SIZE;
     }
 
-    getMaxFileSizeWithOverhead(): number {
+    calculateSavedFileSize(): number {
         return MAX_REAL_CHUNK_SIZE + ENCRYPTION_OVERHEAD
     }
 

@@ -45,10 +45,10 @@ export default abstract class BaseProvider {
         const decipher = this.createCipher(file.iv);
 
         const decryptedRead = new PassThrough();    
-        const buffer = new MutableBuffer(this.getMaxFileSizeWithOverhead()); // encrypted data is bigger than decrypted data   
+        const buffer = new MutableBuffer(this.calculateSavedFileSize()); // encrypted data is bigger than decrypted data   
     
         readStream.on("data", (chunk) => {
-            const left = this.getMaxFileSizeWithOverhead() - buffer.size;
+            const left = this.calculateSavedFileSize() - buffer.size;
             if (chunk.length < left) {
                 buffer.write(chunk);
             } else {
@@ -81,7 +81,7 @@ export default abstract class BaseProvider {
         const cipher = this.createCipher(file.iv);
         const writeStreamAwaiter = withResolvers();
         
-        const buffer = new MutableBuffer(this.maxProviderFileSize());
+        const buffer = new MutableBuffer(this.calculateProviderMaxSize());
 
         rawWriteStream.on("finish", () => {
             writeStreamAwaiter.resolve();
@@ -94,7 +94,7 @@ export default abstract class BaseProvider {
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
                 // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
-                const left = this.maxProviderFileSize() - buffer.size;
+                const left = this.calculateProviderMaxSize() - buffer.size;
                 if (chunk.length < left) {
                     buffer.write(chunk, encoding);
                 } else {
@@ -190,6 +190,6 @@ export default abstract class BaseProvider {
     /**
      * Custom provider should implement this method to provide max file size.
      */
-    abstract maxProviderFileSize(): number;
-    abstract getMaxFileSizeWithOverhead(): number;
+    abstract calculateProviderMaxSize(): number;
+    abstract calculateSavedFileSize(): number;
 }

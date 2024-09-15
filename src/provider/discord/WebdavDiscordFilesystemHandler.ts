@@ -4,7 +4,6 @@ import { Errors } from "webdav-server/lib/index.v2.js";
 import mime from "mime-types";
 import path from "path";
 import DICloudApp from "../../DICloudApp.js";
-import { IFile } from "../../file/IFile.js";
 import VolumeEx from "../../file/VolumeEx.js";
 
 
@@ -189,10 +188,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             this.client.getLogger().info(".openWriteStream", "Stream error: " + path.toString() + " | " + err);
             this.fs.rmSync(path.toString(), { recursive: true });
         });
-
-
-
-
         this.client.getLogger().info(".openWriteStream", "Stream opened: " + path.toString());
 
         return callback(undefined, writeStream);
@@ -313,7 +308,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     _rename(pathFrom: v2.Path, newName: string, ctx: v2.RenameInfo, callback: v2.ReturnCallback<boolean>): void {
-        //this.log(ctx.context, ".rename", pathFrom + " | " + newName);
+        this.client.getLogger().info(".rename", pathFrom.toString(), newName, getContext(ctx));
 
         const oldPath = pathFrom.toString();
         const newPath = pathFrom.parentName() + "/" + newName;
@@ -323,7 +318,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
-        // this.client.getLogger().info(".lastModifiedDate", path.toString());
+        this.client.getLogger().info(".lastModifiedDate", path.toString(), getContext(ctx));
 
         if (this.fs.statSync(path.toString()).isDirectory()) {
             return callback(undefined, new Date().getTime());
@@ -334,7 +329,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _creationDate(path: v2.Path, ctx: v2.CreationDateInfo, callback: v2.ReturnCallback<number>): void {
-        // this.client.getLogger().info(".creationDate", path.toString());
+        // this.client.getLogger().info(".creationDate", path.toString(), getContext(ctx));
 
         if (this.fs.statSync(path.toString()).isDirectory()) {
             return callback(undefined, new Date().getTime());
