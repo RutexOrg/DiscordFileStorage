@@ -33,28 +33,35 @@ export default class HttpStreamPool {
 
         const stream = new PassThrough();
         const next = async () => {
-            if (this.isCancelled) {
-				console.log("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
-                stream.end();
+            if (this.isCancelled) { // extra check against race conditions, since we are using async functions.
+                console.log("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
+                this.cleanupStream(stream);
                 return;
             }
 
             if (this.currentUrlIndex >= this.chunks.length) {
                 console.log("[HttpStreamPool] Downloading finished: " + this.downloadingFileName);
-                stream.end();
+                this.cleanupStream(stream);
                 return;
             }
 
             if (stream.closed || stream.destroyed) {
-                console.log("[HttpStreamPool] stream closed; aborting");
+                console.log("[HttpStreamPool] Stream closed; aborting");
+                this.cleanupStream(stream);
                 return;
             }
 
-            let fileChunk = this.chunks[this.currentUrlIndex];
             try {
-                console.log("[HttpStreamPool] getting: become next chunk url of a file:", this.downloadingFileName);
-                const url = await resolver(fileChunk.id);
-                console.log("[HttpStreamPool] Got url: ", url);
+                console.log("[HttpStreamPool] Getting next chunk url for file:", this.downloadingFileName);
+                const url = await resolver(this.chunks[this.currentUrlIndex].id);
+                console.log("[HttpStreamPool] Got url:", url);
+
+                if (this.isCancelled) {
+                    console.log("[HttpStreamPool] Download cancelled before starting chunk");
+                    this.cleanupStream(stream);
+                    return;
+                }
+
                 const res = await client.get<Readable>(url, {
                     responseType: "stream",
                     headers: {
@@ -96,8 +103,12 @@ export default class HttpStreamPool {
             console.error("[HttpStreamPool] Error:", err);
             stream.emit("error", err instanceof Error ? err : new Error("Unknown error occurred"));
         }
-		this.cancelDownload();
+        this.cleanupStream(stream);
+    }
+
+    private cleanupStream(stream: PassThrough) {
         stream.end();
+        this.cancelDownload();
     }
 
     public cancelDownload() {
