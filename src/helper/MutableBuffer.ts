@@ -93,6 +93,12 @@ export class BaseMutableBuffer {
 		return result;
 	}
 
+	flushAndDestory() {
+		const result = this.flush(true);
+		this.destory();
+		return result;
+	}
+
 
 	write(source: WriteData, encoding?: BufferEncoding): number;
 	write(source: WriteData, ...args: any[]): number;

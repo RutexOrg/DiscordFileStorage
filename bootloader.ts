@@ -102,7 +102,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
     }, params.guildId);
 
     app.getLogger().info("Logging in...");
-    await app.login(params.token);
+    await app.getDiscordClient().login(params.token);
     await app.init();
 
     if (params.startWebdavServer) {

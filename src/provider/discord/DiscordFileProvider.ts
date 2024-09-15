@@ -40,25 +40,23 @@ export default class DiscordFileProvider extends BaseProvider {
      * FLUSHES THE MUTABLE BUFFER! Mutates the buffer and the file object.
      * @param chunk Buffer to upload
      * @param chunkNumber Chunk number (starts at 1)
-     * @param totalChunks Total chunks, used only for logging, looks like is broken anyway at the moment
      * @param filesChannel Channel to upload the chunk to
      * @param file File that the chunk belongs to and will be added to after upload. 
      */
-    private async uploadChunkToDiscord(chunk: MutableBuffer, chunkNumber: number, totalChunks: number, filesChannel: TextChannel, file: IFile) {
-        this.client.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber} of ${totalChunks} chunks.`);
+    private async uploadChunkToDiscord(chunk: MutableBuffer, chunkNumber: number, filesChannel: TextChannel, file: IFile) {
+        this.client.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber}....`);
         const message = await filesChannel.send({
             files: [
                 this.getAttachmentBuilderFromBuffer(chunk.flush(), path.parse(truncate(file.name, 15)).name, chunkNumber, false, this.client.shouldEncryptFiles())
             ],
         });
 
-        this.client.getLogger().info(`[${file.name}] Chunk ${chunkNumber} of ${totalChunks} chunks added.`);
         file.chunks.push({
             id: message.id,
             // url: message.attachments.first()!.id,
             size: chunk.size,
         });
-        this.client.getLogger().info(file.chunks);
+        this.client.getLogger().info(`[${file.name}] Chunk ${chunkNumber} added.`);
     }
 
     public async createRawReadStream(file: IFile): Promise<Readable> {
@@ -72,7 +70,6 @@ export default class DiscordFileProvider extends BaseProvider {
         this.client.getLogger().info(".createRawWriteStream() - file: " + file.name);
 
         const channel = this.client.getFilesChannel();
-        const totalChunks = Math.ceil(file.size / MAX_REAL_CHUNK_SIZE);
         const buffer = new MutableBuffer(MAX_REAL_CHUNK_SIZE);
 
         let chunkId = 1;
@@ -81,12 +78,12 @@ export default class DiscordFileProvider extends BaseProvider {
             write: async function (chunk, encoding, callback) { // write is called when a chunk of data is ready to be written to stream.
                 const left = MAX_REAL_CHUNK_SIZE - buffer.size;
 
-                if (chunk.length < left) {
+                if (chunk.length <= left) {
                     buffer.write(chunk, encoding);
                 } else {
                     buffer.write(chunk.slice(0, left), encoding);
-                    await self.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
-                    this.emit("chunkUploaded", chunkId, totalChunks);
+                    await self.uploadChunkToDiscord(buffer, chunkId, channel, file);
+                    this.emit("chunkUploaded", chunkId);
                     chunkId++;
                     buffer.write(chunk.slice(left), encoding);
                 }
@@ -98,8 +95,9 @@ export default class DiscordFileProvider extends BaseProvider {
             final: async (callback) => {
                 this.client.getLogger().info("final() Finalizing upload.");
                 if (buffer.size > 0) {
-                    await this.uploadChunkToDiscord(buffer, chunkId, totalChunks, channel, file);
+                    await this.uploadChunkToDiscord(buffer, chunkId, channel, file);
                 }
+                buffer.destory();
                 this.client.getLogger().info("final() write stream finished, onFinished() called.")
                 callback();
             },
@@ -114,7 +112,7 @@ export default class DiscordFileProvider extends BaseProvider {
     public async processDeletionQueue(): Promise<void> {
         if (this.deletionQueue.length > 0) {
             const info = this.deletionQueue.shift()!;
-            const channel = this.client.channels.cache.get(info.channel) as TextChannel;
+            const channel = this.client.getDiscordClient().channels.cache.get(info.channel) as TextChannel;
 
             if (!channel) {
                 this.client.getLogger().error("Failed to find channel: " + info.channel);

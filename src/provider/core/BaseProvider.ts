@@ -49,7 +49,7 @@ export default abstract class BaseProvider {
     
         readStream.on("data", (chunk) => {
             const left = this.calculateSavedFileSize() - buffer.size;
-            if (chunk.length < left) {
+            if (chunk.length <= left) {
                 buffer.write(chunk);
             } else {
                 buffer.write(chunk.slice(0, left));
@@ -95,7 +95,7 @@ export default abstract class BaseProvider {
             write: async (chunk: Buffer, encoding, callback) => {
                 // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 const left = this.calculateProviderMaxSize() - buffer.size;
-                if (chunk.length < left) {
+                if (chunk.length <= left) {
                     buffer.write(chunk, encoding);
                 } else {
                     buffer.write(chunk.subarray(0, left), encoding);
@@ -108,7 +108,7 @@ export default abstract class BaseProvider {
             final: async (callback) => {
                 console.log("[BaseProvider] final() Finalizing upload.");
                 if (buffer.size > 0) {
-                    rawWriteStream.write(cipher.encrypt(buffer.flush()));
+                    rawWriteStream.write(cipher.encrypt(buffer.flushAndDestory()));
                 }
                 rawWriteStream.end();
                 await writeStreamAwaiter.promise;
@@ -123,42 +123,10 @@ export default abstract class BaseProvider {
 
     }
 
-
-    /**
-     * Main method that should be used to download files from provider.
-     * Creates read stream for downloading files from provider. Handles decryption if enabled.
-     * Does not handle with any fs operations, only downloads from provider.
-     * @param file 
-     * @returns 
-     */
-    async createReadStream(file: IFile): Promise<Readable> {
-        if (this.client.shouldEncryptFiles()) {
-            return await this.createReadStreamWithDecryption(file);
-        } else {
-            return await this.createRawReadStream(file);
-        }
-    }
-
-    /**
-     * Main method that should be used to upload files to provider.
-     * Creates write stream for uploading files to provider. Handles encryption if enabled.
-     * Does not handle with any fs operations, only uploads to provider.
-     * @param file - file to upload
-     * @param callbacks - callbacks for write stream. 
-     * @returns write stream
-     */
-    async createWriteStream(file: IFile): Promise<Writable> {
-        if (this.client.shouldEncryptFiles()) {
-            return await this.createWriteStreamWithEncryption(file);
-        } else {
-            return await this.createRawWriteStream(file);
-        }
-    }
-
     /**
      * Returns file struct, no remote operations are done.
      */
-    public createVFile(name: string, size: number): IFile {
+    public createVFile(name: string, size: number = 0): IFile {
         return {
             name,
             size,
@@ -192,4 +160,94 @@ export default abstract class BaseProvider {
      */
     abstract calculateProviderMaxSize(): number;
     abstract calculateSavedFileSize(): number;
+
+
+    /* ----------------------------------------------------------------------------------------- */
+    
+
+    /**
+     * Main method that should be used to download files from provider.
+     * Creates read stream for downloading files from provider. Handles decryption if enabled.
+     * Does not handle with any fs operations, only downloads from provider.
+     * @param file 
+     * @returns 
+     */
+    async createReadStream(file: IFile): Promise<Readable> {
+        if (this.client.shouldEncryptFiles()) {
+            return await this.createReadStreamWithDecryption(file);
+        } else {
+            return await this.createRawReadStream(file);
+        }
+    }
+
+    /**
+     * Main method that should be used to upload files to provider.
+     * Creates write stream for uploading files to provider. Handles encryption if enabled.
+     * Does not handle with any fs operations, only uploads to provider.
+     * Mutates the file object (chunks and size)
+     * @param file - file to upload
+     * @param callbacks - callbacks for write stream. 
+     * @returns write stream
+     */
+    async createWriteStream(file: IFile): Promise<Writable> {
+        if (this.client.shouldEncryptFiles()) {
+            return await this.createWriteStreamWithEncryption(file);
+        } else {
+            return await this.createRawWriteStream(file);
+        }
+    }
+    
+    /**
+     * 
+     * @param buffer Convinient buffer upload function
+     * @param name Filename. Not really used, but can be used for logging or other purposes.
+     * @returns created file struct with all data about file.
+     */
+    public async uploadFile(buffer: Buffer, name: string): Promise<IFile> {
+        const promise = withResolvers();
+        const file = this.createVFile(name);
+        const stream = await this.createWriteStream(file);
+
+        stream.on("finish", () => {
+            promise.resolve(file);
+        });
+
+        stream.on("error", (err) => {
+            promise.reject(err);
+        });
+
+        stream.write(buffer);
+        stream.end();
+        await promise.promise;
+
+        return file;
+    }
+
+    /**
+     * Convinient download function that downloads file from provider and returns it as buffer. Uses buffer.
+     * @param file valid file struct
+     * @returns Buffer with file data
+     */
+    public async downloadFile(file: IFile): Promise<Buffer> {
+        const stream = await this.createReadStream(file);
+        const size = this.client.shouldEncryptFiles() ? file.size - (16 * file.chunks.length) : file.size;
+        const buffer = Buffer.alloc(size);
+
+        return new Promise((resolve, reject) => {
+            let offset = 0;
+            stream.on("data", (chunk) => {
+                chunk.copy(buffer, offset);
+                offset += chunk.length;
+            });
+
+            stream.on("end", () => {
+                resolve(buffer);
+            });
+
+            stream.on("error", (err) => {
+                reject(err);
+            });
+        });
+    }
+        
 }

@@ -7,9 +7,11 @@ import { IFile, IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
-import { printAndExit } from './helper/utils.js';
+import { printAndExit, withResolvers } from './helper/utils.js';
 import BaseProvider from './provider/core/BaseProvider.js';
 import WebdavServer from './webdav/WebdavServer.js';
+import { Readable, Writable } from 'stream';
+import MutableBuffer from './helper/MutableBuffer.js';
 
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -24,9 +26,9 @@ export interface DICloudAppOptions extends ClientOptions {
 }
 
 /**
- * Main class of the DICloud. It is a Discord.js client with some additional functionality.
+ * Main class of the DICloud. Most functions are designed to work with webdav.
  */
-export default class DICloudApp extends Client {
+export default class DICloudApp {
 
     private guildId: string;
     private metaChannelName: string;
@@ -57,11 +59,12 @@ export default class DICloudApp extends Client {
     private metaChannel!: TextChannel;
     private filesChannel!: TextChannel;
 
-    private webdavServer: WebdavServer | undefined;
+    private discordClient: Client
+    private webdavServer?: WebdavServer;
 
 
     constructor(options: DICloudAppOptions, guildId: string) {
-        super(options);
+        this.discordClient = new Client(options);
         if (DICloudApp.instance) {
             throw new Error("DICloud already running");
         }
@@ -117,7 +120,7 @@ export default class DICloudApp extends Client {
 
     public async waitForReady(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.once("ready", resolve as any);
+            this.discordClient.once("ready", resolve as any);
         });
     }
 
@@ -136,13 +139,13 @@ export default class DICloudApp extends Client {
      */
     private async preload() {
         this.logger.info("Fetching guilds...");
-        await this.guilds.fetch();
+        await this.discordClient.guilds.fetch();
 
-        if (!this.guilds.cache.has(this.guildId)) {
+        if (!this.discordClient.guilds.cache.has(this.guildId)) {
             printAndExit("Provided guild not found. Is the bot in the guild?");
         }
 
-        const guild = await this.guilds.cache.get(this.guildId)?.fetch();
+        const guild = await this.discordClient.guilds.cache.get(this.guildId)?.fetch();
         if (!guild) {
             printAndExit("Failed to fetch guild: " + this.guildId);
         }
@@ -183,7 +186,7 @@ export default class DICloudApp extends Client {
     
 
     async getAllMessages(channelId: string): Promise<Message[]> {
-        const channel = await this.channels.fetch(channelId) as TextChannel;
+        const channel = await this.discordClient.channels.fetch(channelId) as TextChannel;
         let messages: Message[] = [];
         let last: string | undefined;
 
@@ -330,6 +333,42 @@ export default class DICloudApp extends Client {
 
     public getWebdavServer() {
         return this.webdavServer;
+    }
+
+    public getDiscordClient() {
+        return this.discordClient;
+    }
+
+    public createWriteStream(file: IFile): Promise<Writable> {
+        return this.provider.createRawWriteStream(file);
+    }
+
+    public createReadStream(file: IFile): Promise<Readable> {
+        return this.provider.createReadStream(file);
+    }
+
+
+    public async uploadFile(Buffer: Buffer, name: string): Promise<IFile> {
+        return this.provider.uploadFile(Buffer, name);
+    }
+
+    public async downloadFile(file: IFile): Promise<Buffer> {
+        return this.provider.downloadFile(file);
+    }
+        
+
+
+    public async shutdown(saveToDfive: boolean = false): Promise<void> {
+        if (this.webdavServer){
+            await this.webdavServer.stopAsync();
+        }
+
+        await this.saveFiles(false, saveToDfive);
+        
+        clearInterval(this.tickInterval);
+        clearInterval(this.debounceTimeout);
+
+        await this.discordClient.destroy();
     }
 
 }
