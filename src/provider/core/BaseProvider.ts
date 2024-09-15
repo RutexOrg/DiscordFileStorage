@@ -71,6 +71,7 @@ export default abstract class BaseProvider {
     
         readStream.on("error", (err) => {
             decryptedRead.destroy(err);
+            buffer.destory();
         });
     
         return decryptedRead;
@@ -89,6 +90,7 @@ export default abstract class BaseProvider {
 
         rawWriteStream.on("error", (err) => {
             writeStreamAwaiter.reject(err);
+            buffer.destory();
         });
 
         return new Writable({
@@ -231,20 +233,19 @@ export default abstract class BaseProvider {
     public async downloadFile(file: IFile): Promise<Buffer> {
         const stream = await this.createReadStream(file);
         const size = this.client.shouldEncryptFiles() ? file.size - (16 * file.chunks.length) : file.size;
-        const buffer = Buffer.alloc(size);
 
         return new Promise((resolve, reject) => {
-            let offset = 0;
+            const buffer = new MutableBuffer(size);
             stream.on("data", (chunk) => {
-                chunk.copy(buffer, offset);
-                offset += chunk.length;
+                buffer.write(chunk)
             });
 
             stream.on("end", () => {
-                resolve(buffer);
+                resolve(buffer.flushAndDestory());
             });
 
             stream.on("error", (err) => {
+                buffer.destory();
                 reject(err);
             });
         });
