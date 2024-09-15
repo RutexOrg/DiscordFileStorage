@@ -26,9 +26,10 @@ export default abstract class BaseProvider {
         return this._app;
     }
 
-    public addToDeletionQueue(info: IDelayedDeletionEntry) {
-        this.fileDeletionQueue.push(info);
+    public addToDeletionQueue(info: IDelayedDeletionEntry[]) {
+        this.fileDeletionQueue.push(...info);
     }
+
 
     public get deletionQueue() {
         return this.fileDeletionQueue;

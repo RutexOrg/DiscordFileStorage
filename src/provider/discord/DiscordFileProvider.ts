@@ -47,7 +47,13 @@ export default class DiscordFileProvider extends BaseProvider {
         this.client.getLogger().info(`[${file.name}] Uploading chunk ${chunkNumber}....`);
         const message = await filesChannel.send({
             files: [
-                this.getAttachmentBuilderFromBuffer(chunk.flush(), path.parse(truncate(file.name, 15)).name, chunkNumber, false, this.client.shouldEncryptFiles())
+                this.getAttachmentBuilderFromBuffer(
+                    chunk.flush(),
+                    path.parse(truncate(file.name, 15)).name,
+                    chunkNumber,
+                    false,
+                    this.client.shouldEncryptFiles()
+                )
             ],
         });
 
@@ -118,8 +124,12 @@ export default class DiscordFileProvider extends BaseProvider {
                 this.client.getLogger().error("Failed to find channel: " + info.channel);
                 return;
             }
-
-            await channel.messages.delete(info.message);
+            try {
+                await channel.messages.delete(info.message);
+            } catch (e) {
+                this.client.getLogger().error(e);
+                this.client.getLogger().error("Failed to delete message: " + info.message + " in channel: " + info.channel);
+            }
         }
     }
 
