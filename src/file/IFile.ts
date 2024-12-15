@@ -1,5 +1,5 @@
 export interface IFile {
-    name: string; // the name isnt really needed/used since everything handled by memfs, but its nice to have it (for debugging and stuff) 
+    name: string; // name is used only for raw provider, not for webdav. Webdav uses paths.  
     size: number;
     chunks: IChunkInfo[]
     created: Date;
@@ -11,7 +11,7 @@ export interface IFile {
 export interface IChunkInfo {
     id: string; // discord (or any other provider) message id
     size: number;
-    url: string;
+    // url: string;
 }
 
 

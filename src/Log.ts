@@ -3,6 +3,20 @@ import util from "util"
 import { createLogger, format, transports, config } from "winston"
 import fs from "fs"
 
+export default class Log {
+
+	private static logger = createLogger(setup("dicloud", true))
+	
+
+	public static info(message: any, ...args: any[]) {
+		Log.logger.info(message, args);
+	}
+
+	static error(message: any, ...args: any[]) {
+		Log.logger.error(message, args);
+	}
+}
+
 export function setup(loggerName: string, logToConsole: boolean = true) {
 	if (!loggerName) {
 		throw new Error("!loggerName")

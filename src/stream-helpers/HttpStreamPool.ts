@@ -1,94 +1,117 @@
-import { AxiosResponse } from "axios";
+import { AxiosResponse, AxiosError } from "axios";
 import { Readable, PassThrough } from "stream";
 import client from "../helper/AxiosInstance.js";
-import { IChunkInfo } from "../file/IFile.js";
+import { IChunkInfo, IFile } from "../file/IFile.js";
+import structuredClone from "@ungap/structured-clone";
 
-/**
- * Class that combines list of urls into a single Readable stream. 
- */
 export default class HttpStreamPool {
-	private urls: IChunkInfo[];
-	private totalSize: number;
-	private gotSize = 0;
-	private currentUrlIndex = 0;
-	private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
-	private downloadingFileName: string;
-	
-	constructor(info: IChunkInfo[], totalSize: number, filename: string) {
-		this.urls = info;
-		this.totalSize = totalSize;
-		this.downloadingFileName = filename;
-	}
+    private chunks: IChunkInfo[];
+    private totalSize: number;
+    private gotSize = 0;
+    private currentUrlIndex = 0;
+    private userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36"
+    private downloadingFileName: string;
+    private isCancelled = false;
 
-	/**
-	 * Combines list of urls into a single Readable stream, where data readen sequentially.
-	 * Warning! After returning stream, since it promise-based function, it will start downloading data from urls in the background.
-	 * Not tested much and may !crash or leak your memory! 
-	 * @returns Readable stream that emits data from all urls sequentially. 
-	 */
-	public async getDownloadStream(): Promise<Readable> {
-		if(this.urls.length == 0) {
-			console.warn("No urls to download, returning empty stream");
-			return Readable.from([]);
-		}
+    constructor(file: IFile, userAgent?: string) {
+        file = structuredClone(file);
 
-		const stream = new PassThrough();
-		const self = this;
+        this.chunks = file.chunks;
+        this.totalSize = file.size;
+        this.downloadingFileName = file.name;
 
-		let next = async () => {
-			if (self.currentUrlIndex >= self.urls.length) {
-				stream.once("unpipe", () => {
-					console.log("Downloading finished: " + self.downloadingFileName);
-					stream.end(null);
-				});
-				return;
-			}
+        if (userAgent) {
+            this.userAgent = userAgent;
+        }
+    }
 
-			if(stream.closed || stream.destroyed) {
-				console.log("stream closed; aborting");
-				return;
-			}
+    public async getDownloadStream(resolver: (id: string) => Promise<string>): Promise<Readable> {
+        if (this.chunks.length == 0) {
+            console.warn("[HttpStreamPool] No urls to download, returning empty stream");
+            return Readable.from([]);
+        }
 
-			let url = self.urls[self.currentUrlIndex];
-			let res: AxiosResponse;
-			try {
-				console.log("getting: " + url.url);
-				res = await client.get(url.url, {
-					responseType: "stream",
-					headers: {
-						"User-Agent": self.userAgent,
-					},
-					timeout: 10000,
-				});
-			} catch (err) {
-				console.error(err);
-				stream.emit("error", err);
-				return;
-			}
+        const stream = new PassThrough();
+        const next = async () => {
+            if (this.isCancelled) { // extra check against race conditions, since we are using async functions.
+                console.log("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
+                this.cleanupStream(stream);
+                return;
+            }
 
-			res.data.on("data", (chunk: Buffer) => {
-				self.gotSize += chunk.length;
-				stream.emit("progress", self.gotSize, self.totalSize);
-			});
+            if (this.currentUrlIndex >= this.chunks.length) {
+                console.log("[HttpStreamPool] Downloading finished: " + this.downloadingFileName);
+                this.cleanupStream(stream);
+                return;
+            }
 
-			res.data.on("end", () => {
-				self.currentUrlIndex++;
-				next();
-			});
+            if (stream.closed || stream.destroyed) {
+                console.log("[HttpStreamPool] Stream closed; aborting");
+                this.cleanupStream(stream);
+                return;
+            }
 
-			res.data.on("error", (err: Error) => {
-				console.error(err);
-				stream.emit("error", err);
-			});
+            try {
+                console.log("[HttpStreamPool] Getting next chunk url for file:", this.downloadingFileName);
+                const url = await resolver(this.chunks[this.currentUrlIndex].id);
+                console.log("[HttpStreamPool] Got url:", url);
 
-			res.data.pipe(stream, { end: false });
-		}
+                if (this.isCancelled) {
+                    console.log("[HttpStreamPool] Download cancelled before starting chunk");
+                    this.cleanupStream(stream);
+                    return;
+                }
 
+                const res = await client.get<Readable>(url, {
+                    responseType: "stream",
+                    headers: {
+                        "User-Agent": this.userAgent,
+                    },
+                    timeout: 10000,
+                });
 
+                res.data.on("data", (chunk: Buffer) => {
+                    this.gotSize += chunk.length;
+                    const progress = this.totalSize > 0 ? this.gotSize / this.totalSize : 0;
+                    stream.emit("progress", this.gotSize, this.totalSize, progress);
+                });
 
-		next();
+                res.data.on("end", () => {
+                    this.currentUrlIndex++;
+                    next();
+                });
 
-		return stream;
-	}
+                res.data.on("error", (err: Error) => {
+                    this.handleError(err, stream);
+                });
 
+                res.data.pipe(stream, { end: false });
+            } catch (err) {
+                this.handleError(err, stream);
+            }
+        };
+
+        next();
+        return stream;
+    }
+
+    private handleError(err: unknown, stream: PassThrough) {
+        if (err instanceof AxiosError && err.code === 'ECONNABORTED') {
+            console.error("[HttpStreamPool] Request timeout:", err.message);
+            stream.emit("error", new Error("Request timeout"));
+        } else {
+            console.error("[HttpStreamPool] Error:", err);
+            stream.emit("error", err instanceof Error ? err : new Error("Unknown error occurred"));
+        }
+        this.cleanupStream(stream);
+    }
+
+    private cleanupStream(stream: PassThrough) {
+        stream.end();
+        this.cancelDownload();
+    }
+
+    public cancelDownload() {
+        this.isCancelled = true;
+    }
 }

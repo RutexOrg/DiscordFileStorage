@@ -26,8 +26,6 @@
     "boot": "tsc && node --no-warnings out/boot.js",
     "build": "tsc",
     "test": "yarn build && node --no-warnings out/tests/raw.spec.js",
-    "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
-    "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test",
     "del": "del /s /q out"
   },
   "devDependencies": {

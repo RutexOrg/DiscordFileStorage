@@ -2,13 +2,16 @@ import nodeFS from 'fs';
 import os from 'os';
 import DiscordFileProvider, { MAX_REAL_CHUNK_SIZE } from './provider/discord/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
-import { make } from './Log.js';
 import { IFile, IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
-import { printAndExit } from './helper/utils.js';
+import { printAndExit, withResolvers } from './helper/utils.js';
 import BaseProvider from './provider/core/BaseProvider.js';
+import WebdavServer from './webdav/WebdavServer.js';
+import { Readable, Writable } from 'stream';
+import MutableBuffer from './helper/MutableBuffer.js';
+import Log from './Log.js';
 
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -23,9 +26,10 @@ export interface DICloudAppOptions extends ClientOptions {
 }
 
 /**
- * Main class of the DICloud. It is a Discord.js client with some additional functionality.
+ * Main class of the DICloud. Most functions are designed to work with webdav.
  */
-export default class DICloudApp extends Client {
+export default class DICloudApp {
+    public static instance: DICloudApp;
 
     private guildId: string;
     private metaChannelName: string;
@@ -36,8 +40,6 @@ export default class DICloudApp extends Client {
     private shouldEncrypt;
     private encryptPassword;
 
-    public static instance: DICloudApp;
-    private logger = make("DICloud", true);
 
     private metadataMessage!: Message<boolean>;
     private fs!: VolumeEx;
@@ -57,8 +59,12 @@ export default class DICloudApp extends Client {
     private filesChannel!: TextChannel;
 
 
+    private discordClient: Client
+    private webdavServer?: WebdavServer;
+
+
     constructor(options: DICloudAppOptions, guildId: string) {
-        super(options);
+        this.discordClient = new Client(options);
         if (DICloudApp.instance) {
             throw new Error("DICloud already running");
         }
@@ -114,17 +120,17 @@ export default class DICloudApp extends Client {
 
     public async waitForReady(): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.once("ready", resolve as any);
+            this.discordClient.once("ready", resolve as any);
         });
     }
 
     public async init() {
-        this.logger.info("Initializing DICloud...");
+        Log.info("Initializing DICloud...");
         await this.waitForReady();
-        this.logger.info("Client authenticated...")
+        Log.info("Client authenticated...")
         await this.preload();
         await this.loadFiles();
-        this.logger.info("DICloud initialized, files loaded...");
+        Log.info("DICloud initialized, files loaded...");
     }
 
     /**
@@ -132,28 +138,28 @@ export default class DICloudApp extends Client {
      * Preloads required data and starts the tick interval.
      */
     private async preload() {
-        this.logger.info("Fetching guilds...");
-        await this.guilds.fetch();
+        Log.info("Fetching guilds...");
+        await this.discordClient.guilds.fetch();
 
-        if (!this.guilds.cache.has(this.guildId)) {
+        if (!this.discordClient.guilds.cache.has(this.guildId)) {
             printAndExit("Provided guild not found. Is the bot in the guild?");
         }
 
-        const guild = await this.guilds.cache.get(this.guildId)?.fetch();
+        const guild = await this.discordClient.guilds.cache.get(this.guildId)?.fetch();
         if (!guild) {
             printAndExit("Failed to fetch guild: " + this.guildId);
         }
         this.guild = guild!;
-        this.logger.info("Guild found: " + this.guild.name);
+        Log.info("Guild found: " + this.guild.name);
 
-        this.logger.info("Fetching channels...");
+        Log.info("Fetching channels...");
         await this.guild.channels.fetch();
         let channels = this.guild.channels.cache.filter(channel => channel.type == ChannelType.GuildText);
 
         let wasChannelCreated = false; // using for caching
         for (const channel of this.createChannels) {
             if (!channels.some(c => c.name == channel)) {
-                this.logger.info("Creating channel: " + channel);
+                Log.info("Creating channel: " + channel);
                 await this.guild.channels.create({
                     name: channel,
                     type: ChannelType.GuildText,
@@ -180,7 +186,7 @@ export default class DICloudApp extends Client {
     
 
     async getAllMessages(channelId: string): Promise<Message[]> {
-        const channel = await this.channels.fetch(channelId) as TextChannel;
+        const channel = await this.discordClient.channels.fetch(channelId) as TextChannel;
         let messages: Message[] = [];
         let last: string | undefined;
 
@@ -193,7 +199,7 @@ export default class DICloudApp extends Client {
             const channelMessages = [... (await channel.messages.fetch(options)).values()];
 
             messages = messages.concat(channelMessages);
-            this.logger.info("[getAllMessages] got block of " + channelMessages.length + " messages")
+            Log.info("[getAllMessages] got block of " + channelMessages.length + " messages")
             if (channelMessages.length < 100) {
                 break;
             }
@@ -224,8 +230,6 @@ export default class DICloudApp extends Client {
             throw new Error("Invalid amount of messages in metadata channel, there should only be one message. Maybe wrong channel is provided?");
         }
 
-
-
         if (message.attachments.size != 1) {
             throw new Error("Invalid amount of attachments in metadata message");
         }
@@ -236,51 +240,58 @@ export default class DICloudApp extends Client {
         }
 
         const file = await axios.get(attachment.url, { responseType: "arraybuffer" });
-        let data;
         try {
-            data = JSON.parse(file.data.toString()) as IFilesDesc;
+            const data = JSON.parse(file.data.toString()) as IFilesDesc;
+            
+            this.fs = VolumeEx.fromJSON(data as any);
+            this.metadataMessage = message;
+
         } catch (e) {
-            this.logger.info(e);
+            Log.error(e);
             printAndExit("Failed to parse JSON file. Is the file corrupted?");
         }
 
-        this.fs = VolumeEx.fromJSON(data as any);
-        this.metadataMessage = message;
+
     }
 
-    public async saveFiles(saveToDriveOnly: boolean = false, driveSaveForce: boolean = false) {
-        this.logger.info("Saving files...");
-
-        if (this.saveToDisk || driveSaveForce) {
-            this.saveToDrive();
-
-            if (saveToDriveOnly) {
-                return;
+    public saveFiles(saveToDriveOnly: boolean = false, driveSaveForce: boolean = false): Promise<void> {
+        Log.info("Saving files...");
+        return new Promise<void>((resolve, reject) => {
+            if (this.saveToDisk || driveSaveForce) {
+                this.saveToDrive();
+    
+                if (saveToDriveOnly) {
+                    resolve();
+                    return;
+                }
             }
-        }
-
-        const json = this.fs.toJSON()
-        const file = JSON.stringify(json);
-
-        await this.metadataMessage.edit({
-            files: [{
-                name: "discordfs.json",
-                attachment: Buffer.from(file)
-            }],
-            content: this.medataInfoMessage
-                + '\n\n' + 'Last saved: ' + new Date().toLocaleString()
-                + '\n' + 'Database Size: ' + file.length + ' bytes (' + Math.floor(file.length / MAX_REAL_CHUNK_SIZE * 100) + ' %)'
-                + '\n' + 'Files: ' + Object.keys(json).length + ' files'
-                + '\n' + 'Total Size: ' + (Math.floor(this.fs.getTreeSizeRecursive("/") / 1000 / 1000)) + ' MB'
-                + '\n' + 'Hash: (' + objectHash(json) + ')'
-        }).catch((err) => {
-            this.logger.info("Failed to save metadata message: " + err);
-            this.saveToDrive();
+    
+            const json = this.fs.toJSON()
+            const file = JSON.stringify(json);
+    
+            this.metadataMessage.edit({
+                files: [{
+                    name: "discordfs.json",
+                    attachment: Buffer.from(file)
+                }],
+                content: this.medataInfoMessage
+                    + '\n\n' + 'Last saved: ' + new Date().toLocaleString()
+                    + '\n' + 'Database Size: ' + file.length + ' bytes (' + Math.floor(file.length / MAX_REAL_CHUNK_SIZE * 100) + ' %)'
+                    + '\n' + 'Files: ' + Object.keys(json).length + ' files'
+                    + '\n' + 'Total Size: ' + (Math.floor(this.fs.getTreeSizeRecursive("/") / 1000 / 1000)) + ' MB'
+                    + '\n' + 'Hash: (' + objectHash(json) + ')'
+            })
+            .then(() => resolve())
+            .catch((err) => {
+                Log.info("Failed to save metadata message: " + err);
+                this.saveToDrive();
+                reject(err);
+            });
         });
     }
 
     private saveToDrive() {
-        this.logger.info("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )");
+        Log.info("Saving files to disk... ( " + os.tmpdir() + "/discordfs.json )");
         nodeFS.writeFileSync(os.tmpdir() + "/discordfs.json", JSON.stringify(this.fs.toJSON()));
     }
 
@@ -312,13 +323,48 @@ export default class DICloudApp extends Client {
         return this.provider;
     }
 
-
-    public getLogger() {
-        return this.logger;
-    }
-
     public getFs() {
         return this.fs;
+    }
+
+    public setWebdavServer(server: WebdavServer) {
+        this.webdavServer = server;
+    }
+
+    public getWebdavServer() {
+        return this.webdavServer;
+    }
+
+    public getDiscordClient() {
+        return this.discordClient;
+    }
+
+    public createWriteStream(file: IFile): Promise<Writable> {
+        return this.provider.createRawWriteStream(file);
+    }
+
+    public createReadStream(file: IFile): Promise<Readable> {
+        return this.provider.createReadStream(file);
+    }
+
+
+    public async uploadFile(Buffer: Buffer, name: string): Promise<IFile> {
+        return this.provider.uploadFile(Buffer, name);
+    }
+
+    public async downloadFile(file: IFile): Promise<Buffer> {
+        return this.provider.downloadFile(file);
+    }
+
+    public async shutdown(saveToDfive: boolean = false): Promise<void> {
+        if (this.webdavServer){
+            await this.webdavServer.stopAsync();
+        }
+        clearInterval(this.tickInterval);
+        clearInterval(this.debounceTimeout);
+
+        await this.saveFiles(false, saveToDfive);
+        await this.discordClient.destroy();
     }
 
 }

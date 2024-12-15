@@ -1,3 +1,7 @@
-import { boot } from "./bootloader.js";
-export default boot;
+import { boot, envBoot } from "./bootloader.js";
+
+export default {
+    boot,
+    envBoot,
+}
 
