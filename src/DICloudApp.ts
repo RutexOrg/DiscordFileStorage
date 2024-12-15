@@ -355,19 +355,15 @@ export default class DICloudApp {
     public async downloadFile(file: IFile): Promise<Buffer> {
         return this.provider.downloadFile(file);
     }
-        
-
 
     public async shutdown(saveToDfive: boolean = false): Promise<void> {
         if (this.webdavServer){
             await this.webdavServer.stopAsync();
         }
-
-        await this.saveFiles(false, saveToDfive);
-        
         clearInterval(this.tickInterval);
         clearInterval(this.debounceTimeout);
 
+        await this.saveFiles(false, saveToDfive);
         await this.discordClient.destroy();
     }
 
