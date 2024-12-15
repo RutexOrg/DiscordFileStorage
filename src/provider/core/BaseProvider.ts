@@ -1,12 +1,11 @@
+import DICloudApp from "../../DICloudApp";
+import MutableBuffer from "../../helper/MutableBuffer";
+
 import { IFile } from "../../file/IFile";
 import { PassThrough, Readable, Transform, Writable } from "stream";
-import DICloudApp from "../../DICloudApp";
-
 import { gcm } from '@noble/ciphers/aes';
 import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
 import { randomBytes } from '@noble/ciphers/webcrypto';
-
-import MutableBuffer from "../../helper/MutableBuffer";
 import { withResolvers } from "../../helper/utils";
 
 export interface IDelayedDeletionEntry {
@@ -35,7 +34,7 @@ export default abstract class BaseProvider {
         return this.fileDeletionQueue;
     }
 
-  
+
     private createCipher(iv: Uint8Array): Cipher {
         const key = utf8ToBytes(this.client.getEncryptPassword());
         return gcm(key, iv);
@@ -45,22 +44,22 @@ export default abstract class BaseProvider {
         const readStream = await this.createRawReadStream(file);
         const decipher = this.createCipher(file.iv);
 
-        const decryptedRead = new PassThrough();    
+        const decryptedRead = new PassThrough();
         const buffer = new MutableBuffer(this.calculateSavedFileSize()); // encrypted data is bigger than decrypted data   
-    
+
         readStream.on("data", (chunk) => {
             const left = this.calculateSavedFileSize() - buffer.size;
             if (chunk.length <= left) {
                 buffer.write(chunk);
             } else {
-                buffer.write(chunk.slice(0, left));
+                buffer.write(chunk.subarray(0, left));
                 const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
                 decryptedRead.push(decrypted);
                 buffer.clear();
-                buffer.write(chunk.slice(left));
+                buffer.write(chunk.subarray(left));
             }
         });
-    
+
         readStream.on("end", () => {
             if (buffer.size > 0) {
                 const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
@@ -69,12 +68,12 @@ export default abstract class BaseProvider {
             decryptedRead.push(null);
             buffer.destory();
         });
-    
+
         readStream.on("error", (err) => {
             decryptedRead.destroy(err);
             buffer.destory();
         });
-    
+
         return decryptedRead;
     }
 
@@ -82,7 +81,7 @@ export default abstract class BaseProvider {
         const rawWriteStream = await this.createRawWriteStream(file);
         const cipher = this.createCipher(file.iv);
         const writeStreamAwaiter = withResolvers();
-        
+
         const buffer = new MutableBuffer(this.calculateProviderMaxSize());
 
         rawWriteStream.on("finish", () => {
@@ -114,7 +113,7 @@ export default abstract class BaseProvider {
                     rawWriteStream.write(cipher.encrypt(buffer.flushAndDestory()));
                 }
                 rawWriteStream.end();
-                await writeStreamAwaiter.promise;
+                await writeStreamAwaiter.promise; // we have to wait for rawWriteStream to finish, otherwise client will close connection too early thinking that upload is finished
                 callback();
             },
             destroy: (err, callback) => {
@@ -140,23 +139,23 @@ export default abstract class BaseProvider {
         };
     }
 
-      /**
-     * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
+    /**
+   * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
+   */
+    public abstract processDeletionQueue(): Promise<void>;
+
+    /**
+     * Method that should provide raw read stream for downloading files from provider. Only basic read stream from provider, no decryption or anything else.
+     * @param file - File which should be downloaded.
      */
-      public abstract processDeletionQueue(): Promise<void>;
-        
-      /**
-       * Method that should provide raw read stream for downloading files from provider. Only basic read stream from provider, no decryption or anything else.
-       * @param file - File which should be downloaded.
-       */
-      public abstract createRawReadStream(file: IFile): Promise<Readable>;
-      /**
-       * Method that should provide raw write stream for uploading files to provider. Only basic write stream to provider, no encryption or anything else.
-       * @param file - File which should be uploaded.
-       * @param callbacks  - Callbacks for write stream.
-       */
-      public abstract createRawWriteStream(file: IFile): Promise<Writable>;
-      
+    public abstract createRawReadStream(file: IFile): Promise<Readable>;
+    /**
+     * Method that should provide raw write stream for uploading files to provider. Only basic write stream to provider, no encryption or anything else.
+     * @param file - File which should be uploaded.
+     * @param callbacks  - Callbacks for write stream.
+     */
+    public abstract createRawWriteStream(file: IFile): Promise<Writable>;
+
 
     /**
      * Custom provider should implement this method to provide max file size.
@@ -166,7 +165,7 @@ export default abstract class BaseProvider {
 
 
     /* ----------------------------------------------------------------------------------------- */
-    
+
 
     /**
      * Main method that should be used to download files from provider.
@@ -178,9 +177,9 @@ export default abstract class BaseProvider {
     async createReadStream(file: IFile): Promise<Readable> {
         if (this.client.shouldEncryptFiles()) {
             return await this.createReadStreamWithDecryption(file);
-        } else {
-            return await this.createRawReadStream(file);
         }
+
+        return await this.createRawReadStream(file);
     }
 
     /**
@@ -195,39 +194,35 @@ export default abstract class BaseProvider {
     async createWriteStream(file: IFile): Promise<Writable> {
         if (this.client.shouldEncryptFiles()) {
             return await this.createWriteStreamWithEncryption(file);
-        } else {
-            return await this.createRawWriteStream(file);
         }
+
+        return await this.createRawWriteStream(file);
     }
-    
+
     /**
-     * 
-     * @param buffer Convinient buffer upload function
+     * Convinient buffer upload function
+     * @param buffer Buffer with file data
      * @param name Filename. Not really used, but can be used for logging or other purposes.
      * @returns created file struct with all data about file.
      */
     public async uploadFile(buffer: Buffer, name: string): Promise<IFile> {
-        const promise = withResolvers();
         const file = this.createVFile(name);
         const stream = await this.createWriteStream(file);
 
-        stream.on("finish", () => {
-            promise.resolve(file);
+        return new Promise(async (resolve, reject) => {
+            stream.on("finish", () => {
+                resolve(file);
+            });
+
+            stream.on("error", (err) => {
+                reject(err);
+            });
+            Readable.from(buffer).pipe(stream);
         });
-
-        stream.on("error", (err) => {
-            promise.reject(err);
-        });
-
-        stream.write(buffer);
-        stream.end();
-        await promise.promise;
-
-        return file;
     }
 
     /**
-     * Convinient download function that downloads file from provider and returns it as buffer. Uses buffer.
+     * Convinient download function that downloads file from provider and returns it as buffer.
      * @param file valid file struct
      * @returns Buffer with file data
      */
@@ -251,5 +246,5 @@ export default abstract class BaseProvider {
             });
         });
     }
-        
+
 }

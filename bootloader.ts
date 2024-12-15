@@ -6,8 +6,9 @@ import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
 import DICloudApp from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
-import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
-import { checkEnvVariableIsSet, checkIfFileExists, readFileSyncOrUndefined, ensureStringLength } from "./src/helper/utils.js";
+import DiscordWebdavFilesystemHandler from "./src/webdav/WebdavFileSystem.js";
+import { getEnv, checkIfFileExists, readFileSyncOrUndefined, ensureStringLength } from "./src/helper/utils.js";
+import Log from "./src/Log.js";
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -101,7 +102,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         saveToDisk: params.saveToDisk,
     }, params.guildId);
 
-    app.getLogger().info("Logging in...");
+    Log.info("Logging in...");
     await app.getDiscordClient().login(params.token);
     await app.init();
 
@@ -142,16 +143,16 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         const webdavServer = WebdavServer.createServer(serverLaunchOptions, app);
 
         await webdavServer.startAsync();
-        app.getLogger().info("WebDAV server started at port " + params.webdavPort + ".");
+        Log.info("WebDAV server started at port " + params.webdavPort + ".");
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
-            app.getLogger().info("[S] IN ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            Log.info("[S] IN ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("[S] OUT ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
+            Log.info("[S] OUT ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
             next();
         });
 
@@ -163,23 +164,23 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
 }
 
 export async function envBoot() {
-    const token = checkEnvVariableIsSet("TOKEN", "Please set the TOKEN to your bot token");
-    const guildId = checkEnvVariableIsSet("GUILD_ID", "Please set the GUILD_ID to your guild id");
-    const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name", "string", "files");
-    const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name", "string", "meta");
+    const token = getEnv("TOKEN", "Please set the TOKEN to your bot token");
+    const guildId = getEnv("GUILD_ID", "Please set the GUILD_ID to your guild id");
+    const filesChannelName = getEnv("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name", "string", "files");
+    const metaChannelName = getEnv("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name", "string", "meta");
 
-    const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
+    const webdavPort = getEnv("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
 
-    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
+    const enableHttps = getEnv("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
 
-    const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth", "boolean", false) as boolean;
-    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
+    const enableAuth = getEnv("AUTH", "Please set the AUTH to true or false to enable auth", "boolean", false) as boolean;
+    const users = getEnv("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
     
-    const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption", "boolean", false) as boolean;
-    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password", "string", "") as string;
+    const enableEncrypt = getEnv("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption", "boolean", false) as boolean;
+    const encryptPassword = getEnv("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password", "string", "") as string;
 
-    const saveTimeout = checkEnvVariableIsSet("SAVE_TIMEOUT", "Please set the SAVE_TIMEOUT to your save timeout in ms", "number", 2000) as number;
-    const saveToDisk = checkEnvVariableIsSet("SAVE_TO_DISK", "Please set the SAVE_TO_DISK to true or false to enable saving to disk", "boolean", false) as boolean;
+    const saveTimeout = getEnv("SAVE_TIMEOUT", "Please set the SAVE_TIMEOUT to your save timeout in ms", "number", 2000) as number;
+    const saveToDisk = getEnv("SAVE_TO_DISK", "Please set the SAVE_TO_DISK to true or false to enable saving to disk", "boolean", false) as boolean;
 
     return await boot({
         token,

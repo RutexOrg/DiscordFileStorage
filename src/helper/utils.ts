@@ -1,5 +1,4 @@
 import fs from "fs";
-import { randomBytes } from '@noble/ciphers/webcrypto';
 
 export function truncate(str: string, n: number, includeDots: boolean = false) {
     return ((str.length > n) ? str.substr(0, n - 1) : str) + (includeDots && str.length > n ? '...' : '');
@@ -10,7 +9,7 @@ export function printAndExit(message: string, exitCode: number = 1) {
     process.exit(exitCode);
 }
 
-export function checkEnvVariableIsSet(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: any): any {
+export function getEnv(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: any): any {
     const value = process.env[name]!;
     if (!value) {
         if (defaultValue !== undefined) {
@@ -82,9 +81,6 @@ export function ensureStringLength(str: string, requiredLength: number, fillWith
     return str;
 }
 
-export function getIv(len = 24){
-    return randomBytes(len);
-}
 
 export function withResolvers() {
     let resolve: any;

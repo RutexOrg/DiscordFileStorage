@@ -31,7 +31,7 @@ test('server boot', async () => {
 });
 
 
-test("create and read small", async () => {
+test("create and read small file", async () => {
     const data = {
         name: "test-small.txt",
         content: "Hello, World!",
@@ -45,8 +45,6 @@ test("create and read small", async () => {
 
     const downloadedBuffer = await app.downloadFile(uploadedFile);
     assert.is(downloadedBuffer.toString(), data.content);
-
-
 });
 
 test("create and read big", async () => {
@@ -67,7 +65,7 @@ test("create and read big", async () => {
     assert.is(downloadedBuffer.toString(), data.content);
 });
 
-test("create empty file", async () => {
+test("create and read empty file", async () => {
     const data = {
         name: "empty.txt",
         content: "",
