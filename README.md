@@ -10,13 +10,16 @@
    - [Authorization](#authorization)
 - [Last steps](#last-steps)
 - [Known issues](#known-issues)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
 ---
 
 
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in various file managers via webdav protocol. 
 
-Yes, even ***above 10MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
+Yes, even ***above 10MB***. Currently tested about 750MB for a single file and 9 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
@@ -113,3 +116,14 @@ Will do some work in the future to fix this.
 4. Half working encryption support. You can use it, but you have to be aware of potential security issues, since im not experienced in cryptography and i cant guarantee that it will be secure. But for now it looks like its working pretty stable.
 
 5. Not all webdav clients are working as expected. Will do some work in the future to fix this.
+
+# Contributing
+
+Just create a issue or pull request. I will be happy to see any feedback or help.
+
+# Disclaimer
+I am not responsible for any consequences, data loss, damage or any other issues that may occur while using this software. 
+
+Additionally, the software violates Discord's terms of service, so use it at your own risk.
+
+USE IT AT YOUR OWN RISK.
