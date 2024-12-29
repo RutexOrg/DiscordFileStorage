@@ -1,41 +1,46 @@
-import { AttachmentBuilder, TextChannel } from "discord.js";
-import BaseProvider from "../core/BaseProvider.js";
-import HttpStreamPool from '../../stream-helpers/HttpStreamPool.js';
-import { Writable, Readable, PassThrough } from "stream";
-import { truncate } from "../../helper/utils.js";
-import { IFile } from "../../file/IFile.js";
 import path from "path";
-import Log from "../../Log.js";
+import BaseProvider from "./BaseProvider.js";
+import HttpStreamPool from '../HttpStreamPool.js';
+
+import { AttachmentBuilder, TextChannel } from "discord.js";
+import { Writable, Readable, PassThrough } from "stream";
+import { truncate } from "../helper/utils.js";
+import { IFile } from "../file/IFile.js";
+
+import Log from "../Log.js";
+import MutableBuffer from "../helper/MutableBuffer.js";
 
 export const MAX_MB_CHUNK_SIZE = 10; // megabytes chunk size. Discord allows 10MB per file.
 export const ENCRYPTION_OVERHEAD = 16; // 16 bytes for encryption metadata
 
-export const MAX_REAL_CHUNK_SIZE = (MAX_MB_CHUNK_SIZE * 1000 * 1000) - ENCRYPTION_OVERHEAD;
+export const MAX_CHUNK_SIZE = (MAX_MB_CHUNK_SIZE * 1000 * 1000) - ENCRYPTION_OVERHEAD;
 
 export default class DiscordFileProvider extends BaseProvider {
-    private getAttachmentBuilderFromStream(stream: Readable, chunkName: string, chunkNumber: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt"): AttachmentBuilder {
+    
+    private getAttachmentBuilderFromBuffer(stream: Buffer, chunkName: string, chunkNumber: number = 0, addExtension: boolean = false, encrypt: boolean, extension: string = "txt"): AttachmentBuilder {
         return new AttachmentBuilder(stream, {
             name: (chunkNumber ? chunkNumber + "-" : "") + chunkName + (addExtension ? "." + extension : "") + (encrypt ? ".enc" : "")
         });
     }
 
-    private async uploadChunkToDiscord(stream: Readable, chunkNumber: number, filesChannel: TextChannel, file: IFile) {
+    private async uploadChunkToDiscord(buf: MutableBuffer, chunkNumber: number, filesChannel: TextChannel, file: IFile) {
         Log.info(`[${file.name}] Uploading chunk ${chunkNumber}....`);
+        const size = buf.size;
         const message = await filesChannel.send({
             files: [
-                this.getAttachmentBuilderFromStream(
-                    stream,
+                this.getAttachmentBuilderFromBuffer(
+                    buf.flush(),
                     path.parse(truncate(file.name, 15)).name,
                     chunkNumber,
                     false,
-                    this.client.shouldEncryptFiles()
+                    file.encrypted
                 )
             ],
         });
 
         file.chunks.push({
             id: message.id,
-            size: MAX_REAL_CHUNK_SIZE,
+            size,
         });
         Log.info(`[${file.name}] Chunk ${chunkNumber} added.`);
     }
@@ -47,50 +52,42 @@ export default class DiscordFileProvider extends BaseProvider {
         })));
     }
 
+    /**
+     * Updates the file size and chunk size.
+     */
     public async createRawWriteStream(file: IFile): Promise<Writable> {
         Log.info(".createRawWriteStream() - file: " + file.name);
-
+        
         const channel = this.client.getFilesChannel();
         let chunkId = 1;
-        let currentSize = 0;
-        let currentChunk = new PassThrough();
+        let currentChunk = new MutableBuffer();
+        let totalFileSize = 0;
 
         const uploadStream = new Writable({
+            highWaterMark: 16 * 1024,
             write: async (chunk: Buffer, encoding: BufferEncoding, callback) => {
-            if (currentSize + chunk.length > MAX_REAL_CHUNK_SIZE) {
-                const remainingSpace = MAX_REAL_CHUNK_SIZE - currentSize;
-                currentChunk.write(chunk.subarray(0, remainingSpace));
-                currentChunk.end();
-                await this.uploadChunkToDiscord(currentChunk, chunkId, channel, file);
-                chunkId++;
-                currentSize = chunk.length - remainingSpace;
-                currentChunk = new PassThrough();
-                currentChunk.write(chunk.subarray(remainingSpace));
+                totalFileSize += chunk.length;
+                currentChunk.write(chunk, encoding);
+                if (currentChunk.size > MAX_CHUNK_SIZE) {
+                    await this.uploadChunkToDiscord(currentChunk, chunkId, channel, file);
+                    chunkId++;
+                    
+                    currentChunk.destroy();
+                    currentChunk = new MutableBuffer();
+                }
                 callback();
-            } else {
-                currentChunk.write(chunk);
-                currentSize += chunk.length;
-                callback();
-            }
-
-            file.size += chunk.length;
             },
-            final: (callback) => {
-            Log.info("final() Finalizing upload.");
-            if (currentSize > 0) {
-                currentChunk.end();
-                this.uploadChunkToDiscord(currentChunk, chunkId, channel, file)
-                .then(() => {
-                    Log.info("final() write stream finished, onFinished() called.");
-                    callback();
-                })
-                .catch(callback);
-            } else {
+            final: async (callback) => {
+                Log.info("[DiscordProvider] final() Finalizing upload.");
+                if (currentChunk.size > 0) {
+                    await this.uploadChunkToDiscord(currentChunk, chunkId, channel, file);
+                    currentChunk.destroy();
+                }
+                file.size = totalFileSize;
                 callback();
-            }
             }
         });
-
+    
         return uploadStream;
     }
 
@@ -113,10 +110,10 @@ export default class DiscordFileProvider extends BaseProvider {
     }
 
     calculateProviderMaxSize(): number {
-        return MAX_REAL_CHUNK_SIZE;
+        return MAX_CHUNK_SIZE;
     }
 
     calculateSavedFileSize(): number {
-        return MAX_REAL_CHUNK_SIZE + ENCRYPTION_OVERHEAD;
+        return MAX_CHUNK_SIZE + ENCRYPTION_OVERHEAD;
     }
 }

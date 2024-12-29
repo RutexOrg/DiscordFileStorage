@@ -1,3 +1,5 @@
+import { randomBytes } from '@noble/ciphers/webcrypto';
+
 export interface IFile {
     name: string; // name is used only for raw provider, not for webdav. Webdav uses paths.  
     size: number;
@@ -6,6 +8,7 @@ export interface IFile {
     modified: Date;
     iv: Uint8Array
     // uploaded: boolean;
+    encrypted: boolean;
 }
 
 export interface IChunkInfo {
@@ -16,3 +19,19 @@ export interface IChunkInfo {
 
 
 export type IFilesDesc = Record<string, IFile>;
+
+
+/**
+     * Returns file struct, no remote operations are done.
+     */
+export function createVFile(name: string, size: number = 0, encrypted: boolean): IFile {
+    return {
+        name,
+        size,
+        chunks: [],
+        created: new Date(),
+        modified: new Date(),
+        encrypted,
+        iv: encrypted ? randomBytes(16) : new Uint8Array(0)
+    };
+}

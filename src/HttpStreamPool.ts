@@ -1,8 +1,12 @@
-import { AxiosResponse, AxiosError } from "axios";
-import { Readable, PassThrough } from "stream";
-import client from "../helper/AxiosInstance.js";
-import { IChunkInfo, IFile } from "../file/IFile.js";
+import Log from "./Log.js";
 import structuredClone from "@ungap/structured-clone";
+import client from "./helper/AxiosInstance.js";
+
+import { AxiosError } from "axios";
+import { IChunkInfo, IFile } from "./file/IFile.js";
+import { Readable, PassThrough } from "stream";
+// import { patchEmitter } from "./helper/EventPatcher.js";
+
 
 export default class HttpStreamPool {
     private chunks: IChunkInfo[];
@@ -34,33 +38,33 @@ export default class HttpStreamPool {
         const stream = new PassThrough();
         const next = async () => {
             if (this.isCancelled) { // extra check against race conditions, since we are using async functions.
-                console.log("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
+                Log.info("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
                 this.cleanupStream(stream);
                 return;
             }
 
             if (this.currentUrlIndex >= this.chunks.length) {
-                console.log("[HttpStreamPool] Downloading finished: " + this.downloadingFileName);
+                Log.info("[HttpStreamPool] Downloading finished: " + this.downloadingFileName);
+                // patchEmitter(stream, "HttpStreamPool", [/progress/]);
                 this.cleanupStream(stream);
                 return;
             }
 
             if (stream.closed || stream.destroyed) {
-                console.log("[HttpStreamPool] Stream closed; aborting");
+                Log.info("[HttpStreamPool] Stream closed; aborting");
                 this.cleanupStream(stream);
                 return;
             }
 
             try {
-                console.log("[HttpStreamPool] Getting next chunk url for file:", this.downloadingFileName);
-                const url = await resolver(this.chunks[this.currentUrlIndex].id);
-                console.log("[HttpStreamPool] Got url:", url);
-
                 if (this.isCancelled) {
-                    console.log("[HttpStreamPool] Download cancelled before starting chunk");
+                    Log.info("[HttpStreamPool] Download cancelled before starting chunk");
                     this.cleanupStream(stream);
                     return;
                 }
+
+                Log.info("Resolving attachment URL for message: " + this.chunks[this.currentUrlIndex].id);
+                const url = await resolver(this.chunks[this.currentUrlIndex].id);
 
                 const res = await client.get<Readable>(url, {
                     responseType: "stream",

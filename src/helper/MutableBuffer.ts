@@ -64,7 +64,7 @@ export class BaseMutableBuffer {
 		this._size = 0;
 	}
 
-	destory() {
+	destroy() {
 		this._buffer = this.Buffer.allocUnsafe(0);
 		this._size = 0;
 	}
@@ -95,7 +95,7 @@ export class BaseMutableBuffer {
 
 	flushAndDestory(): Buffer {
 		const result = this.flush(true);
-		this.destory();
+		this.destroy();
 		return result;
 	}
 

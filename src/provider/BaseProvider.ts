@@ -1,12 +1,14 @@
-import DICloudApp from "../../DICloudApp";
-import MutableBuffer from "../../helper/MutableBuffer";
+import DICloudApp from "../DICloudApp";
+import MutableBuffer from "../helper/MutableBuffer";
 
-import { IFile } from "../../file/IFile";
-import { PassThrough, Readable, Transform, Writable } from "stream";
+import { createVFile, IFile } from "../file/IFile";
+import { PassThrough, pipeline, Readable, Transform, Writable } from "stream";
 import { gcm } from '@noble/ciphers/aes';
 import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
-import { randomBytes } from '@noble/ciphers/webcrypto';
-import { withResolvers } from "../../helper/utils";
+import { withResolvers } from "../helper/utils";
+
+import Log from "../Log";
+import { ENCRYPTION_OVERHEAD } from "./DiscordFileProvider";
 
 export interface IDelayedDeletionEntry {
     channel: string;
@@ -43,46 +45,72 @@ export default abstract class BaseProvider {
     private async createReadStreamWithDecryption(file: IFile): Promise<Readable> {
         const readStream = await this.createRawReadStream(file);
         const decipher = this.createCipher(file.iv);
-
         const decryptedRead = new PassThrough();
-        const buffer = new MutableBuffer(this.calculateSavedFileSize()); // encrypted data is bigger than decrypted data   
+
+        const encryptedChunkSize = this.calculateSavedFileSize();
+        const buffer = new MutableBuffer(encryptedChunkSize);
+
 
         readStream.on("data", (chunk) => {
-            const left = this.calculateSavedFileSize() - buffer.size;
-            if (chunk.length <= left) {
-                buffer.write(chunk);
-            } else {
-                buffer.write(chunk.subarray(0, left));
-                const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
-                decryptedRead.push(decrypted);
-                buffer.clear();
-                buffer.write(chunk.subarray(left));
+            try {
+                const left = encryptedChunkSize - buffer.size;
+
+                if (chunk.length <= left) {
+                    buffer.write(chunk);
+                } else {
+                    buffer.write(chunk.subarray(0, left));
+                    const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
+                    const writeSuccess = decryptedRead.write(decrypted);
+                    if (!writeSuccess) {
+                        readStream.pause();
+                    }
+                    buffer.clear();
+                    buffer.write(chunk.subarray(left));
+                }
+            } catch (err) {
+                decryptedRead.destroy(err instanceof Error ? err : new Error(String(err)));
+                buffer.destroy();
             }
         });
 
         readStream.on("end", () => {
-            if (buffer.size > 0) {
-                const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
-                decryptedRead.push(decrypted);
+            try {
+                if (buffer.size > 0) {
+                    const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
+                    decryptedRead.write(decrypted);
+                }
+                buffer.destroy();
+                decryptedRead.end();
+            } catch (err) {
+                decryptedRead.destroy(err instanceof Error ? err : new Error(String(err)));
+                buffer.destroy();
             }
-            decryptedRead.push(null);
-            buffer.destory();
+        });
+
+        decryptedRead.on("drain", () => {
+            readStream.resume();
         });
 
         readStream.on("error", (err) => {
             decryptedRead.destroy(err);
-            buffer.destory();
+            buffer.destroy();
+        });
+
+        decryptedRead.on("error", (err) => {
+            readStream.destroy(err);
+            buffer.destroy();
         });
 
         return decryptedRead;
     }
+
 
     private async createWriteStreamWithEncryption(file: IFile): Promise<Writable> {
         const rawWriteStream = await this.createRawWriteStream(file);
         const cipher = this.createCipher(file.iv);
         const writeStreamAwaiter = withResolvers();
 
-        const buffer = new MutableBuffer(this.calculateProviderMaxSize());
+        let buffer = new MutableBuffer(this.calculateProviderMaxSize());
 
         rawWriteStream.on("finish", () => {
             writeStreamAwaiter.resolve();
@@ -90,25 +118,26 @@ export default abstract class BaseProvider {
 
         rawWriteStream.on("error", (err) => {
             writeStreamAwaiter.reject(err);
-            buffer.destory();
+            buffer.destroy();
         });
 
         return new Writable({
             write: async (chunk: Buffer, encoding, callback) => {
-                // console.log("[BaseProvider] write() chunk.length: " + chunk.length + " - encoding: " + encoding);
                 const left = this.calculateProviderMaxSize() - buffer.size;
                 if (chunk.length <= left) {
                     buffer.write(chunk, encoding);
                 } else {
                     buffer.write(chunk.subarray(0, left), encoding);
-                    rawWriteStream.write(cipher.encrypt(buffer.flush()));
+                    const f = buffer.flush();
+                    const e = cipher.encrypt(f);
+                    rawWriteStream.write(e);
                     buffer.clear();
                     buffer.write(chunk.subarray(left), encoding);
                 }
                 callback();
             },
             final: async (callback) => {
-                console.log("[BaseProvider] final() Finalizing upload.");
+                Log.info("[BaseProvider] final() Finalizing upload.");
                 if (buffer.size > 0) {
                     rawWriteStream.write(cipher.encrypt(buffer.flushAndDestory()));
                 }
@@ -117,27 +146,15 @@ export default abstract class BaseProvider {
                 callback();
             },
             destroy: (err, callback) => {
-                console.log("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
-                buffer.destory();
+                Log.info("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
+                buffer.destroy();
                 callback(err);
             }
         });
 
     }
 
-    /**
-     * Returns file struct, no remote operations are done.
-     */
-    public createVFile(name: string, size: number = 0): IFile {
-        return {
-            name,
-            size,
-            chunks: [],
-            created: new Date(),
-            modified: new Date(),
-            iv: randomBytes(),
-        };
-    }
+
 
     /**
    * Method that should be used to implement queue for deleting files from provider. Queue is used to prevent ratelimiting and other blocking issues.
@@ -175,7 +192,7 @@ export default abstract class BaseProvider {
      * @returns 
      */
     async createReadStream(file: IFile): Promise<Readable> {
-        if (this.client.shouldEncryptFiles()) {
+        if (file.encrypted) {
             return await this.createReadStreamWithDecryption(file);
         }
 
@@ -192,7 +209,7 @@ export default abstract class BaseProvider {
      * @returns write stream
      */
     async createWriteStream(file: IFile): Promise<Writable> {
-        if (this.client.shouldEncryptFiles()) {
+        if (file.encrypted) {
             return await this.createWriteStreamWithEncryption(file);
         }
 
@@ -206,7 +223,7 @@ export default abstract class BaseProvider {
      * @returns created file struct with all data about file.
      */
     public async uploadFile(buffer: Buffer, name: string): Promise<IFile> {
-        const file = this.createVFile(name);
+        const file = createVFile(name, 0, this.client.shouldEncryptFiles());
         const stream = await this.createWriteStream(file);
 
         return new Promise(async (resolve, reject) => {
@@ -228,7 +245,7 @@ export default abstract class BaseProvider {
      */
     public async downloadFile(file: IFile): Promise<Buffer> {
         const stream = await this.createReadStream(file);
-        const size = this.client.shouldEncryptFiles() ? file.size - (16 * file.chunks.length) : file.size;
+        const size = file.encrypted ? file.size - (16 * file.chunks.length) : file.size;
 
         return new Promise((resolve, reject) => {
             const buffer = new MutableBuffer(size);
@@ -241,7 +258,7 @@ export default abstract class BaseProvider {
             });
 
             stream.on("error", (err) => {
-                buffer.destory();
+                buffer.destroy();
                 reject(err);
             });
         });

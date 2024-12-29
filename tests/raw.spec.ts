@@ -6,9 +6,6 @@ import * as assert from 'uvu/assert';
 
 import { envBoot } from "../bootloader"
 import DICloudApp from '../src/DICloudApp';
-import { withResolvers } from '../src/helper/utils';
-import { Readable } from 'stream';
-import client from "../src/helper/AxiosInstance";
 
 const test = uvu.test;
 

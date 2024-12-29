@@ -122,8 +122,8 @@ Will do some work in the future to fix this.
 Just create a issue or pull request. I will be happy to see any feedback or help.
 
 # Disclaimer
-I am not responsible for any consequences, data loss, damage or any other issues that may occur while using this software. 
+I am not responsible for any consequences, data loss, damage, law violations or any other issues that may arise from using this software.
 
-Additionally, the software violates Discord's terms of service, so use it at your own risk.
+The software (probably) violates Discord's terms of service, so use it at your own risk.
 
 USE IT AT YOUR OWN RISK.

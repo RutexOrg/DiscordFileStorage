@@ -48,6 +48,7 @@ export interface IBootParamsParsed extends IBootParams {
 function bootPrecheck(params: IBootParams): IBootParamsParsed {
 
     if (params.enableEncrypt){
+        // TODO: add password check for downloading encrypted files in not encrypted server.
         if (!params.encryptPassword) {
             throw new Error("Please set the ENCRYPT_PASSWORD to your encryption password.");
         }
@@ -77,6 +78,10 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
         throw new Error("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
     }
 
+    if(params.metaChannelName.toLowerCase() === params.filesChannelName.toLowerCase()){
+        throw new Error("META_CHANNEL and FILES_CHANNEL env variables are set to the same value. Please set them to different values.");
+    }
+
     return {
         ...params,
         usersParsed,
@@ -103,7 +108,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
     }, params.guildId);
 
     Log.info("Logging in...");
-    await app.getDiscordClient().login(params.token);
+    await app.login(params.token);
     await app.init();
 
     if (params.startWebdavServer) {
@@ -143,7 +148,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         const webdavServer = WebdavServer.createServer(serverLaunchOptions, app);
 
         await webdavServer.startAsync();
-        Log.info("WebDAV server started at port " + params.webdavPort + ".");
+        Log.info("WebDAV server started at port ", params.webdavPort , ".");
 
         // debug
         webdavServer.beforeRequest((arg, next) => {
@@ -157,6 +162,8 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         });
 
         app.setWebdavServer(webdavServer);
+
+        Log.info("Looks like everything is ready.");
 
     }
 
@@ -188,7 +195,6 @@ export async function envBoot() {
         filesChannelName,
         metaChannelName,
         webdavPort,
-        startWebdavServer: true,
         enableHttps,
         enableAuth,
         users: users,
@@ -196,21 +202,24 @@ export async function envBoot() {
         encryptPassword,
         saveTimeout,
         saveToDisk,
+        startWebdavServer: true,
     })
     
 }
 
 
+if (require.main === module) {
+    process.on("uncaughtException", (err) => {
+        console.log("Uncaught exception");
+        console.trace(err)
+        // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
+    });
+    
+    process.on("unhandledRejection", (reason, promise) => {
+        console.trace(reason);
+    });
 
+    
 
-
-
-process.on("uncaughtException", (err) => {
-    console.log("Uncaught exception");
-    console.trace(err)
-    // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-    console.trace(reason);
-});
+    envBoot();
+}

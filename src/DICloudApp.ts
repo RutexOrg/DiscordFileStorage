@@ -1,16 +1,15 @@
 import nodeFS from 'fs';
 import os from 'os';
-import DiscordFileProvider, { MAX_REAL_CHUNK_SIZE } from './provider/discord/DiscordFileProvider.js';
+import DiscordFileProvider, { MAX_CHUNK_SIZE } from './provider/DiscordFileProvider.js';
 import axios from './helper/AxiosInstance.js';
 import { IFile, IFilesDesc } from './file/IFile.js';
 import { ChannelType, Client, ClientOptions, FetchMessagesOptions, Guild, Message, TextChannel } from 'discord.js';
 import VolumeEx from './file/VolumeEx.js';
 import objectHash from "object-hash";
-import { printAndExit, withResolvers } from './helper/utils.js';
-import BaseProvider from './provider/core/BaseProvider.js';
+import { printAndExit } from './helper/utils.js';
+import BaseProvider from './provider/BaseProvider.js';
 import WebdavServer from './webdav/WebdavServer.js';
 import { Readable, Writable } from 'stream';
-import MutableBuffer from './helper/MutableBuffer.js';
 import Log from './Log.js';
 
 
@@ -89,13 +88,6 @@ export default class DICloudApp {
         this.guildId = guildId;
         this.provider = new DiscordFileProvider(this);
 
-        // catch all process errors and unhandled rejections, save files to disk before exiting.
-        process.on('uncaughtException', (err) => {
-            console.trace(err);
-            this.saveToDrive();
-            process.exit(1);
-        });
-
     }
 
     public shouldEncryptFiles(): boolean {
@@ -122,6 +114,10 @@ export default class DICloudApp {
         return new Promise((resolve, reject) => {
             this.discordClient.once("ready", resolve as any);
         });
+    }
+
+    public async login(token: string): Promise<void> {
+        await this.discordClient.login(token);
     }
 
     public async init() {
@@ -276,7 +272,7 @@ export default class DICloudApp {
                 }],
                 content: this.medataInfoMessage
                     + '\n\n' + 'Last saved: ' + new Date().toLocaleString()
-                    + '\n' + 'Database Size: ' + file.length + ' bytes (' + Math.floor(file.length / MAX_REAL_CHUNK_SIZE * 100) + ' %)'
+                    + '\n' + 'Database Size: ' + file.length + ' bytes (' + Math.floor(file.length / MAX_CHUNK_SIZE * 100) + ' %)'
                     + '\n' + 'Files: ' + Object.keys(json).length + ' files'
                     + '\n' + 'Total Size: ' + (Math.floor(this.fs.getTreeSizeRecursive("/") / 1000 / 1000)) + ' MB'
                     + '\n' + 'Hash: (' + objectHash(json) + ')'
