@@ -195,7 +195,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
             const files = app.getFs().getFilesWithPathRecursive(path);
             for (let [filePath, file] of Object.entries(files)) {
                 // replace file path with relative path, so current relative path is root of the zip
-                // filePath = filePath.replace(path, "");
+                filePath = filePath.replace(path, "");
                 zip.append(await app.getProvider().createReadStream(file), { name: filePath });
             }
 
