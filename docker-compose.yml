@@ -1,0 +1,18 @@
+services:
+  dicloud-storage:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./certs:/app/certs
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - dicloud-network
+
+networks:
+  dicloud-network:
+    driver: bridge
