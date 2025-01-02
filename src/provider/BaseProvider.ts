@@ -8,8 +8,6 @@ import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
 import { withResolvers } from "../helper/utils";
 
 import Log from "../Log";
-import { ENCRYPTION_OVERHEAD } from "./DiscordFileProvider";
-
 export interface IDelayedDeletionEntry {
     channel: string;
     message: string;

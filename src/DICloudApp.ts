@@ -12,7 +12,6 @@ import WebdavServer from './webdav/WebdavServer.js';
 import { Readable, Writable } from 'stream';
 import Log from './Log.js';
 
-
 export interface DICloudAppOptions extends ClientOptions {
     metaChannelName: string;
     filesChannelName: string;
@@ -60,6 +59,7 @@ export default class DICloudApp {
 
     private discordClient: Client
     private webdavServer?: WebdavServer;
+    // private app = express();
 
 
     constructor(options: DICloudAppOptions, guildId: string) {
@@ -87,7 +87,6 @@ export default class DICloudApp {
 
         this.guildId = guildId;
         this.provider = new DiscordFileProvider(this);
-
     }
 
     public shouldEncryptFiles(): boolean {
@@ -126,7 +125,7 @@ export default class DICloudApp {
         Log.info("Client authenticated...")
         await this.preload();
         await this.loadFiles();
-        Log.info("DICloud initialized, files loaded...");
+        Log.info("DICloud initialized, files loaded: ", Object.keys(this.fs.toJSON()).length);
     }
 
     /**

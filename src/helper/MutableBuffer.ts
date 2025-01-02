@@ -69,6 +69,14 @@ export class BaseMutableBuffer {
 		this._size = 0;
 	}
 
+	// recreate(size?: number, blockSize?: number) {
+	// 	this._initialSize = size ?? DEFAULT_INITIAL_SIZE;
+	// 	this._blockSize = blockSize ?? DEFAULT_BLOCK_SIZE;
+
+	// 	this._buffer = this.Buffer.allocUnsafe(this._initialSize);
+	// 	this._size = 0;
+	// }
+
 
 
 	/**

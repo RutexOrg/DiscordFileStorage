@@ -2,12 +2,26 @@ import { DirectoryJSON, Volume } from "memfs/lib/volume.js";
 import { IFile } from "./IFile.js";
 import Dirent from "memfs/lib/Dirent.js";
 
+export interface IEntry {
+    file: boolean,
+    name: string,
+}
+
 export default class VolumeEx extends Volume {
 
     public static fromJSON(json: DirectoryJSON, cwd?: string | undefined): VolumeEx {
         const vol = new VolumeEx(cwd);
         vol.fromJSON(json);
         return vol;
+    }
+
+    public pathExists(path: string): boolean {
+        try {
+            this.statSync(path);
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
     
     public getFile(path: string): IFile {
@@ -30,7 +44,7 @@ export default class VolumeEx extends Volume {
     private getFilesPathsRecursive(initial: string, paths: string[] = []) {
         const entries = this.readdirSync(initial, { withFileTypes: true });
         for (const entry of entries) {
-            const path = initial + "/" + (entry as Dirent).name;
+            const path = initial === '/' ? '/' + (entry as Dirent).name : initial + '/' + (entry as Dirent).name;
             if ((entry as Dirent).isDirectory()) {
                 this.getFilesPathsRecursive(path, paths);
             } else {
@@ -58,6 +72,17 @@ export default class VolumeEx extends Volume {
     public getTreeSizeRecursive(path: string): number {
         return this.getFilesRecursive(path).reduce((acc, file) => acc + file.size, 0);
     }
+
+    // todo: reorganize this
+    public getFilesAndFolders(path: string): IEntry[] {
+        return this.readdirSync(path, { withFileTypes: true }).map((entry) => {
+            return {
+                file: (entry as Dirent).isFile(),
+                name: (entry as Dirent).name.toString(),
+            }
+        });
+    }
+
         
     
     

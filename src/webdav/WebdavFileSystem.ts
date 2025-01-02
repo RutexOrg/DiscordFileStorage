@@ -34,23 +34,27 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _lockManager(path: v2.Path, ctx: v2.LockManagerInfo, callback: v2.ReturnCallback<v2.ILockManager>): void {
-        const key = path.toString();
-        if (!this.locks.has(key)) {
-            this.locks.set(key, new LocalLockManager());
-        }
-        return callback(undefined, this.locks.get(key));
+        return callback(undefined, this.createOrGetLockManager(path));
     }
 
     protected _propertyManager(path: v2.Path, ctx: v2.PropertyManagerInfo, callback: v2.ReturnCallback<v2.IPropertyManager>): void {
-        const key = path.toString();
-        if (key == "/.git/info/exclude"){
-            Log.info("test")
+        return callback(undefined, this.getOrCreatePropManager(path));
+    }
+
+    private createOrGetLockManager(path: v2.Path): LocalLockManager {
+        if (!this.locks.has(path.toString())) {
+            this.locks.set(path.toString(), new LocalLockManager());
         }
 
-        if (!this.properties.has(key)) {
-            this.properties.set(key, new LocalPropertyManager());
+        return this.locks.get(path.toString())!;
+    }
+
+    private getOrCreatePropManager(path: v2.Path): LocalPropertyManager {
+        if (!this.properties.has(path.toString())) {
+            this.properties.set(path.toString(), new LocalPropertyManager());
         }
-        return callback(undefined, this.properties.get(key));
+
+        return this.properties.get(path.toString())!;
     }
 
     private cleanupLocksAndProperties(path: v2.Path) {
@@ -66,6 +70,12 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     private getMimeType(rPath: string): string {
         return mime.lookup(path.parse(rPath).base) || "application/octet-stream";
     }
+
+    // private valiatePath(path: v2.Path, callback: v2.ReturnCallback<v2.Resource>): void {
+    //     if (!this.fs.existsSync(path.toString())) {
+    //         return callback(Errors.ResourceNotFound);
+    //     }
+    // }
 
 
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
@@ -112,7 +122,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
         Log.info(".mimeType", path.toString(), getContext(ctx));
-
         const stat = this.fs.statSync(path.toString());
 
         if (stat.isFile()) {

@@ -93,7 +93,7 @@ Once server started, the webdav server will be available on port 3000.
 
 Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive. 
 
-You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
+You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/dav``.
 
 # Limitations
 
@@ -113,9 +113,7 @@ For now no other solution for this, sorry.
 3. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. \
 Will do some work in the future to fix this.
 
-4. Half working encryption support. You can use it, but you have to be aware of potential security issues, since im not experienced in cryptography and i cant guarantee that it will be secure. But for now it looks like its working pretty stable.
-
-5. Not all webdav clients are working as expected. Will do some work in the future to fix this.
+4. Not all webdav clients are working as expected. Will do some work in the future to fix this.
 
 # Contributing
 
