@@ -4,9 +4,16 @@ dotenv.config();
 import fs from "node:fs";
 import root from "app-root-path";
 import { GatewayIntentBits } from "discord.js";
-import DICloudApp, { print, printAndExit } from "./src/DICloudApp.js";
+import DICloudApp from "./src/DICloudApp.js";
 import WebdavServer, { ServerOptions } from "./src/webdav/WebdavServer.js";
-import DiscordWebdavFilesystemHandler from "./src/provider/discord/WebdavDiscordFilesystemHandler.js";
+import DiscordWebdavFilesystemHandler from "./src/webdav/WebdavFileSystem.js";
+import { getEnv, checkIfFileExists, readFileSyncOrUndefined, ensureStringLength, withResolvers } from "./src/helper/utils.js";
+import Log from "./src/Log.js";
+import { v2 as webdav } from "webdav-server/"
+import express from "express";
+import { IEntry } from "./src/file/VolumeEx";
+import archiver from "archiver";
+
 
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 //Without it throws error: cause: Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: localhost. is not in the cert's altnames: DNS: ***
@@ -32,21 +39,35 @@ export interface IBootParams {
     encryptPassword: string;
     saveTimeout: number;
     saveToDisk: boolean;
-
 }
 
 export interface IBootParamsParsed extends IBootParams {
     usersParsed: IUserRecord[];
 }
 
+/**
+ * Checks if the params are correct and in correct format. Function mutates the params object. Throws error if the params are not correct.
+ * @param params - params to check
+ * @returns - parsed params. 
+ */
 function bootPrecheck(params: IBootParams): IBootParamsParsed {
-    if (params.enableEncrypt && !params.encryptPassword) {
-        printAndExit("Please set the ENCRYPT_PASSWORD to your encryption password.");
+
+    if (params.enableEncrypt) {
+        // TODO: add password check for downloading encrypted files in not encrypted server.
+        if (!params.encryptPassword) {
+            throw new Error("Please set the ENCRYPT_PASSWORD to your encryption password.");
+        }
+
+        if (params.encryptPassword.length <= 0 && params.encryptPassword.length > 32) {
+            throw new Error("ENCRYPT_PASSWORD env variable is not in correct format. Please set it to a password between 1 and 32 characters. Current length: " + params.encryptPassword.length);
+        }
+
+        params.encryptPassword = ensureStringLength(params.encryptPassword, 32);
     }
 
     // regex: key:value,key:value,...
-    if(params.enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(params.users)){
-        printAndExit("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
+    if (params.enableAuth && !(/^(?:\w+:\w+,)*\w+:\w+$/i).test(params.users)) {
+        throw new Error("USERS env variable is not in correct format. Please use format username1:password1,username2:password2");
     }
 
     const usersParsed: IUserRecord[] = params.users.split(",").map((user) => {
@@ -55,11 +76,15 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
     });
 
     if (params.enableAuth && usersParsed.length == 0) {
-        printAndExit("USERS env variable is empty. Please set at least one user.");
+        throw new Error("USERS env variable is empty. Please set at least one user.");
     }
 
-    if(params.saveTimeout < 1){
-        printAndExit("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
+    if (params.saveTimeout < 1) {
+        throw new Error("SAVE_TIMEOUT env variable is set to < 1ms. Please set it to at least 1ms.");
+    }
+
+    if (params.metaChannelName.toLowerCase() === params.filesChannelName.toLowerCase()) {
+        throw new Error("META_CHANNEL and FILES_CHANNEL env variables are set to the same value. Please set them to different values.");
     }
 
     return {
@@ -69,7 +94,7 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
 }
 
 
-export async function boot(data: IBootParams){
+export async function boot(data: IBootParams): Promise<DICloudApp> {
     console.log(`NodeJS version: ${process.version}`);
     console.log("Starting DICloud...");
     const params = bootPrecheck(data);
@@ -79,7 +104,7 @@ export async function boot(data: IBootParams){
         ],
         filesChannelName: params.filesChannelName,
         metaChannelName: params.metaChannelName,
-        
+
         shouldEncrypt: params.enableEncrypt,
         encryptPassword: params.encryptPassword,
 
@@ -87,13 +112,15 @@ export async function boot(data: IBootParams){
         saveToDisk: params.saveToDisk,
     }, params.guildId);
 
-    app.getLogger().info("Logging in...");
+    Log.info("Logging in...");
     await app.login(params.token);
     await app.init();
 
     if (params.startWebdavServer) {
+        const web = express();
+
         const serverLaunchOptions: ServerOptions = {
-            port: params.webdavPort,   
+            port: params.webdavPort,
             rootFileSystem: new DiscordWebdavFilesystemHandler(app),
         }
 
@@ -114,54 +141,241 @@ export async function boot(data: IBootParams){
 
 
         if (params.enableAuth) {
-            if(params.users.length === 0) {
-                printAndExit("Please set the USERS to your users in format username:password,username:password or add at least one user.");
+            if (params.users.length === 0) {
+                console.log("Please set the USERS to your users in format username:password,username:password or add at least one user.");
+                console.log("Adding default user: admin:admin");
+                params.usersParsed.push({ username: "admin", password: "admin" });
             }
 
             console.log("Detected AUTH env variable. Starting webdav server with auth enabled.");
-            serverLaunchOptions.enableAuth = true;
             serverLaunchOptions.users = params.usersParsed;
+
+            web.use((req, res, next) => {
+                if (!req.headers.authorization) {
+                    res.setHeader("WWW-Authenticate", 'Basic realm="DICloud Server"');
+                    res.status(401).end();
+                    return;
+                }
+
+                const auth = req.headers.authorization.split(" ")[1];
+                const [username, password] = Buffer.from(auth, "base64").toString().split(":");
+
+                const user = params.usersParsed.find((user) => user.username === username && user.password === password);
+                if (!user) {
+                    res.setHeader("WWW-Authenticate", 'Basic realm="DICloud Server"');
+                    res.status(401).end();
+                    return;
+                }
+
+                next();
+            });
         }
 
-        console.log("Starting webdav server...");
+        Log.info("Starting webdav server...");
         const webdavServer = WebdavServer.createServer(serverLaunchOptions, app);
 
-        await webdavServer.startAsync();
-        app.getLogger().info("WebDAV server started at port " + params.webdavPort + ".");
 
-        // debug
+        const relativePath = "dav";
+        web.use(express.json());
+        web.use(express.urlencoded({ extended: true }));
+        web.use(webdav.extensions.express("/" + relativePath, webdavServer));
+
+        // zip folder download, have to be first, because of the regex and priority of the routes.
+        web.get(/.*\.zip$/, async (req, res) => {
+            const path = req.path.replace(".zip", "");
+            Log.info("[Zip] Requested path:", path);
+
+            if(!app.getFs().existsSync(path)) {
+                res.status(404).send("Not found");
+                return;
+            }
+
+            const zip = archiver("zip");
+
+            const files = app.getFs().getFilesWithPathRecursive(path);
+            for (let [filePath, file] of Object.entries(files)) {
+                // replace file path with relative path, so current relative path is root of the zip
+                filePath = filePath.replace(path, "");
+                zip.append(await app.getProvider().createReadStream(file), { name: filePath });
+            }
+
+            zip.finalize();
+            res.setHeader("Content-Type", "application/zip");
+            zip.pipe(res);
+
+        });
+
+
+        // web file listings
+        web.get("/*", async (req, res) => {
+            const path = req.path;
+            Log.info("Requested path:", path);
+
+            if (!app.getFs().existsSync(path)) {
+                res.status(404).send("Not found");
+                return;
+            }
+            const files = app.getFs().getFilesAndFolders(path);
+
+            const parentPath = path.split('/').slice(0, -1).join('/') || '/';
+
+            const html = `
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>DICloud Files</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            h1 {
+                color: #2c3e50;
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #3498db;
+            }
+            .menu {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                justify-content: center;
+            }
+            .menu-item {
+                padding: 8px 16px;
+                background-color: #3498db;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+            }
+            .menu-item:hover {
+                background-color: #2980b9;
+            }
+            ul {
+                list-style: none;
+                padding: 0;
+            }
+            .file {
+                background-color: white;
+                margin: 10px 0;
+                padding: 12px 20px;
+                border-radius: 5px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                transition: transform 0.2s ease;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .file:hover {
+                transform: translateX(5px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            }
+            .file a {
+                color: #2980b9;
+                text-decoration: none;
+                font-size: 16px;
+            }
+            .file a:hover {
+                color: #3498db;
+            }
+            .zip-link {
+                color: #27ae60;
+                padding-left: 15px;
+            }
+            .back-button {
+                display: inline-block;
+                padding: 8px 16px;
+                background-color: #3498db;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                margin-bottom: 20px;
+            }
+            .back-button:hover {
+                background-color: #2980b9;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="menu">
+            <a href="/" class="menu-item">🏠 Home</a>
+            <a href="${parentPath}" class="menu-item">⬅️ Parent Directory</a>
+            <a href="${path}" class="menu-item">🔄 Refresh</a>
+            ${path !== '/' ? `<a href="${path}.zip" class="menu-item">📥 Download Directory</a>` : ''}
+        </div>
+        <h1>DICloud Files</h1>
+        <ul>
+            ${files.map((file: IEntry) => {
+                const currentPath = path === '/' ? '' : path;
+                const filePath = file.file 
+                    ? `/${relativePath}${currentPath}/${file.name}`
+                    : `${currentPath}/${file.name}`;
+                const zipPath = !file.file ? `${currentPath}/${file.name}.zip` : null;
+                return `
+                    <li class="file">
+                        <a href="${filePath}">
+                            ${file.file ? '' : '📁 '}${file.name}
+                        </a>
+                        ${zipPath ? `<a href="${zipPath}" class="zip-link">📥 Download ZIP</a>` : ''}
+                    </li>
+                `;
+            }).join("")}
+        </ul>
+    </body>
+</html>`;
+            res.send(html);
+        });
+
+        await new Promise<void>((resolve, reject) => {
+            web.listen(params.webdavPort, () => {
+                Log.info("WebDAV server started at port", params.webdavPort);
+                resolve();
+            }).on('error', (err) => {
+                reject(err);
+            });
+        });
+
+        // debug logging for requests and responses
         webdavServer.beforeRequest((arg, next) => {
-            app.getLogger().info(">>>> ["+arg.request.socket.remoteAddress+"] > "+arg.request.method + ", " + arg.request.url);
+            Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > " + arg.request.method + ", " + arg.request.url);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            app.getLogger().info("<<<< ["+arg.request.socket.remoteAddress+"] >", "(" + arg.response.statusCode + ") " + arg.responseBody );
+            Log.info("[S] OUT [" + arg.request.socket.remoteAddress + "] >", "(" + arg.response.statusCode + ") " + arg.responseBody);
             next();
         });
+
+        app.setWebdavServer(webdavServer);
+        Log.info("Looks like everything is ready.");
+
     }
 
-    return app;
+    return app
 }
 
 export async function envBoot() {
-    const token = checkEnvVariableIsSet("TOKEN", "Please set the TOKEN to your bot token");
-    const guildId = checkEnvVariableIsSet("GUILD_ID", "Please set the GUILD_ID to your guild id");
-    const filesChannelName = checkEnvVariableIsSet("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name", "string", "files");
-    const metaChannelName = checkEnvVariableIsSet("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name", "string", "meta");
+    const token = getEnv("TOKEN", "Please set the TOKEN to your bot token");
+    const guildId = getEnv("GUILD_ID", "Please set the GUILD_ID to your guild id");
+    const filesChannelName = getEnv("FILES_CHANNEL", "Please set the FILES_CHANNEL to your files channel name", "string", "files");
+    const metaChannelName = getEnv("META_CHANNEL", "Please set the META_CHANNEL to your meta channel name", "string", "meta");
 
-    const webdavPort = checkEnvVariableIsSet("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
+    const webdavPort = getEnv("PORT", "Please set the PORT to your webdav server port", "number", 3000) as number;
 
-    const enableHttps = checkEnvVariableIsSet("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
+    const enableHttps = getEnv("ENABLE_HTTPS", "Please set the ENABLE_HTTPS to true or false to enable https", "boolean", false) as boolean;
 
-    const enableAuth = checkEnvVariableIsSet("AUTH", "Please set the AUTH to true or false to enable auth", "boolean", false) as boolean;
-    const users = checkEnvVariableIsSet("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
-    
-    const enableEncrypt = checkEnvVariableIsSet("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption", "boolean", false) as boolean;
-    const encryptPassword = checkEnvVariableIsSet("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password", "string", "") as string;
+    const enableAuth = getEnv("AUTH", "Please set the AUTH to true or false to enable auth", "boolean", false) as boolean;
+    const users = getEnv("USERS", "Please set the USERS to your users in format username:password,username:password", "string", "") as string;
 
-    const saveTimeout = checkEnvVariableIsSet("SAVE_TIMEOUT", "Please set the SAVE_TIMEOUT to your save timeout in ms", "number", 2000) as number;
-    const saveToDisk = checkEnvVariableIsSet("SAVE_TO_DISK", "Please set the SAVE_TO_DISK to true or false to enable saving to disk", "boolean", false) as boolean;
+    const enableEncrypt = getEnv("ENCRYPT", "Please set the ENCRYPT to true or false to enable encryption", "boolean", false) as boolean;
+    const encryptPassword = getEnv("ENCRYPT_PASS", "Please set the ENCRYPT_PASSWORD to your encryption password", "string", "") as string;
+
+    const saveTimeout = getEnv("SAVE_TIMEOUT", "Please set the SAVE_TIMEOUT to your save timeout in ms", "number", 2000) as number;
+    const saveToDisk = getEnv("SAVE_TO_DISK", "Please set the SAVE_TO_DISK to true or false to enable saving to disk", "boolean", false) as boolean;
 
     return await boot({
         token,
@@ -169,7 +383,6 @@ export async function envBoot() {
         filesChannelName,
         metaChannelName,
         webdavPort,
-        startWebdavServer: true,
         enableHttps,
         enableAuth,
         users: users,
@@ -177,81 +390,22 @@ export async function envBoot() {
         encryptPassword,
         saveTimeout,
         saveToDisk,
+        startWebdavServer: true,
     })
 
-    
 }
 
 
-export function checkIfFileExists(path: string, soft: boolean, assertString: string = ""): boolean {
-    try {
-        if (!fs.statSync(path).isFile()) {
-            const string = "File " + path + " is not found" + (assertString.length > 0 ? ": " + assertString : "");
-            if (!soft) {
-                throw new Error(string);
-            }
-            console.warn(string);
-            return false;
-        }
-    } catch (e) {
-        return false;
-    }
-    return true;
+if (require.main === module) {
+    process.on("uncaughtException", (err) => {
+        console.log("Uncaught exception");
+        console.trace(err)
+        // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
+    });
+
+    process.on("unhandledRejection", (reason, promise) => {
+        console.trace(reason);
+    });
+
+    envBoot();
 }
-
-export function checkEnvVariableIsSet(name: string, assertString: string, type: "string" | "number" | "boolean" = "string", defaultValue?: any): any {
-    const value = process.env[name]!;
-    if (!value) {
-        if (defaultValue !== undefined) {
-            print("Env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Using default value: " + (defaultValue === "" ? "N/A" : defaultValue));
-            return defaultValue;
-        }
-        printAndExit("Required env variable " + name + " is not set" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-    };
-
-    const valueLower = value.toLowerCase();
-
-    if (type == "boolean") {
-        if (valueLower === "true") {
-            return true;
-        } else if (valueLower === "false") {
-            return false;
-        } else {
-            printAndExit("Env variable " + name + " is not set to true or false" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-        }
-    }
-
-    if (type == "number") {
-        const number = parseInt(value!);
-        if (isNaN(number)) {
-            printAndExit("Env variable " + name + " is not set to number" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-        }
-        return number;
-    }
-
-    if(type == "string" && value.length == 0){
-        printAndExit("Env variable " + name + " is empty" + (assertString.length > 0 ? ": " + assertString : "") + ". Please set it in .env file or in your system environment variables.");
-    }
-
-    return value;
-}
-
-export function readFileSyncOrUndefined(path: string): string | undefined {
-    try {
-        let file = fs.readFileSync(path);
-        return file.toString();
-    } catch (error) {
-        return undefined;
-    }
-}
-
-
-process.on("uncaughtException", (err) => {
-    console.log("Uncaught exception");
-    console.trace(err)
-    // printAndExit("Uncaught exception, to prevent data loss, the app will be closed.");
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-    console.trace(reason);
-});

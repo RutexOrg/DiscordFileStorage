@@ -3,46 +3,41 @@
   "version": "2.2.0",
   "main": "out/boot.js",
   "license": "MIT",
-  "type": "module",
   "dependencies": {
+    "@noble/ciphers": "^1.0.0",
     "@ungap/structured-clone": "^1.2.0",
     "app-root-path": "^3.1.0",
+    "archiver": "^7.0.1",
     "axios": "^1.3.6",
-    "axios-retry": "^3.4.0",
+    "axios-retry": "^4.5.0",
     "discord.js": "^14.9.0",
     "dotenv": "^16.0.3",
+    "express": "^4.21.2",
     "memfs": "^4.2.0",
-    "mime-types": "^2.1.35",
+    "mime-types": "^3.0.0",
     "object-hash": "^3.0.0",
-    "webdav-server": "^2.6.2",
-    "winston": "^3.8.2"
+    "webdav-server": "^2.6.2"
   },
   "engines": {
     "node": ">=16",
     "yarn": ">=1.22.0"
   },
   "scripts": {
-    "start": "node --no-warnings out/boot.js",
-    "boot": "tsc && node --no-warnings out/boot.js",
-    "build": "tsc",
-    "test": "yarn build && mocha --no-warnings out/tests/",
-    "test:vfs": "yarn build && mocha --no-warnings out/tests/vfs.test",
-    "test:webdav": "yarn build && mocha --no-warnings out/tests/webdav.test",
+    "start": "node --no-warnings out/bootloader.js",
+    "boot": "tsc -p tsconfig.json && node --no-warnings out/bootloader.js",
+    "build": "tsc -p tsconfig.json",
+    "test": "yarn build && node --no-warnings out/tests/raw.spec.js",
     "del": "del /s /q out"
   },
   "devDependencies": {
-    "@types/chai": "^4.3.4",
+    "@types/archiver": "^6.0.3",
+    "@types/express": "^5.0.0",
     "@types/mime-types": "^2.1.1",
-    "@types/mocha": "^10.0.1",
     "@types/node": "^18.16.1",
     "@types/object-hash": "^3.0.3",
-    "@types/sinon": "^10.0.14",
     "@types/ungap__structured-clone": "^0.3.0",
-    "chai": "^4.3.7",
-    "mocha": "^10.2.0",
-    "sinon": "^15.0.4",
     "typescript": "^5.0.4",
-    "webdav": "^5.0.0-r3",
+    "uvu": "^0.5.6",
     "yarn-upgrade-all": "^0.7.2"
   }
 }

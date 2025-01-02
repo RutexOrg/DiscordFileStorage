@@ -64,10 +64,18 @@ export class BaseMutableBuffer {
 		this._size = 0;
 	}
 
-	destory() {
+	destroy() {
 		this._buffer = this.Buffer.allocUnsafe(0);
 		this._size = 0;
 	}
+
+	// recreate(size?: number, blockSize?: number) {
+	// 	this._initialSize = size ?? DEFAULT_INITIAL_SIZE;
+	// 	this._blockSize = blockSize ?? DEFAULT_BLOCK_SIZE;
+
+	// 	this._buffer = this.Buffer.allocUnsafe(this._initialSize);
+	// 	this._size = 0;
+	// }
 
 
 
@@ -84,12 +92,18 @@ export class BaseMutableBuffer {
 			this._buffer.copy(answer, 0, 0, this._size);
 			return answer;
 		}
-		return this._buffer.slice(0, this._size);
+		return this._buffer.subarray(0, this._size);
 	}
 
 	flush(targetOrCreate?: Buffer | boolean) {
 		const result = this.render(targetOrCreate);
 		this.clear();
+		return result;
+	}
+
+	flushAndDestory(): Buffer {
+		const result = this.flush(true);
+		this.destroy();
 		return result;
 	}
 
@@ -284,7 +298,7 @@ export class BaseMutableBuffer {
 			return this.size;
 		}
 
-		this._buffer = this._buffer.slice(begin, end);
+		this._buffer = this._buffer.subarray(begin, end);
 		this._size = end - begin;
 		return this.size;
 	}
@@ -296,7 +310,7 @@ export class BaseMutableBuffer {
 
 		for (let i = 0; i < this.size; i++) {
 			if (this._buffer[i]) {
-				this._buffer = this._buffer.slice(i);
+				this._buffer = this._buffer.subarray(i);
 				this._size = this.size - i;
 				return this.size;
 			}
@@ -314,7 +328,7 @@ export class BaseMutableBuffer {
 
 		for (let i = this.size; i > 0; i--) {
 			if (this._buffer[i - 1]) {
-				this._buffer = this._buffer.slice(0, i);
+				this._buffer = this._buffer.subarray(0, i);
 				this._size = i;
 				return this.size;
 			}

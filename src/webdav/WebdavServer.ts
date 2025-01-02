@@ -1,8 +1,6 @@
-import { HTTPCodes, v2 as webdav } from "webdav-server";
+import { v2 as webdav } from "webdav-server";
 import { Server, IncomingMessage, ServerResponse } from "http";
-import { HTTPMethod } from "webdav-server/lib/index.v2";
 import DICloudApp from "../DICloudApp";
-
 export interface IUserData {
     username: string;
     password: string;

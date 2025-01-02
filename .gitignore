@@ -1,17 +1,15 @@
 node_modules/
 out/
 .*env*
-log.txt
 certs/
-runner.ts
 yarn-error.log
-tmp*
-testfile-downloaded.txt
 logs/
+
 .local
+
 .space
 Spacefile
+index.js
 
-
-dataloader.js
-data.json
+test.ts
+.vscode

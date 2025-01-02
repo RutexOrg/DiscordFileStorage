@@ -1,4 +1,4 @@
-## Table of Contents
+## Contents
 - [DICloud](#dicloud)
 - [State and details](#state-and-details)
 - [How to setup and play with this](#how-to-setup-and-play-with-this)
@@ -10,13 +10,16 @@
    - [Authorization](#authorization)
 - [Last steps](#last-steps)
 - [Known issues](#known-issues)
+- [Limitations](#limitations)
+- [Contributing](#contributing)
+- [Disclaimer](#disclaimer)
 ---
 
 
 # DICloud
-File manager that allows you to upload and download files to and from Discord and manage them in a windows explorer. 
+File manager that allows you to upload and download files to and from Discord and manage them in various file managers via webdav protocol. 
 
-Yes, even ***above 25MB***. Currently tested limit for a single file is about 750MB (+/- 50MB) and 9 GB in multifile mode.
+Yes, even ***above 10MB***. Currently tested about 750MB for a single file and 9 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
@@ -28,7 +31,7 @@ Not even alpha. **Created for fun and ONLY for fun**. Dont use it as important s
 Please look at the [Known issues](#known-issues) section for more information.
 
 
-Has been tested __MAINLY__ on Windows 10 and on some third party webdav clients, like OwlFiles, WinSCP, dolphin. 
+Has been tested __MAINLY__ on Windows 10 and on some third party webdav clients: OwlFiles (Android), WinSCP (Windows), dolphin (Linux). 
 
 
 # How to setup and play with this
@@ -69,7 +72,7 @@ If you want to use SSL, you have to generate a certificate. You can use [this](h
 
 ## Encryption
 
-Files in discord are not encrypted. Because of this, the server supports encryption via __chacha20__ algorithm. 
+Files in discord are not encrypted. Because of this, the server supports encryption via __AES256-GCM__ algorithm. 
 To enable encryption:
 1. Set ``ENCRYPT`` to ``true`` in ``.env`` file.
 2. set ``ENCRYPT_PASS`` to your password. This password will be used to encrypt and decrypt files. \
@@ -88,9 +91,13 @@ Then add your username and password to ``.env`` file. Set ``USERS`` to ``usernam
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
-Windows explorer will support webdav out of the box. You can now [add network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive.
+Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive. 
 
-You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/``.
+You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/dav``.
+
+# Limitations
+
+Does not suitable for low memory devices. Uploading and downloading uing in-memory buffer, so it can consume memory.
 
 # Known issues
 
@@ -106,6 +113,15 @@ For now no other solution for this, sorry.
 3. Half-working SSL support. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some problems which i dont know how to fix for the moment. But if you dont care much about targeted intercetion of your data, you can use it. \
 Will do some work in the future to fix this.
 
-4. Half working encryption support. You can use it, but you have to be aware of potential security issues, since im not experienced in cryptography and i cant guarantee that it will be secure. But for now it looks like its working pretty stable.
+4. Not all webdav clients are working as expected. Will do some work in the future to fix this.
 
-5. Not all webdav clients are working as expected. Will do some work in the future to fix this.
+# Contributing
+
+Just create a issue or pull request. I will be happy to see any feedback or help.
+
+# Disclaimer
+I am not responsible for any consequences, data loss, damage, law violations or any other issues that may arise from using this software.
+
+The software (probably) violates Discord's terms of service, so use it at your own risk.
+
+USE IT AT YOUR OWN RISK.
