@@ -91,9 +91,8 @@ Then add your username and password to ``.env`` file. Set ``USERS`` to ``usernam
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
-Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to localhost:3000 and use DICloud as a regular drive. 
-
-You can also open the webdav server in your **explorer directly**. Just go to ``http://localhost:3000/dav``.
+Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to http://localhost:3000/dav and use DICloud as a regular drive. 
+Or, just use any client you want.
 
 # Limitations
 
