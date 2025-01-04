@@ -91,3 +91,12 @@ export function withResolvers() {
     });
     return { promise, resolve, reject };
 }
+
+
+export function splitBufferBy(buffer: Buffer, size: number): Buffer[] {
+    const chunks = [];
+    for (let i = 0; i < buffer.length; i += size) {
+        chunks.push(buffer.slice(i, i + size));
+    }
+    return chunks;
+}

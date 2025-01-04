@@ -4,7 +4,7 @@ import HttpStreamPool from '../HttpStreamPool.js';
 
 import { AttachmentBuilder, TextChannel } from "discord.js";
 import { Writable, Readable, PassThrough } from "stream";
-import { truncate } from "../helper/utils.js";
+import { splitBufferBy, truncate } from "../helper/utils.js";
 import { IFile } from "../file/IFile.js";
 
 import Log from "../Log.js";
@@ -60,28 +60,33 @@ export default class DiscordFileProvider extends BaseProvider {
         
         const channel = this.client.getFilesChannel();
         let chunkId = 1;
-        let currentChunk = new MutableBuffer();
+        let chunkBuffer = new MutableBuffer();
         let totalFileSize = 0;
 
         const uploadStream = new Writable({
-            highWaterMark: 16 * 1024,
-            write: async (chunk: Buffer, encoding: BufferEncoding, callback) => {
-                totalFileSize += chunk.length;
-                currentChunk.write(chunk, encoding);
-                if (currentChunk.size > MAX_CHUNK_SIZE) {
-                    await this.uploadChunkToDiscord(currentChunk, chunkId, channel, file);
-                    chunkId++;
-                    
-                    currentChunk.destroy();
-                    currentChunk = new MutableBuffer();
+            write: async (chunk_: Buffer, encoding: BufferEncoding, callback) => {
+                for (const chunk of splitBufferBy(chunk_, MAX_CHUNK_SIZE)) {  // in case the chunk is too big
+                    if(chunkBuffer.size + chunk.length > MAX_CHUNK_SIZE) {
+                        const left = MAX_CHUNK_SIZE - chunkBuffer.size;
+                        const slice = chunk.slice(0, left);
+                        chunkBuffer.write(slice, encoding);
+                        await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
+                        chunkBuffer.destroy();
+                        chunkBuffer = new MutableBuffer();
+                        chunkBuffer.write(chunk.slice(left), encoding);
+                        chunkId++;
+                    } else {
+                        chunkBuffer.write(chunk);
+                    }
+                    totalFileSize += chunk.length;
                 }
                 callback();
             },
             final: async (callback) => {
                 Log.info("[DiscordProvider] final() Finalizing upload.");
-                if (currentChunk.size > 0) {
-                    await this.uploadChunkToDiscord(currentChunk, chunkId, channel, file);
-                    currentChunk.destroy();
+                if (chunkBuffer.size > 0) {
+                    await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
+                    chunkBuffer.destroy();
                 }
                 file.size = totalFileSize;
                 callback();
