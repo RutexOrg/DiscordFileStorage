@@ -13,7 +13,7 @@ import MutableBuffer from "../helper/MutableBuffer.js";
 export const MAX_MB_CHUNK_SIZE = 10; // megabytes chunk size. Discord allows 10MB per file.
 export const ENCRYPTION_OVERHEAD = 16; // 16 bytes for encryption metadata
 
-export const MAX_CHUNK_SIZE = (MAX_MB_CHUNK_SIZE * 1000 * 1000) - ENCRYPTION_OVERHEAD;
+export const MAX_CHUNK_SIZE = (MAX_MB_CHUNK_SIZE * 1000 * 1000);
 
 export default class DiscordFileProvider extends BaseProvider {
     
@@ -89,7 +89,7 @@ export default class DiscordFileProvider extends BaseProvider {
             },
             final: async (callback) => {
                 try {
-                    Log.info("[DiscordProvider] final() Finalizing upload.");
+                    Log.info("["+ file.name+"] final() Finalizing upload.");
                     if (chunkBuffer.size > 0) {
                         await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
                         chunkBuffer.destroy();
@@ -100,6 +100,9 @@ export default class DiscordFileProvider extends BaseProvider {
                     console.error(error);
                     callback(error as Error);
                 }
+
+                Log.info("["+ file.name+"] final() Finalized upload:");
+                console.dir(file);
             }
         });
     
@@ -126,13 +129,5 @@ export default class DiscordFileProvider extends BaseProvider {
             Log.error(e);
             Log.error("Failed to delete message: " + info.message + " in channel: " + info.channel);
         }
-    }
-
-    calculateProviderMaxSize(): number {
-        return MAX_CHUNK_SIZE;
-    }
-
-    calculateSavedFileSize(): number {
-        return MAX_CHUNK_SIZE + ENCRYPTION_OVERHEAD;
     }
 }

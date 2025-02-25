@@ -13,3 +13,4 @@ index.js
 
 test.ts
 .vscode
+ignore/*

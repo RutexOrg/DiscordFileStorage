@@ -79,7 +79,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
 
     protected _size(path: v2.Path, ctx: v2.SizeInfo, callback: v2.ReturnCallback<number>): void {
-        Log.info(".size", path.toString(), getContext(ctx));
+        // Log.info(".size", path.toString(), getContext(ctx));
 
         const stat = this.fs.statSync(path.toString());
 
@@ -87,7 +87,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
             const file = this.fs.getFile(path.toString());
 
             if(file.encrypted){
-                return callback(undefined, file.size - (ENCRYPTION_OVERHEAD * file.chunks.length)); // -16 bytes for each chunk for encryption metadata. client side will wait for full file, so if we provide size with metadata, which exists only on the server, the client will wait for the metadata to be downloaded which will never happen.
+                return callback(undefined, file.size - ENCRYPTION_OVERHEAD); // -16 bytes for each chunk for encryption metadata. client side will wait for full file, so if we provide size with metadata, which exists only on the server, the client will wait for the metadata to be downloaded which will never happen.
             }
             return callback(undefined, file.size);
         }
@@ -95,7 +95,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _readDir(path: v2.Path, ctx: v2.ReadDirInfo, callback: v2.ReturnCallback<string[] | v2.Path[]>): void {
-        Log.info(".readDir", path.toString(), getContext(ctx));
+        // Log.info(".readDir", path.toString(), getContext(ctx));
 
         const stat = this.fs.statSync(path.toString());
 
@@ -121,7 +121,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _mimeType(path: v2.Path, ctx: v2.MimeTypeInfo, callback: v2.ReturnCallback<string>): void {
-        Log.info(".mimeType", path.toString(), getContext(ctx));
+        // Log.info(".mimeType", path.toString(), getContext(ctx));
         const stat = this.fs.statSync(path.toString());
 
         if (stat.isFile()) {
@@ -137,6 +137,10 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         return callback(this.fs.existsSync(path.toString()));
     }
 
+    private createFile(path: v2.Path, size: number = 0): void {
+        this.fs.setFile(path.toString(), createVFile(path.fileName(), size, this.client.shouldEncryptFiles()));
+    }
+
     _create(path: v2.Path, ctx: v2.CreateInfo, callback: v2.SimpleCallback): void {
         Log.info(".create", path.toString(), getContext(ctx));
 
@@ -145,7 +149,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         }
 
         if (ctx.type.isFile) {
-            this.fs.setFile(path.toString(), createVFile(path.fileName(), 0, this.client.shouldEncryptFiles()));
+            this.createFile(path);
         }
 
         this.client.markForUpload();
@@ -176,9 +180,36 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
 
+    private getDummyWriteStream(): Writable {
+        return new Writable({
+            write(chunk, encoding, callback) {
+                console.log("[DEBUG] Write stream is empty. Writing to nowhere.");
+                callback();
+            }
+        });
+    }
+    
+
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         const { targetSource, estimatedSize, mode } = ctx;
         Log.info(".openWriteStream", targetSource, estimatedSize, mode);
+
+        if (mode === "mustCreate") {
+            const stat = this.fs.statSync(path.toString());
+
+            console.log("[DEBUG, " + path.toString() + "] Must create file.");
+            console.log("[DEBUG, " + path.toString() + "] File exists: " + stat.isFile());
+            console.log("[DEBUG, " + path.toString() + "] Directory exists: " + stat.isDirectory());
+
+            if(!stat.isFile()){
+                this.createFile(path, estimatedSize);
+                this.client.markForUpload();
+            } else {
+                console.error("[DEBUG] File already exists: " + path.toString());
+                return callback(undefined, this.getDummyWriteStream());
+            }
+   
+        }
 
         const stat = this.fs.statSync(path.toString());
 
@@ -196,15 +227,15 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         
         file.chunks = [];
         file.modified = new Date();
-        this.fs.setFile(path.toString(), file);
+        this.fs.setFile(path, file);
         this.client.markForUpload();
 
-
         const writeStream = await this.client.getProvider().createWriteStream(file);
-
+        
         writeStream.on("finish", () => {
             Log.info(".openWriteStream", "Stream finished: " + path.toString());
-            this.fs.setFile(path.toString(), file);
+            console.dir(file);
+            this.fs.setFile(path, file);
             this.client.markForUpload();
         });
 
@@ -284,7 +315,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
 
             writeStream.on("finish", () => {
                 Log.info(".copy", "Stream finished: " + pathTo.toString());
-                this.fs.setFile(pathTo.toString(), newFile);
+                this.fs.setFile(pathTo, newFile);
                 
                 this.locks.set(pathTo.toString(), new LocalLockManager());
                 const oldProps = this.properties.get(pathFrom.toString());
@@ -396,7 +427,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     }
 
     protected _lastModifiedDate(path: v2.Path, ctx: v2.LastModifiedDateInfo, callback: v2.ReturnCallback<number>): void {
-        Log.info(".lastModifiedDate", path.toString(), getContext(ctx));
+        // Log.info(".lastModifiedDate", path.toString(), getContext(ctx));
 
         if (this.fs.statSync(path.toString()).isDirectory()) {
             return callback(undefined, new Date().getTime());

@@ -1,6 +1,7 @@
 import { DirectoryJSON, Volume } from "memfs/lib/volume.js";
 import { IFile } from "./IFile.js";
 import Dirent from "memfs/lib/Dirent.js";
+import { v2 } from "webdav-server";
 
 export interface IEntry {
     file: boolean,
@@ -29,15 +30,20 @@ export default class VolumeEx extends Volume {
             if (k === "created" || k === "modified") {
                 return new Date(v);
             }
-            if (k === "iv") {
-                return new Uint8Array(Object.values(v));
+
+            if (k === "iv") { // iv = buffer
+                return Buffer.from(v.data);
             }
 
             return v;
         }) as IFile;
     }
 
-    public setFile(path: string, file: IFile) {
+    public setFile(path: string | v2.Path, file: IFile) {
+        if (typeof path !== "string"){
+            path = path.toString();
+        }
+        
         this.writeFileSync(path, JSON.stringify(file));
     }
 

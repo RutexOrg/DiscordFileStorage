@@ -2,12 +2,15 @@ import DICloudApp from "../DICloudApp";
 import MutableBuffer from "../helper/MutableBuffer";
 
 import { createVFile, IFile } from "../file/IFile";
-import { PassThrough, pipeline, Readable, Transform, Writable } from "stream";
-import { gcm } from '@noble/ciphers/aes';
-import { Cipher, utf8ToBytes } from '@noble/ciphers/utils';
+import { PassThrough, Readable, Transform, Writable, pipeline } from "stream";
 import { withResolvers } from "../helper/utils";
 
+import { scryptSync, randomFill, createCipheriv, createDecipheriv, CipherCCM, Cipher } from 'node:crypto';
+
+
+
 import Log from "../Log";
+import { patchEmitter } from "../helper/EventPatcher";
 export interface IDelayedDeletionEntry {
     channel: string;
     message: string;
@@ -34,122 +37,112 @@ export default abstract class BaseProvider {
         return this.fileDeletionQueue;
     }
 
+    private getAlgorithm(): string {
+        return "aes-256-gcm";
+    }
 
-    private createCipher(iv: Uint8Array): Cipher {
-        const key = utf8ToBytes(this.client.getEncryptPassword());
-        return gcm(key, iv);
+    private createCipher(iv: Buffer): Cipher {
+        const password = this.client.getEncryptPassword();
+        const key = scryptSync(password, Buffer.alloc(16), 32);
+        return createCipheriv(this.getAlgorithm(), key, iv);
+    }
+
+    private createDecipher(iv: Buffer): Cipher {
+        const password = this.client.getEncryptPassword();
+        const key = scryptSync(password, Buffer.alloc(16), 32);
+        return createDecipheriv(this.getAlgorithm(), key, iv);
     }
 
     private async createReadStreamWithDecryption(file: IFile): Promise<Readable> {
-        const readStream = await this.createRawReadStream(file);
-        const decipher = this.createCipher(file.iv);
-        const decryptedRead = new PassThrough();
-
-        const encryptedChunkSize = this.calculateSavedFileSize();
-        const buffer = new MutableBuffer(encryptedChunkSize);
-
-
-        readStream.on("data", (chunk) => {
-            try {
-                const left = encryptedChunkSize - buffer.size;
-
-                if (chunk.length <= left) {
-                    buffer.write(chunk);
-                } else {
-                    buffer.write(chunk.subarray(0, left));
-                    const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
-                    const writeSuccess = decryptedRead.write(decrypted);
-                    if (!writeSuccess) {
-                        readStream.pause();
+        try {
+            const decipher = this.createDecipher(file.iv);
+            const stream = await this.createRawReadStream(file);
+            
+            const transform = new Transform({
+                transform(chunk: Buffer, encoding, callback) {
+                    // last chunk
+                    if (chunk.length <= 16) {
+                        this.push(null);
+                        callback();
+                        return;
                     }
-                    buffer.clear();
-                    buffer.write(chunk.subarray(left));
-                }
-            } catch (err) {
-                decryptedRead.destroy(err instanceof Error ? err : new Error(String(err)));
-                buffer.destroy();
-            }
-        });
 
-        readStream.on("end", () => {
-            try {
-                if (buffer.size > 0) {
-                    const decrypted = decipher.decrypt(buffer.cloneNativeBuffer());
-                    decryptedRead.write(decrypted);
-                }
-                buffer.destroy();
-                decryptedRead.end();
-            } catch (err) {
-                decryptedRead.destroy(err instanceof Error ? err : new Error(String(err)));
-                buffer.destroy();
-            }
-        });
+                    this.push(decipher.update(chunk));
+                    callback();
+                },
 
-        decryptedRead.on("drain", () => {
-            readStream.resume();
-        });
+                flush(callback) {
+                    try {
+                        const lastChunk = this.read();
+                        if (!lastChunk) {
+                            throw new Error('No auth tag found');
+                        }
 
-        readStream.on("error", (err) => {
-            decryptedRead.destroy(err);
-            buffer.destroy();
-        });
+                        const authTag = lastChunk.subarray(-16);
+                        const remainingData = lastChunk.subarray(0, lastChunk.length - 16);
 
-        decryptedRead.on("error", (err) => {
-            readStream.destroy(err);
-            buffer.destroy();
-        });
+                        (decipher as any).setAuthTag(authTag);
+                        
+                        if (remainingData.length > 0) {
+                            this.push(decipher.update(remainingData));
+                        }
+                        this.push(decipher.final());
+                        callback();
+                    } catch (err) {
+                        callback(err as Error);
+                    }
+                },
+                highWaterMark: 64 * 1024
+            });
 
-        return decryptedRead;
+            return pipeline(stream, transform, (err) => {
+                if (err) transform.destroy(err);
+            });
+
+        } catch (err) {
+            throw err;
+        }
     }
 
-
     private async createWriteStreamWithEncryption(file: IFile): Promise<Writable> {
-        const rawWriteStream = await this.createRawWriteStream(file);
-        const cipher = this.createCipher(file.iv);
-        const writeStreamAwaiter = withResolvers();
+        try {
+            const cipher = this.createCipher(file.iv);
+            const stream = await this.createRawWriteStream(file);
+            
+            const wt = new Writable({
+                write: (chunk, encoding, callback) => {
+                    try {
+                        const encrypted = cipher.update(chunk);
+                        if (encrypted.length) {
+                            stream.write(encrypted, callback);
+                        } else {
+                            callback();
+                        }
+                    } catch (err: any) {
+                        callback(err);
+                    }
+                },
+                final: (callback) => {
+                    try {
+                        const final = cipher.final();
+                        if (final.length) {
+                            stream.write(final);
+                        }
+                        const authTag = (cipher as any).getAuthTag();
+                        stream.write(authTag);
+                        stream.end(callback);
+                    } catch (err: any) {
+                        callback(err);
+                    }
+                },
+                highWaterMark: 64 * 1024
+            });
 
-        let buffer = new MutableBuffer(this.calculateProviderMaxSize());
+            return wt;
 
-        rawWriteStream.on("finish", () => {
-            writeStreamAwaiter.resolve();
-        });
-
-        rawWriteStream.on("error", (err) => {
-            writeStreamAwaiter.reject(err);
-            buffer.destroy();
-        });
-
-        return new Writable({
-            write: async (chunk: Buffer, encoding, callback) => {
-                const left = this.calculateProviderMaxSize() - buffer.size;
-                if (chunk.length <= left) {
-                    buffer.write(chunk, encoding);
-                } else {
-                    buffer.write(chunk.subarray(0, left), encoding);
-                    const f = buffer.flush();
-                    const e = cipher.encrypt(f);
-                    rawWriteStream.write(e);
-                    buffer.clear();
-                    buffer.write(chunk.subarray(left), encoding);
-                }
-                callback();
-            },
-            final: async (callback) => {
-                Log.info("[BaseProvider] final() Finalizing upload.");
-                if (buffer.size > 0) {
-                    rawWriteStream.write(cipher.encrypt(buffer.flushAndDestory()));
-                }
-                rawWriteStream.end();
-                await writeStreamAwaiter.promise; // we have to wait for rawWriteStream to finish, otherwise client will close connection too early thinking that upload is finished
-                callback();
-            },
-            destroy: (err, callback) => {
-                Log.info("[BaseProvider] destroy() Destroying write stream (error: " + err + ")");
-                buffer.destroy();
-                callback(err);
-            }
-        });
-
+        } catch (err) {
+            throw err;
+        }
     }
 
 
@@ -170,13 +163,6 @@ export default abstract class BaseProvider {
      * @param callbacks  - Callbacks for write stream.
      */
     public abstract createRawWriteStream(file: IFile): Promise<Writable>;
-
-
-    /**
-     * Custom provider should implement this method to provide max file size.
-     */
-    abstract calculateProviderMaxSize(): number;
-    abstract calculateSavedFileSize(): number;
 
 
     /* ----------------------------------------------------------------------------------------- */

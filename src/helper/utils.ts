@@ -82,10 +82,10 @@ export function ensureStringLength(str: string, requiredLength: number, fillWith
 }
 
 
-export function withResolvers() {
-    let resolve: any;
-    let reject: any;
-    const promise = new Promise((res, rej) => {
+export function withResolvers<T = void>() {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: any) => void; 
+    const promise = new Promise<T>((res, rej) => {
         resolve = res;
         reject = rej;
     });

@@ -1,5 +1,6 @@
-import dotenv from "dotenv";
-dotenv.config();
+// @ts-nocheck
+import { env }from "custom-env";
+env();
 
 import fs from "node:fs";
 import root from "app-root-path";
@@ -342,12 +343,12 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         // debug logging for requests and responses
         webdavServer.beforeRequest((arg, next) => {
             Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > " + arg.request.method + ", " + arg.request.url);
-            Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > Headers:", arg.request.headers);
+            // Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > Headers:", arg.request.headers);
             next();
         });
 
         webdavServer.afterRequest((arg, next) => {
-            Log.info("[S] OUT [" + arg.request.socket.remoteAddress + "] >", "(" + arg.response.statusCode + ") " + arg.responseBody);
+            // Log.info("[S] OUT [" + arg.request.socket.remoteAddress + "] >", "(" + arg.response.statusCode + ") " + arg.responseBody);
             next();
         });
 

@@ -4,7 +4,7 @@ import Log from "../Log";
  * Debugging helper to log all events emitted by the given emitter without having to manually add a listener for each event.
  * @param emitter The emitter to patch.
  */
-export const patchEmitter = (emitter: any, label: string, ignoredEvents: RegExp[] = []) => {
+export const patchEmitter = (emitter: any, label: string = "emitter", ignoredEvents: RegExp[] = []) => {
 	const oldEmit = emitter.emit;
 
 	emitter.emit = function () {
