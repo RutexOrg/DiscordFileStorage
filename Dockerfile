@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json yarn.lock tsconfig.json ./
 COPY src ./src
 COPY out ./out
-COPY .env ./
+COPY .env.example ./
 
 RUN yarn install --frozen-lockfile
 RUN yarn build

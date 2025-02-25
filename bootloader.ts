@@ -342,6 +342,7 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
         // debug logging for requests and responses
         webdavServer.beforeRequest((arg, next) => {
             Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > " + arg.request.method + ", " + arg.request.url);
+            Log.info("[S] IN [" + arg.request.socket.remoteAddress + "] > Headers:", arg.request.headers);
             next();
         });
 

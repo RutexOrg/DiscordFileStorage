@@ -19,11 +19,12 @@
 # DICloud
 File manager that allows you to upload and download files to and from Discord and manage them in various file managers via webdav protocol. 
 
-Yes, even ***above 10MB***. Currently tested about 750MB for a single file and 9 GB in multifile mode.
+Yes, even ***above 10MB***. Currently tested about 750MB for a single file and 15 GB in multifile mode.
 
 Supported functions: 
 - Manage files (Upload, Download, Delete, Rename, Move, Modify)
 - Manage folders (Create, Delete, Rename, Move)
+- HTTP UI (view, download + ZIP)
 
 # State and details
 Not even alpha. **Created for fun and ONLY for fun**. Dont use it as important storage, since it *active development, contains bugs, LOT of _bugs_ and im still making LOT of breaking changes*. Use it only for testing and playing around.
@@ -48,17 +49,17 @@ Create a bot with admin permissions and invite it to your server. If you already
 5. Enable ``MESSAGE CONTENT INTENT``. 
 6. Goto ``OAuth2/Url-Generator`` tab and select ``bot`` scope.
 7. Scroll down to ``Bot Permissions`` and select ``Administrator``.
-8. In the bottom you will find url.  Your url should look like this: ``https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot``.
+8. In the bottom you will find url.  Your url should look something like this: ``https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot``.
 Copy the link and visit it. Follow the instructions to invite the bot to your server.
 
 ## Setup
-1. Install [NodeJS (Tested on 16)](https://nodejs.org/en/) and [Yarn (Tested on 1.22.10)](https://yarnpkg.com/).
+1. Install NodeJS (Tested on v16, v22)
 2. Clone this repo.
-3. Navigate to the root of the project and run ``yarn install``.
+3. Navigate to the root of the project and run ``npm install``.
 4. Create a file named ``.env`` in the root of the project. There example file ``env.example``, so you can just copy it and rename to ```.env```. You should fill the file with your data (token, server id). Other settings are optional and documented in the file. \
 __If you dont have opportunity to use .env file, you can set environment variables instead, they should have the same names as in `.env.example` file.__
 
-5. To run the bot, run ``yarn boot``. This will compile the project and start the bot.
+5. To run the bot, run ``npm run boot``. This will compile the project and start the bot.
 
 ## SSL
 Warning! At the moment SSL support **is not complete**. You can use it, but you have to be aware of potential security issues, since TLS_REJECT_UNAUTHORIZED is set to 0 because of some temponary problems with requests. \
@@ -91,12 +92,14 @@ Then add your username and password to ``.env`` file. Set ``USERS`` to ``usernam
 # Last steps
 Once server started, the webdav server will be available on port 3000. 
 
-Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to http://localhost:3000/dav and use DICloud as a regular drive. 
+Windows explorer will support webdav out of the box. You can now [add windows network drive](https://www.maketecheasier.com/map-webdav-drive-windows10/) to http://localhost:3000/dav (\\localhost@3001\dav) and use DICloud as a regular drive.
 Or, just use any client you want.
+
+You can visit http://localhost:3000 in browser aswell, you will see simple http page.
 
 # Limitations
 
-Does not suitable for low memory devices. Uploading and downloading uing in-memory buffer, so it can consume memory.
+Does not suitable for low memory devices. Uploading and downloading using in-memory buffer, so it can consume memory.
 
 # Known issues
 

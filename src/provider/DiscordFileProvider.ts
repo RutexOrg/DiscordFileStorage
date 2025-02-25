@@ -26,6 +26,7 @@ export default class DiscordFileProvider extends BaseProvider {
     private async uploadChunkToDiscord(buf: MutableBuffer, chunkNumber: number, filesChannel: TextChannel, file: IFile) {
         Log.info(`[${file.name}] Uploading chunk ${chunkNumber}....`);
         const size = buf.size;
+
         const message = await filesChannel.send({
             files: [
                 this.getAttachmentBuilderFromBuffer(
@@ -60,36 +61,45 @@ export default class DiscordFileProvider extends BaseProvider {
         
         const channel = this.client.getFilesChannel();
         let chunkId = 1;
-        let chunkBuffer = new MutableBuffer();
+        let chunkBuffer = new MutableBuffer(MAX_CHUNK_SIZE);
         let totalFileSize = 0;
 
         const uploadStream = new Writable({
             write: async (chunk_: Buffer, encoding: BufferEncoding, callback) => {
-                for (const chunk of splitBufferBy(chunk_, MAX_CHUNK_SIZE)) {  // in case the chunk is too big
-                    if(chunkBuffer.size + chunk.length > MAX_CHUNK_SIZE) {
-                        const left = MAX_CHUNK_SIZE - chunkBuffer.size;
-                        const slice = chunk.slice(0, left);
-                        chunkBuffer.write(slice, encoding);
-                        await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
-                        chunkBuffer.destroy();
-                        chunkBuffer = new MutableBuffer();
-                        chunkBuffer.write(chunk.slice(left), encoding);
-                        chunkId++;
-                    } else {
-                        chunkBuffer.write(chunk);
+                try {
+                    for (const chunk of splitBufferBy(chunk_, MAX_CHUNK_SIZE)) {  // in case the chunk is too big
+                        if(chunkBuffer.size + chunk.length > MAX_CHUNK_SIZE) {
+                            const left = MAX_CHUNK_SIZE - chunkBuffer.size;
+                            const slice = chunk.subarray(0, left);
+                            chunkBuffer.write(slice, encoding);
+                            await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
+                            chunkBuffer.clear()
+                            chunkBuffer.write(chunk.subarray(left), encoding);
+                            chunkId++;
+                        } else {
+                            chunkBuffer.write(chunk);
+                        }
+                        totalFileSize += chunk.length;
                     }
-                    totalFileSize += chunk.length;
+                    callback();
+                } catch (error) {
+                    console.error(error);
+                    callback(error as Error);
                 }
-                callback();
             },
             final: async (callback) => {
-                Log.info("[DiscordProvider] final() Finalizing upload.");
-                if (chunkBuffer.size > 0) {
-                    await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
-                    chunkBuffer.destroy();
+                try {
+                    Log.info("[DiscordProvider] final() Finalizing upload.");
+                    if (chunkBuffer.size > 0) {
+                        await this.uploadChunkToDiscord(chunkBuffer, chunkId, channel, file);
+                        chunkBuffer.destroy();
+                    }
+                    file.size = totalFileSize;
+                    callback();
+                } catch (error) {
+                    console.error(error);
+                    callback(error as Error);
                 }
-                file.size = totalFileSize;
-                callback();
             }
         });
     
@@ -97,20 +107,24 @@ export default class DiscordFileProvider extends BaseProvider {
     }
 
     public async processDeletionQueue(): Promise<void> {
-        if (this.deletionQueue.length > 0) {
-            const info = this.deletionQueue.shift()!;
-            const channel = this.client.getDiscordClient().channels.cache.get(info.channel) as TextChannel;
+        if (this.deletionQueue.length == 0) {
+            return 
+        }
 
-            if (!channel) {
-                Log.error("Failed to find channel: " + info.channel);
-                return;
-            }
-            try {
-                await channel.messages.delete(info.message);
-            } catch (e) {
-                Log.error(e);
-                Log.error("Failed to delete message: " + info.message + " in channel: " + info.channel);
-            }
+        const info = this.deletionQueue.shift()!;
+        const channel = this.client.getDiscordClient().channels.cache.get(info.channel) as TextChannel;
+
+        if (!channel) {
+            Log.error("Failed to find channel: " + info.channel);
+            return;
+        }
+        
+        try {
+            await channel.messages.delete(info.message);
+            Log.info("Deleted message: " + info.message);
+        } catch (e) {
+            Log.error(e);
+            Log.error("Failed to delete message: " + info.message + " in channel: " + info.channel);
         }
     }
 

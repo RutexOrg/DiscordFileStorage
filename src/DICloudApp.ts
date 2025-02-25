@@ -9,7 +9,7 @@ import objectHash from "object-hash";
 import { printAndExit } from './helper/utils.js';
 import BaseProvider from './provider/BaseProvider.js';
 import WebdavServer from './webdav/WebdavServer.js';
-import { Readable, Writable } from 'stream';
+import { EventEmitter, Readable, Writable } from 'stream';
 import Log from './Log.js';
 
 export interface DICloudAppOptions extends ClientOptions {
@@ -26,7 +26,7 @@ export interface DICloudAppOptions extends ClientOptions {
 /**
  * Main class of the DICloud. Most functions are designed to work with webdav.
  */
-export default class DICloudApp {
+export default class DICloudApp extends EventEmitter {
     public static instance: DICloudApp;
 
     private guildId: string;
@@ -63,6 +63,8 @@ export default class DICloudApp {
 
 
     constructor(options: DICloudAppOptions, guildId: string) {
+        super();
+
         this.discordClient = new Client(options);
         if (DICloudApp.instance) {
             throw new Error("DICloud already running");
@@ -109,7 +111,7 @@ export default class DICloudApp {
         return this.filesChannel;
     }
 
-    public async waitForReady(): Promise<void> {
+    public async waitReady(): Promise<void> {
         return new Promise((resolve, reject) => {
             this.discordClient.once("ready", resolve as any);
         });
@@ -121,7 +123,7 @@ export default class DICloudApp {
 
     public async init() {
         Log.info("Initializing DICloud...");
-        await this.waitForReady();
+        await this.waitReady();
         Log.info("Client authenticated...")
         await this.preload();
         await this.loadFiles();
@@ -249,7 +251,7 @@ export default class DICloudApp {
 
     }
 
-    public saveFiles(saveToDriveOnly: boolean = false, driveSaveForce: boolean = false): Promise<void> {
+    public async saveFiles(saveToDriveOnly: boolean = false, driveSaveForce: boolean = false): Promise<void> {
         Log.info("Saving files...");
         return new Promise<void>((resolve, reject) => {
             if (this.saveToDisk || driveSaveForce) {
@@ -303,6 +305,7 @@ export default class DICloudApp {
         this.debounceTimeout = setTimeout(() => {
             this.debounceTimeout = undefined;
             this.saveFiles();
+            this.emit("saved");
         }, this.debounceTimeoutTime);
     }
 
