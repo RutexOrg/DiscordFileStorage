@@ -5,7 +5,6 @@ import client from "./helper/AxiosInstance.js";
 import { AxiosError } from "axios";
 import { IChunkInfo, IFile } from "./file/IFile.js";
 import { Readable, PassThrough } from "stream";
-// import { patchEmitter } from "./helper/EventPatcher.js";
 
 
 export default class HttpStreamPool {
@@ -65,6 +64,7 @@ export default class HttpStreamPool {
 
                 Log.info("Resolving attachment URL for message: " + this.chunks[this.currentUrlIndex].id);
                 const url = await resolver(this.chunks[this.currentUrlIndex].id);
+                Log.info("Resolved attachment URL: " + url);
 
                 const res = await client.get<Readable>(url, {
                     responseType: "stream",

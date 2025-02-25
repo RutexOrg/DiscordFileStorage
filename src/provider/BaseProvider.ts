@@ -114,7 +114,12 @@ export default abstract class BaseProvider {
                     try {
                         const encrypted = cipher.update(chunk);
                         if (encrypted.length) {
-                            stream.write(encrypted, callback);
+                            // Handle backpressure by checking if write is successful
+                            if (!stream.write(encrypted)) {
+                                stream.once('drain', callback);
+                            } else {
+                                callback();
+                            }
                         } else {
                             callback();
                         }

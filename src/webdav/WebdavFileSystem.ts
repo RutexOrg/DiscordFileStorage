@@ -234,7 +234,6 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
         
         writeStream.on("finish", () => {
             Log.info(".openWriteStream", "Stream finished: " + path.toString());
-            console.dir(file);
             this.fs.setFile(path, file);
             this.client.markForUpload();
         });

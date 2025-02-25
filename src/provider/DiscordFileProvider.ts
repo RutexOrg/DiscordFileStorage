@@ -25,7 +25,6 @@ export default class DiscordFileProvider extends BaseProvider {
 
     private async uploadChunkToDiscord(buf: MutableBuffer, chunkNumber: number, filesChannel: TextChannel, file: IFile) {
         Log.info(`[${file.name}] Uploading chunk ${chunkNumber}....`);
-        const size = buf.size;
 
         const message = await filesChannel.send({
             files: [
@@ -41,7 +40,7 @@ export default class DiscordFileProvider extends BaseProvider {
 
         file.chunks.push({
             id: message.id,
-            size,
+            size: buf.size,
         });
         Log.info(`[${file.name}] Chunk ${chunkNumber} added.`);
     }
@@ -101,9 +100,9 @@ export default class DiscordFileProvider extends BaseProvider {
                     callback(error as Error);
                 }
 
-                Log.info("["+ file.name+"] final() Finalized upload:");
-                console.dir(file);
-            }
+                Log.info("["+ file.name+"] final() Finalized upload");
+            },
+            highWaterMark: 64 * 1024
         });
     
         return uploadStream;

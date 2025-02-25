@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { env }from "custom-env";
+import { env } from "custom-env";
 env();
 
 import fs from "node:fs";
