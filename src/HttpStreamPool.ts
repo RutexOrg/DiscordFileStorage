@@ -34,7 +34,10 @@ export default class HttpStreamPool {
             return Readable.from([]);
         }
 
-        const stream = new PassThrough();
+        const stream = new PassThrough({
+            highWaterMark: 1024 * 1024 * 4, // 4MB
+        });
+
         const next = async () => {
             if (this.isCancelled) { // extra check against race conditions, since we are using async functions.
                 Log.info("[HttpStreamPool] Downloading cancelled: " + this.downloadingFileName);
