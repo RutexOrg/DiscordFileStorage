@@ -193,24 +193,7 @@ export default class DiscordWebdavFilesystemHandler extends v2.FileSystem {
     async _openWriteStream(path: v2.Path, ctx: v2.OpenWriteStreamInfo, callback: v2.ReturnCallback<Writable>): Promise<void> {
         const { targetSource, estimatedSize, mode } = ctx;
         Log.info(".openWriteStream", targetSource, estimatedSize, mode);
-
-        if (mode === "mustCreate") {
-            const stat = this.fs.statSync(path.toString());
-
-            console.log("[DEBUG, " + path.toString() + "] Must create file.");
-            console.log("[DEBUG, " + path.toString() + "] File exists: " + stat.isFile());
-            console.log("[DEBUG, " + path.toString() + "] Directory exists: " + stat.isDirectory());
-
-            if(!stat.isFile()){
-                this.createFile(path, estimatedSize);
-                this.client.markForUpload();
-            } else {
-                console.error("[DEBUG] File already exists: " + path.toString());
-                return callback(undefined, this.getDummyWriteStream());
-            }
-   
-        }
-
+        
         const stat = this.fs.statSync(path.toString());
 
         if (!stat.isFile()) {
