@@ -1,7 +1,43 @@
 {
   "name": "dicloud",
   "version": "2.2.0",
-  "main": "out/boot.js",
+  "description": "Use Discord as cloud storage backend - WebDAV server with file management, encryption, and programmatic API",
+  "main": "out/index.js",
+  "types": "out/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./out/index.d.ts",
+      "require": "./out/index.js",
+      "import": "./out/index.js"
+    }
+  },
+  "files": [
+    "out/**/*.js",
+    "out/**/*.d.ts",
+    "out/**/*.d.ts.map",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "discord",
+    "storage",
+    "webdav",
+    "cloud",
+    "file-storage",
+    "discord-bot",
+    "file-manager",
+    "encryption",
+    "discord.js"
+  ],
+  "author": "DICloud Contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/DiscordFileStorage.git"
+  },
+  "homepage": "https://github.com/your-username/DiscordFileStorage#readme",
+  "bugs": {
+    "url": "https://github.com/your-username/DiscordFileStorage/issues"
+  },
   "license": "MIT",
   "dependencies": {
     "@noble/ciphers": "^1.0.0",
@@ -20,13 +56,14 @@
   },
   "engines": {
     "node": ">=16",
-    "yarn": ">=1.22.0"
+    "bun": ">=1.0.0"
   },
   "scripts": {
     "start": "node --no-warnings out/bootloader.js",
     "boot": "tsc && node --no-warnings out/bootloader.js",
     "build": "tsc",
-    "test": "yarn build && node --no-warnings out/tests/raw.spec.js",
+    "test": "bun run build && node --no-warnings out/tests/raw.spec.js",
+    "test:bun": "bun build && bun out/tests/raw.spec.js",
     "del": "del /s /q out"
   },
   "devDependencies": {

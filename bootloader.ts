@@ -20,28 +20,51 @@ process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0 as any;
 // Idk how to fix it now, so let it be just disabled.
 
 
+/**
+ * User record for WebDAV authentication
+ */
 export interface IUserRecord {
     username: string;
     password: string;
 }
 
+/**
+ * Configuration parameters for booting DICloud
+ */
 export interface IBootParams {
+    /** Discord bot token */
     token: string;
+    /** Discord guild (server) ID */
     guildId: string;
+    /** Name of the channel for storing file chunks */
     filesChannelName: string;
+    /** Name of the channel for storing metadata */
     metaChannelName: string;
+    /** Port for the WebDAV server */
     webdavPort: number;
+    /** Whether to start the WebDAV server */
     startWebdavServer: boolean;
+    /** Whether to enable HTTPS for WebDAV server */
     enableHttps: boolean;
+    /** Whether to enable basic auth for WebDAV server */
     enableAuth: boolean;
+    /** Comma-separated list of users in format "user1:pass1,user2:pass2" */
     users: string;
+    /** Whether to enable AES-256-GCM encryption for files */
     enableEncrypt: boolean;
+    /** Password for file encryption (1-32 characters) */
     encryptPassword: string;
+    /** Debounce timeout for saving metadata (in milliseconds) */
     saveTimeout: number;
+    /** Whether to save metadata backup to disk */
     saveToDisk: boolean;
 }
 
+/**
+ * Boot parameters with parsed users array
+ */
 export interface IBootParamsParsed extends IBootParams {
+    /** Parsed array of user records */
     usersParsed: IUserRecord[];
 }
 
@@ -94,32 +117,15 @@ function bootPrecheck(params: IBootParams): IBootParamsParsed {
 }
 
 
-export async function boot(data: IBootParams): Promise<DICloudApp> {
-    console.log(`NodeJS version: ${process.version}`);
-    console.log("Starting DICloud...");
-    const params = bootPrecheck(data);
-    const app = new DICloudApp({
-        intents: [
-            GatewayIntentBits.MessageContent,
-        ],
-        filesChannelName: params.filesChannelName,
-        metaChannelName: params.metaChannelName,
+/**
+ * Start the WebDAV server for the DICloud app
+ * @param app - DICloud app instance
+ * @param params - Boot parameters
+ */
+export async function startWebdavServer(app: DICloudApp, params: IBootParamsParsed): Promise<void> {
+    const web = express();
 
-        shouldEncrypt: params.enableEncrypt,
-        encryptPassword: params.encryptPassword,
-
-        saveTimeout: params.saveTimeout,
-        saveToDisk: params.saveToDisk,
-    }, params.guildId);
-
-    Log.info("Logging in...");
-    await app.login(params.token);
-    await app.init();
-
-    if (params.startWebdavServer) {
-        const web = express();
-
-        const serverLaunchOptions: ServerOptions = {
+    const serverLaunchOptions: ServerOptions = {
             port: params.webdavPort,
             rootFileSystem: new DiscordWebdavFilesystemHandler(app),
         }
@@ -350,14 +356,147 @@ export async function boot(data: IBootParams): Promise<DICloudApp> {
             next();
         });
 
-        app.setWebdavServer(webdavServer);
-        Log.info("Looks like everything is ready.");
-
-    }
-
-    return app
+    app.setWebdavServer(webdavServer);
+    Log.info("Looks like everything is ready.");
 }
 
+/**
+ * Boot the DICloud app with full server initialization (Discord bot + WebDAV server).
+ * This is the traditional server mode.
+ * @param data - Boot parameters
+ * @returns DICloud app instance with servers running
+ */
+export async function boot(data: IBootParams): Promise<DICloudApp> {
+    console.log(`NodeJS version: ${process.version}`);
+    console.log("Starting DICloud...");
+    const params = bootPrecheck(data);
+    const app = new DICloudApp({
+        intents: [
+            GatewayIntentBits.MessageContent,
+        ],
+        filesChannelName: params.filesChannelName,
+        metaChannelName: params.metaChannelName,
+
+        shouldEncrypt: params.enableEncrypt,
+        encryptPassword: params.encryptPassword,
+
+        saveTimeout: params.saveTimeout,
+        saveToDisk: params.saveToDisk,
+    }, params.guildId);
+
+    Log.info("Logging in...");
+    await app.login(params.token);
+    await app.init();
+
+    if (params.startWebdavServer) {
+        await startWebdavServer(app, params);
+    }
+
+    return app;
+}
+
+/**
+ * Create a DICloud client for library usage without starting servers.
+ * This allows programmatic access to Discord file storage.
+ * 
+ * @example
+ * ```typescript
+ * import { createClient } from 'dicloud';
+ * 
+ * const client = await createClient({
+ *   token: 'YOUR_DISCORD_BOT_TOKEN',
+ *   guildId: 'YOUR_GUILD_ID',
+ *   filesChannelName: 'files', // optional, defaults to 'files'
+ *   metaChannelName: 'meta',   // optional, defaults to 'meta'
+ * });
+ * 
+ * // Upload a file
+ * const file = await client.uploadFile(Buffer.from('Hello!'), 'hello.txt');
+ * 
+ * // Download a file
+ * const data = await client.downloadFile(file);
+ * 
+ * // Get filesystem
+ * const fs = client.getFs();
+ * 
+ * // Shutdown when done
+ * await client.shutdown();
+ * ```
+ * 
+ * @param config - Client configuration
+ * @param config.token - Discord bot token
+ * @param config.guildId - Discord guild (server) ID
+ * @param config.filesChannelName - Channel name for file chunks (default: "files")
+ * @param config.metaChannelName - Channel name for metadata (default: "meta")
+ * @param config.enableEncrypt - Enable AES-256-GCM encryption (default: false)
+ * @param config.encryptPassword - Encryption password if encryption is enabled
+ * @param config.saveTimeout - Debounce timeout for saves in ms (default: 2000)
+ * @param config.saveToDisk - Save metadata backup to disk (default: false)
+ * @returns DICloud app instance (servers not started)
+ */
+export async function createClient(config: {
+    token: string;
+    guildId: string;
+    filesChannelName?: string;
+    metaChannelName?: string;
+    enableEncrypt?: boolean;
+    encryptPassword?: string;
+    saveTimeout?: number;
+    saveToDisk?: boolean;
+}): Promise<DICloudApp> {
+    const app = new DICloudApp({
+        intents: [
+            GatewayIntentBits.MessageContent,
+        ],
+        filesChannelName: config.filesChannelName || "files",
+        metaChannelName: config.metaChannelName || "meta",
+
+        shouldEncrypt: config.enableEncrypt || false,
+        encryptPassword: config.encryptPassword || "",
+
+        saveTimeout: config.saveTimeout || 2000,
+        saveToDisk: config.saveToDisk || false,
+    }, config.guildId);
+
+    await app.login(config.token);
+    await app.init();
+
+    return app;
+}
+
+/**
+ * Boot the DICloud app from environment variables (.env file).
+ * This is a convenience function that reads configuration from environment variables
+ * and starts both the Discord bot and WebDAV server.
+ * 
+ * Required environment variables:
+ * - TOKEN: Discord bot token
+ * - GUILD_ID: Discord guild (server) ID
+ * 
+ * Optional environment variables:
+ * - FILES_CHANNEL: Channel name for files (default: "files")
+ * - META_CHANNEL: Channel name for metadata (default: "meta")
+ * - PORT: WebDAV server port (default: 3000)
+ * - ENABLE_HTTPS: Enable HTTPS (default: false)
+ * - AUTH: Enable authentication (default: false)
+ * - USERS: Users in format "user1:pass1,user2:pass2"
+ * - ENCRYPT: Enable encryption (default: false)
+ * - ENCRYPT_PASS: Encryption password
+ * - SAVE_TIMEOUT: Save debounce timeout in ms (default: 2000)
+ * - SAVE_TO_DISK: Save to disk backup (default: false)
+ * 
+ * @example
+ * ```typescript
+ * // .env file:
+ * // TOKEN=your_bot_token
+ * // GUILD_ID=your_guild_id
+ * 
+ * import { envBoot } from 'dicloud';
+ * const app = await envBoot();
+ * ```
+ * 
+ * @returns DICloud app instance with servers running
+ */
 export async function envBoot() {
     const token = getEnv("TOKEN", "Please set the TOKEN to your bot token");
     const guildId = getEnv("GUILD_ID", "Please set the GUILD_ID to your guild id");

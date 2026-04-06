@@ -12,19 +12,61 @@ import WebdavServer from './webdav/WebdavServer.js';
 import { Readable, Writable } from 'stream';
 import Log from './Log.js';
 
+/**
+ * Options for initializing DICloudApp
+ */
 export interface DICloudAppOptions extends ClientOptions {
+    /** Name of the channel for storing metadata */
     metaChannelName: string;
+    /** Name of the channel for storing file chunks */
     filesChannelName: string;
 
+    /** Whether to encrypt files with AES-256-GCM */
     shouldEncrypt: boolean;
+    /** Password for file encryption */
     encryptPassword?: string;
 
+    /** Debounce timeout for saving metadata changes (in milliseconds) */
     saveTimeout: number;
+    /** Whether to save metadata backup to OS temp directory */
     saveToDisk: boolean;
 }
 
 /**
- * Main class of the DICloud. Most functions are designed to work with webdav.
+ * Main DICloud application class.
+ * 
+ * Manages Discord file storage with features including:
+ * - File upload/download with chunking support
+ * - Optional AES-256-GCM encryption
+ * - Virtual filesystem with VolumeEx
+ * - WebDAV server integration
+ * - Automatic metadata persistence
+ * 
+ * @example
+ * ```typescript
+ * // Create instance
+ * const app = new DICloudApp({
+ *   intents: [GatewayIntentBits.MessageContent],
+ *   metaChannelName: 'meta',
+ *   filesChannelName: 'files',
+ *   shouldEncrypt: false,
+ *   saveTimeout: 2000,
+ *   saveToDisk: false,
+ * }, 'GUILD_ID');
+ * 
+ * // Initialize
+ * await app.login('BOT_TOKEN');
+ * await app.init();
+ * 
+ * // Use the filesystem
+ * const fs = app.getFs();
+ * 
+ * // Upload a file
+ * const file = await app.uploadFile(Buffer.from('data'), 'file.txt');
+ * 
+ * // Shutdown gracefully
+ * await app.shutdown();
+ * ```
  */
 export default class DICloudApp {
     public static instance: DICloudApp;
@@ -314,10 +356,18 @@ export default class DICloudApp {
         await this.provider.processDeletionQueue();
     }
 
+    /**
+     * Get the file provider instance
+     * @returns BaseProvider instance (typically DiscordFileProvider)
+     */
     public getProvider(): BaseProvider {
         return this.provider;
     }
 
+    /**
+     * Get the virtual filesystem instance
+     * @returns VolumeEx filesystem instance
+     */
     public getFs() {
         return this.fs;
     }
@@ -330,27 +380,87 @@ export default class DICloudApp {
         return this.webdavServer;
     }
 
+    /**
+     * Get the Discord.js client instance
+     * @returns Discord.js Client
+     */
     public getDiscordClient() {
         return this.discordClient;
     }
 
+    /**
+     * Create a writable stream for uploading a file.
+     * Useful for streaming large files without loading them entirely into memory.
+     * 
+     * @example
+     * ```typescript
+     * const file = await client.uploadFile(Buffer.alloc(0), 'large-file.bin');
+     * const writeStream = await client.createWriteStream(file);
+     * 
+     * // Pipe from a file
+     * fs.createReadStream('local-file.bin').pipe(writeStream);
+     * 
+     * // Or write chunks manually
+     * writeStream.write(chunk1);
+     * writeStream.write(chunk2);
+     * writeStream.end();
+     * ```
+     * 
+     * @param file - File metadata object
+     * @returns Writable stream for uploading file data
+     */
     public createWriteStream(file: IFile): Promise<Writable> {
         return this.provider.createRawWriteStream(file);
     }
 
+    /**
+     * Create a readable stream for downloading a file.
+     * Useful for streaming large files without loading them entirely into memory.
+     * 
+     * @example
+     * ```typescript
+     * const readStream = await client.createReadStream(file);
+     * 
+     * // Pipe to a file
+     * readStream.pipe(fs.createWriteStream('output.bin'));
+     * 
+     * // Or read chunks manually
+     * readStream.on('data', (chunk) => console.log('Got chunk:', chunk.length));
+     * readStream.on('end', () => console.log('Download complete'));
+     * ```
+     * 
+     * @param file - File metadata object
+     * @returns Readable stream for downloading file data
+     */
     public createReadStream(file: IFile): Promise<Readable> {
         return this.provider.createReadStream(file);
     }
 
 
+    /**
+     * Upload a file to Discord storage
+     * @param Buffer - File data as Buffer
+     * @param name - File name
+     * @returns File metadata object
+     */
     public async uploadFile(Buffer: Buffer, name: string): Promise<IFile> {
         return this.provider.uploadFile(Buffer, name);
     }
 
+    /**
+     * Download a file from Discord storage
+     * @param file - File metadata object
+     * @returns File data as Buffer
+     */
     public async downloadFile(file: IFile): Promise<Buffer> {
         return this.provider.downloadFile(file);
     }
 
+    /**
+     * Shutdown the DICloud app gracefully.
+     * Saves metadata, stops servers, and disconnects from Discord.
+     * @param saveToDfive - Force save metadata backup to disk
+     */
     public async shutdown(saveToDfive: boolean = false): Promise<void> {
         if (this.webdavServer){
             await this.webdavServer.stopAsync();
